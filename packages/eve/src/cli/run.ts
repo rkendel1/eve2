@@ -276,6 +276,13 @@ export function createCliProgram(
         }),
       );
 
+      const { checkBuiltSandboxReadiness } = await import("#cli/sandbox-readiness.js");
+      for (const line of await checkBuiltSandboxReadiness(applicationContext.root)) {
+        logger.log(
+          renderCliTaggedLine(theme, { message: line.message, tag: "start", tone: line.tone }),
+        );
+      }
+
       if (options.schedules === false || areSchedulesDisabled()) {
         logger.log(
           renderCliTaggedLine(theme, {

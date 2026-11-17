@@ -265,8 +265,12 @@ jobs:
           path: ${{ runner.temp }}/pnpm-cache/lockfile-verified.jsonl
           key: ${{ steps.verdict-cache.outputs.cache-primary-key }}
 
+      # Optional: with this secret, the self-hosted acceptance scenario also runs a
+      # real Anthropic turn and restart. Without it, that one test is skipped.
       - name: Run scenario tests
         run: pnpm test:scenario
+        env:
+          EVE_ACCEPTANCE_ANTHROPIC_API_KEY: ${{ secrets.EVE_ACCEPTANCE_ANTHROPIC_API_KEY }}
 
   # The desktop job installs apt packages and pulls agent-desktop from npm, so it
   # runs only when its package changes. It skips at the job level instead of

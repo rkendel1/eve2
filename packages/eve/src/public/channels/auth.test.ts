@@ -1,5 +1,5 @@
 import { exportSPKI, generateKeyPair, SignJWT } from "jose";
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 vi.mock("node:os", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:os")>()),
@@ -812,33 +812,35 @@ describe("routeAuth", () => {
 });
 
 describe("placeholderAuth", () => {
-  const originalVercelEnv = process.env.VERCEL_ENV;
+  const MESSAGE =
+    "Production auth is not configured. Replace placeholderAuth() in agent/channels/eve.ts with your app's auth provider, such as jwtHmac(), httpBasic(), oidc(), or vercelOidc().";
+
+  beforeEach(() => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("EVE_DEV", undefined);
+  });
 
   afterEach(() => {
-    if (originalVercelEnv === undefined) {
-      delete process.env.VERCEL_ENV;
-    } else {
-      process.env.VERCEL_ENV = originalVercelEnv;
-    }
+    vi.unstubAllEnvs();
   });
 
-  it("skips the auth walk outside production", async () => {
-    process.env.VERCEL_ENV = "preview";
+  it.each([
+    ["a Vercel preview deployment", { VERCEL_ENV: "preview" }],
+    ["a Vercel development deployment", { VERCEL_ENV: "development" }],
+    ["eve dev", { EVE_DEV: "1" }],
+  ])("skips the auth walk on %s", async (_name, env) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
 
-    const result = await placeholderAuth()(new Request(TEST_ROUTE_URL));
-
-    expect(result).toBeNull();
+    expect(placeholderAuth()(new Request(TEST_ROUTE_URL))).toBeNull();
   });
 
-  it("throws a structured auth rejection in production", async () => {
-    process.env.VERCEL_ENV = "production";
+  it.each([
+    ["a Vercel production deployment", { VERCEL_ENV: "production" }],
+    ["a self-hosted server", {}],
+  ])("routes %s as a structured 401", async (_name, env) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
 
     expect(() => placeholderAuth()(new Request(TEST_ROUTE_URL))).toThrow(UnauthenticatedError);
-  });
-
-  it("routes the production placeholder as a structured 401", async () => {
-    process.env.VERCEL_ENV = "production";
-
     const result = await routeAuth(new Request(TEST_ROUTE_URL), placeholderAuth());
 
     expect(result).toBeInstanceOf(Response);
@@ -847,9 +849,34 @@ describe("placeholderAuth", () => {
       expect(result.headers.get("cache-control")).toBe("no-store");
       await expect(result.json()).resolves.toEqual({
         code: "eve_production_auth_not_configured",
-        error:
-          "Production auth is not configured. Replace placeholderAuth() in agent/channels/eve.ts with your app's auth provider.",
+        error: MESSAGE,
         ok: false,
+      });
+    }
+  });
+});
+
+describe("placeholderAuth in the default policy", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps the Bearer challenge when the default policy reaches placeholderAuth", async () => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("EVE_DEV", undefined);
+
+    const result = await routeAuth(new Request(TEST_ROUTE_URL), [
+      vercelOidc(),
+      localDev(),
+      placeholderAuth(),
+    ]);
+
+    expect(result).toBeInstanceOf(Response);
+    if (result instanceof Response) {
+      expect(result.status).toBe(401);
+      expect(result.headers.get("www-authenticate")).toBe("Bearer");
+      await expect(result.json()).resolves.toMatchObject({
+        code: "eve_production_auth_not_configured",
       });
     }
   });

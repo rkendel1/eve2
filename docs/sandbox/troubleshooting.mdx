@@ -86,7 +86,7 @@ The sandbox file selected different providers at build time and at runtime, beca
 DefaultSandbox has no sandbox provider for this build: it did not run on Vercel, no Docker daemon was reachable, and production builds do not fall back to just-bash.
 ```
 
-The production `eve build` ran outside Vercel without a reachable Docker daemon, so `DefaultSandbox` recorded no provider. A `RUN eve build` step in a Dockerfile usually has no Docker daemon, even when the running container later mounts `/var/run/docker.sock`. Start Docker and run `eve build` again, deploy to Vercel, or select a provider explicitly, for example `DockerSandbox.environment()` from `eve/sandbox/docker`. See [How eve selects the provider](/docs/sandbox/default#how-eve-selects-the-provider).
+The production `eve build` ran outside Vercel without a reachable Docker daemon, so `DefaultSandbox` recorded no provider. A `RUN eve build` step in a Dockerfile usually has no Docker daemon, even when the running container later mounts `/var/run/docker.sock`. Run `eve build` where the server's Docker daemon is reachable, deploy to Vercel, or select a provider that doesn't need a local daemon. See [Build inside a container image](/docs/guides/deployment/self-hosting#build-inside-a-container-image). See [How eve selects the provider](/docs/sandbox/default#how-eve-selects-the-provider).
 
 ### `Sandbox template ... is not available to this runtime`
 

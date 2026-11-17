@@ -698,6 +698,11 @@ export async function runInitCommand(
   }
 
   if (!startDevelopment) {
+    logger.log(
+      initAgentReadySummary(options.model, result.projectPath, {
+        workspace: options.agents !== undefined,
+      }),
+    );
     logger.log(agentHandoff);
     return;
   }

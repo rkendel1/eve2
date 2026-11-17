@@ -89,10 +89,31 @@ The document lives in a backend, not in the agent's sandbox filesystem. Omit
 | Vercel with Blob credentials (token, or attached store with OIDC) | Private Vercel Blob                                                          |
 | Vercel without Blob configuration                                 | Error recommending `/add memory/file` or `eve integration setup file-memory` |
 | `eve dev`                                                         | Shared process-local in-memory storage                                       |
-| Every other environment                                           | Error asking you for an explicit backend                                     |
+| Every other environment, including `eve start`                    | Error asking you for an explicit backend                                     |
 
 `NODE_ENV=development` alone does not select in-memory storage. A Blob token
 outside Vercel does not select Blob.
+
+### Local files
+
+On a self-hosted server that runs one `eve start` process, store the document on
+local disk:
+
+```ts
+import { fileMemory, localFiles } from "eve/memory/file";
+
+provider: fileMemory({ backend: localFiles() });
+```
+
+`localFiles()` writes one file per scope under `.eve/memory`, relative to the
+server's working directory. Pass `localFiles({ directory })` to choose another
+path. Mount the directory on persistent storage and back it up with the
+[Workflow world data](/docs/guides/deployment/self-hosted-operations#manage-run-data).
+
+Each write replaces the file atomically, and a write based on an older version
+fails with `MemoryDocumentConflictError`. That check holds within one process
+only. With several replicas, or two processes on one directory, use a shared
+backend such as Vercel Blob or a [custom backend](#custom-backend).
 
 ### In-memory
 
@@ -196,7 +217,7 @@ expose the same signal as `ctx.abortSignal`.
 | What you see                                                            | What to do                                                                                                                      |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `fileMemory() requires Vercel Blob storage.`                            | Run `eve integration setup file-memory`, then redeploy. Or pass `fileMemory({ backend })`.                                      |
-| `fileMemory() requires an explicit backend outside Vercel and eve dev.` | Pass `fileMemory({ backend })`, because only Vercel and `eve dev` have a default backend.                                       |
+| `fileMemory() requires an explicit backend outside Vercel and eve dev.` | On one self-hosted server, pass `fileMemory({ backend: localFiles() })`. With replicas, pass a shared backend.                  |
 | `Memory would exceed the configured 4,000-character limit.`             | Have the model remove outdated entries, or raise `maxCharacters`.                                                               |
 | Setup reports that a store has an incompatible eve file-memory prefix   | Reconnect the store in Vercel with the `EVE_MEMORY_BLOB` prefix and OIDC, then redeploy. Keeping the store keeps its documents. |
 

@@ -1,9 +1,34 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect } from "vitest";
 
 const EVE_BIN_PATH = fileURLToPath(new URL("../../bin/eve.js", import.meta.url));
+
+export function isVercelEnvName(name: string): boolean {
+  return /^VERCEL/u.test(name) || name === "AI_GATEWAY_API_KEY";
+}
+
+export function withoutVercelEnv(
+  extra: Record<string, string | undefined> = {},
+): NodeJS.ProcessEnv {
+  const env: Record<string, string | undefined> = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (isVercelEnvName(name) || /_API_KEY$/u.test(name) || name.startsWith("EVE_ACCEPTANCE_")) {
+      continue;
+    }
+    env[name] = value;
+  }
+  return {
+    ...env,
+    PATH: [dirname(process.execPath), "/usr/local/bin", "/usr/bin", "/bin"].join(":"),
+    NODE_ENV: "production" as const,
+    EVE_MOCK_AUTHORED_MODELS: "",
+    EVE_TELEMETRY_DISABLED: "1",
+    ...extra,
+  };
+}
 
 export interface RunningEveStart {
   readonly url: string;
@@ -13,13 +38,17 @@ export interface RunningEveStart {
   stop(): Promise<void>;
 }
 
-export async function startPackagedEveStart(appRoot: string): Promise<RunningEveStart> {
+export async function startPackagedEveStart(
+  appRoot: string,
+  options: { readonly env?: NodeJS.ProcessEnv } = {},
+): Promise<RunningEveStart> {
   const child = spawn(
     process.execPath,
     [EVE_BIN_PATH, "start", "--host", "127.0.0.1", "--port", "0"],
     {
       cwd: appRoot,
       detached: true,
+      env: options.env ?? process.env,
       stdio: ["ignore", "pipe", "pipe"],
     },
   );

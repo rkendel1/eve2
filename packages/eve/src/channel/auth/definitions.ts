@@ -5,6 +5,7 @@ import type { SessionAuthContext } from "#channel/types.js";
 import {
   isEveDevEnvironment,
   isLocalDevelopmentServer,
+  resolveInstrumentationEnvironment,
 } from "#internal/application/dev-environment.js";
 import {
   isLocalMachineAddress,
@@ -714,19 +715,22 @@ function addInvalidBearerTokenError(
  * eveChannel({ auth: [vercelOidc(), localDev(), placeholderAuth()] });
  * ```
  *
- * Outside production it returns `null`, so the auth walk keeps the same local
- * development behavior as any other skipped entry.
+ * It rejects on Vercel production deployments and on self-hosted servers such
+ * as `eve start`. Under `eve dev` and on Vercel preview or development
+ * deployments it returns `null`, so the auth walk continues as for any other
+ * skipped entry.
  */
 export function placeholderAuth(): AuthFn<Request> {
   return () => {
-    if (process.env.VERCEL_ENV !== "production") {
+    if (resolveInstrumentationEnvironment() !== "production") {
       return null;
     }
 
     throw new UnauthenticatedError({
+      challenges: [{ scheme: "Bearer" }],
       code: "eve_production_auth_not_configured",
       message:
-        "Production auth is not configured. Replace placeholderAuth() in agent/channels/eve.ts with your app's auth provider.",
+        "Production auth is not configured. Replace placeholderAuth() in agent/channels/eve.ts with your app's auth provider, such as jwtHmac(), httpBasic(), oidc(), or vercelOidc().",
     });
   };
 }
