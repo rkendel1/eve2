@@ -7,6 +7,7 @@ import {
   createCompiledRuntimeModelCatalogLoader,
   resolveCompiledRuntimeModelCatalogCachePath,
 } from "#compiler/model-catalog.js";
+import { MODEL_CATALOG_SNAPSHOT } from "#compiler/model-catalog-snapshot.js";
 import {
   catalogModelProviderSchema,
   catalogModelSchema,
@@ -189,6 +190,7 @@ describe("modelCatalogResponseSchema", () => {
 describe("createCompiledRuntimeModelCatalogLoader", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("resolves model limits by slug", async () => {
@@ -306,20 +308,49 @@ describe("createCompiledRuntimeModelCatalogLoader", () => {
     });
   });
 
-  it("ships an empty snapshot when the catalog is unavailable", async () => {
+  it("falls back to eve's bundled metadata when the catalog is unavailable", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     const loader = createCompiledRuntimeModelCatalogLoader(unusedAppRoot());
 
-    await expect(loader.loadModelMetadata()).resolves.toMatchObject({
-      fetchedAt: null,
-      models: [],
-    });
+    const metadata = await loader.loadModelMetadata();
+
+    expect(metadata.fetchedAt).toBe(MODEL_CATALOG_SNAPSHOT.fetchedAt);
+    expect(metadata.models.length).toBeGreaterThan(100);
+    expect(loader.usedBundledFallback()).toBe(true);
   });
 
-  it("preserves the fetch error for an unknown model", async () => {
+  it("resolves a direct provider model from bundled metadata offline", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     const loader = createCompiledRuntimeModelCatalogLoader(unusedAppRoot());
-    await expect(loader.getModelLimits("unknown/model")).rejects.toThrow("offline");
+
+    await expect(
+      loader.getByProviderModelId("anthropic.messages", "claude-sonnet-5"),
+    ).resolves.toEqual({
+      contextWindowTokens: 1_000_000,
+      slug: "anthropic/claude-sonnet-5",
+    });
+    await expect(loader.getModelLimits("unknown/model")).resolves.toBeNull();
+  });
+
+  it("uses only bundled metadata with EVE_MODEL_CATALOG=bundled", async () => {
+    vi.stubEnv("EVE_MODEL_CATALOG", "bundled");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const loader = createCompiledRuntimeModelCatalogLoader(unusedAppRoot());
+
+    await expect(loader.getModelLimits("anthropic/claude-sonnet-5")).resolves.toMatchObject({
+      contextWindowTokens: 1_000_000,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(loader.usedBundledFallback()).toBe(false);
+  });
+
+  it("rejects an unknown EVE_MODEL_CATALOG value", async () => {
+    vi.stubEnv("EVE_MODEL_CATALOG", "vercel");
+    const loader = createCompiledRuntimeModelCatalogLoader(unusedAppRoot());
+
+    await expect(loader.getModelLimits("anthropic/claude-sonnet-5")).rejects.toThrow(
+      'EVE_MODEL_CATALOG must be "remote" or "bundled"',
+    );
   });
 
   it("returns cache path under .eve/cache", () => {

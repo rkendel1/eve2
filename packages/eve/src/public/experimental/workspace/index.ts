@@ -3,3 +3,4 @@ export {
   type WorkspaceAgentDefinition,
   type WorkspaceAgentTransport,
 } from "#public/definitions/workspace-agent.js";
+export { workspacePeers } from "#channel/auth/definitions.js";

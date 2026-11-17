@@ -6,6 +6,12 @@ import {
   type RemoteAgentUrl,
 } from "#public/definitions/remote-agent.js";
 import { normalizePublicRoutePrefix } from "#shared/public-route-prefix.js";
+import {
+  mintWorkspacePeerToken,
+  readWorkspacePeers,
+  readWorkspaceSecret,
+  WORKSPACE_AGENT_ENV,
+} from "#internal/workspace/peer-auth.js";
 import type { AgentToolExposure } from "#shared/agent-definition.js";
 
 const WORKSPACE_AGENT_NAME = Symbol.for("eve.workspace-agent.name");
@@ -74,11 +80,11 @@ function defaultWorkspaceAgentTransport(name: string): WorkspaceAgentTransport {
   const auth = vercelOidc();
   return {
     auth: async () => {
-      requireVercelWorkspaceEnvironment();
+      if (!process.env.VERCEL) return { headers: selfHostedWorkspacePeerHeaders(name) };
       return process.env.VERCEL_ENV === "development" ? { headers: {} } : auth();
     },
     url: () => {
-      requireVercelWorkspaceEnvironment();
+      if (!process.env.VERCEL) return selfHostedWorkspacePeerOrigin(name);
       const development = process.env.VERCEL_ENV === "development";
       const host =
         process.env.VERCEL_ENV === "production"
@@ -94,9 +100,31 @@ function defaultWorkspaceAgentTransport(name: string): WorkspaceAgentTransport {
   };
 }
 
-function requireVercelWorkspaceEnvironment(): void {
-  if (process.env.VERCEL) return;
-  throw new Error(
-    "No default workspace-agent transport is available in this environment. Provide transport to defineWorkspaceAgent().",
-  );
+function selfHostedWorkspacePeerOrigin(name: string): string {
+  const peers = readWorkspacePeers();
+  if (peers === undefined) {
+    throw new Error(
+      "No default workspace-agent transport is available in this environment. Run the workspace with `eve start` from its root, deploy it to Vercel, or provide transport to defineWorkspaceAgent().",
+    );
+  }
+  const origin = peers[name];
+  if (origin === undefined) {
+    throw new Error(
+      `Workspace agent "${name}" is not running in this workspace. Running agents: ${Object.keys(peers).join(", ")}.`,
+    );
+  }
+  return origin;
+}
+
+function selfHostedWorkspacePeerHeaders(name: string): Record<string, string> {
+  const secret = readWorkspaceSecret();
+  const caller = process.env[WORKSPACE_AGENT_ENV];
+  if (secret === undefined || caller === undefined || caller.length === 0) {
+    throw new Error(
+      "The self-hosted workspace-agent transport requires the agent to run under `eve start` from the workspace root.",
+    );
+  }
+  return {
+    authorization: `Bearer ${mintWorkspacePeerToken({ callee: name, caller, secret })}`,
+  };
 }

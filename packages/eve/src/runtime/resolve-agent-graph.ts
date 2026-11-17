@@ -30,6 +30,7 @@ import type { AgentToolExposure } from "#shared/agent-definition.js";
 interface ResolveRuntimeAgentGraphInput {
   manifest: CompiledAgentManifest;
   moduleMap: CompiledModuleMap;
+  resolveRemoteAgentUrls?: boolean;
 }
 
 class ResolveRuntimeAgentGraphError extends Error {
@@ -77,6 +78,7 @@ export async function resolveRuntimeAgentGraph(
     moduleMap: input.moduleMap,
     nodeId: ROOT_COMPILED_AGENT_NODE_ID,
     nodesByNodeId,
+    resolveRemoteAgentUrls: input.resolveRemoteAgentUrls,
     subagentNodesById,
   });
   attachInheritedSandboxWorkspaceResources({
@@ -97,6 +99,7 @@ interface ResolveRuntimeAgentNodeInput {
   readonly moduleMap: CompiledModuleMap;
   readonly nodeId: string;
   readonly nodesByNodeId: Map<string, ResolvedAgentGraphBundle["root"]>;
+  readonly resolveRemoteAgentUrls?: boolean;
   readonly sourceId?: string;
   readonly subagentNodesById: ReadonlyMap<string, CompiledSubagentNode>;
 }
@@ -139,6 +142,7 @@ async function resolveRuntimeAgentNode(
       moduleMap: input.moduleMap,
       nodesByNodeId: input.nodesByNodeId,
       parentNodeId: input.nodeId,
+      resolveRemoteAgentUrls: input.resolveRemoteAgentUrls,
       subagentNodesById: input.subagentNodesById,
     }),
   });
@@ -169,6 +173,7 @@ async function resolveRuntimeSubagents(input: {
   readonly moduleMap: CompiledModuleMap;
   readonly nodesByNodeId: Map<string, ResolvedAgentGraphBundle["root"]>;
   readonly parentNodeId: string;
+  readonly resolveRemoteAgentUrls?: boolean;
   readonly subagentNodesById: ReadonlyMap<string, CompiledSubagentNode>;
 }): Promise<readonly ResolvedRuntimeDelegationNode[]> {
   const resolvedSubagents: ResolvedRuntimeDelegationNode[] = [];
@@ -192,6 +197,7 @@ async function resolveRuntimeSubagents(input: {
         childNodeIdsByParentNodeId: input.childNodeIdsByParentNodeId,
         moduleMap: input.moduleMap,
         nodesByNodeId: input.nodesByNodeId,
+        resolveRemoteAgentUrls: input.resolveRemoteAgentUrls,
         sourceRef,
         subagentNodesById: input.subagentNodesById,
       }),
@@ -203,6 +209,7 @@ async function resolveRuntimeSubagents(input: {
       await resolveRuntimeRemoteAgent({
         moduleMap: input.moduleMap,
         nodeScopeId: input.parentNodeId,
+        resolveUrl: input.resolveRemoteAgentUrls !== false,
         sourceRef: remoteAgent,
       }),
     );
@@ -215,6 +222,7 @@ async function resolveRuntimeSubagent(input: {
   readonly childNodeIdsByParentNodeId: ReadonlyMap<string, readonly string[]>;
   readonly moduleMap: CompiledModuleMap;
   readonly nodesByNodeId: Map<string, ResolvedAgentGraphBundle["root"]>;
+  readonly resolveRemoteAgentUrls?: boolean;
   readonly sourceRef: CompiledSubagentNode;
   readonly subagentNodesById: ReadonlyMap<string, CompiledSubagentNode>;
 }): Promise<ResolvedRuntimeSubagentNode> {
@@ -251,6 +259,7 @@ async function resolveRuntimeSubagent(input: {
     nodeId: input.sourceRef.nodeId,
     nodesByNodeId: input.nodesByNodeId,
     sourceId: input.sourceRef.sourceId,
+    resolveRemoteAgentUrls: input.resolveRemoteAgentUrls,
     subagentNodesById: input.subagentNodesById,
   });
 
@@ -260,6 +269,7 @@ async function resolveRuntimeSubagent(input: {
 async function resolveRuntimeRemoteAgent(input: {
   readonly moduleMap: CompiledModuleMap;
   readonly nodeScopeId: string;
+  readonly resolveUrl: boolean;
   readonly sourceRef: CompiledRemoteAgentNode;
 }): Promise<ResolvedRuntimeRemoteAgentNode> {
   const resolvedExportValue = await loadResolvedModuleExport({
@@ -297,11 +307,13 @@ async function resolveRuntimeRemoteAgent(input: {
     sourceId: input.sourceRef.sourceId,
     sourceKind: "module",
     tool: input.sourceRef.tool,
-    url: await resolveRemoteAgentUrl({
-      bakedUrl: input.sourceRef.url,
-      logicalPath: input.sourceRef.logicalPath,
-      resolvedUrl: resolvedRecord.url,
-    }),
+    url: input.resolveUrl
+      ? await resolveRemoteAgentUrl({
+          bakedUrl: input.sourceRef.url,
+          logicalPath: input.sourceRef.logicalPath,
+          resolvedUrl: resolvedRecord.url,
+        })
+      : (input.sourceRef.url ?? ""),
   };
 
   if (typeof resolvedRecord.auth === "function") {

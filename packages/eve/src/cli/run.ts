@@ -28,7 +28,11 @@ import {
   parseReasoningOption,
 } from "#cli/option-parsers.js";
 import type { AgentReasoningDefinition } from "#shared/agent-definition.js";
-import { findEveProjectContext, resolveEveProjectContext } from "#internal/project-context.js";
+import {
+  findEveProjectContext,
+  resolveEveProjectContext,
+  type AgentWorkspace,
+} from "#internal/project-context.js";
 import { parseDevelopmentServerUrl } from "#cli/dev/url.js";
 import { createCliTheme, renderCliTaggedLine } from "#cli/ui/output.js";
 import { registerEveTelemetryCommands } from "#cli/telemetry/command.js";
@@ -251,12 +255,63 @@ export function createCliProgram(
     program,
   });
 
-  agentCommand(program.command("start"), applicationContext)
-    .description("Start a built eve application.")
+  const runWorkspaceHost = async (workspace: AgentWorkspace, options: ProductionCliOptions) => {
+    const { startWorkspaceHost } = await import("#internal/workspace/start-workspace-host.js");
+    const host = await startWorkspaceHost(workspace, {
+      host: options.host,
+      port: options.port,
+      schedules: options.schedules,
+    });
+    logger.log(
+      renderCliTaggedLine(theme, {
+        message: `server listening at ${host.url}`,
+        tag: "start",
+        tone: "success",
+      }),
+    );
+    const { checkBuiltSandboxReadiness } = await import("#cli/sandbox-readiness.js");
+    for (const agent of host.agents) {
+      logger.log(
+        renderCliTaggedLine(theme, {
+          message: `agent ${agent.name} at ${agent.routePrefix}/v1`,
+          tag: "start",
+          tone: "info",
+        }),
+      );
+      const member = workspace.members.find((entry) => entry.name === agent.name);
+      for (const line of member === undefined
+        ? []
+        : await checkBuiltSandboxReadiness(member.appRoot)) {
+        logger.log(
+          renderCliTaggedLine(theme, {
+            message: `${agent.name} ${line.message}`,
+            tag: "start",
+            tone: line.tone,
+          }),
+        );
+      }
+    }
+    await waitForShutdownSignal({ close: () => host.close(), wait: () => host.wait() });
+  };
+
+  agentCommand(
+    program.command("start"),
+    applicationContext,
+    (command) => command.opts<{ agent?: string }>().agent !== undefined,
+  )
+    .description("Start a built eve application, or every agent of an agents/ workspace.")
     .option("--no-schedules", "Start without running authored cron schedules")
     .option("--host <host>", "Host interface to bind")
     .option("--port <port>", "Port to listen on (defaults to $PORT, then 3000)", parsePortOption)
-    .action(async (options: ProductionCliOptions) => {
+    .action(async (options: ProductionCliOptions & { agent?: string }) => {
+      if (options.agent === undefined) {
+        const project = await applicationContext.resolveAgent();
+        if (project.kind === "workspace") {
+          await runWorkspaceHost(project.workspace, options);
+          return;
+        }
+        await applicationContext.resolve();
+      }
       const { loadDevelopmentEnvironmentFiles } = await import("#cli/dev/environment.js");
 
       await loadDevelopmentEnvironmentFiles(applicationContext.root);

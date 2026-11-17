@@ -1,4 +1,10 @@
 import { decodeJwt } from "#compiled/jose/index.js";
+import {
+  readWorkspaceSecret,
+  WORKSPACE_AGENT_ENV,
+  WORKSPACE_TOKEN_ISSUER,
+  workspaceTokenAudience,
+} from "#internal/workspace/peer-auth.js";
 
 import { ANONYMOUS_SESSION_AUTH_CONTEXT } from "#channel/principal-identity.js";
 import type { SessionAuthContext } from "#channel/types.js";
@@ -1138,6 +1144,33 @@ export function jwtHmac(config: VerifyJwtHmacConfig): AuthFn<Request> {
     async (request) => {
       const token = extractBearerToken(request.headers.get("authorization"));
       const result = await verifyJwtHmac(token, config);
+      return result.ok ? result.sessionAuth : null;
+    },
+    [{ scheme: "Bearer" }],
+  );
+}
+
+/**
+ * Returns an {@link AuthFn} that admits other agents of the same self-hosted
+ * workspace. `eve start` at a workspace root gives each agent a shared secret
+ * and signs every peer call with a short-lived token for the receiving agent.
+ * The caller becomes a `service` principal named `eve-workspace:<agent>`, so it
+ * gains no user's authority unless the channel's `trustedForwarders` accepts a
+ * forwarded principal. Outside a workspace host it returns `null`.
+ */
+export function workspacePeers(): AuthFn<Request> {
+  return withAuthChallenges(
+    async (request) => {
+      const secret = readWorkspaceSecret();
+      const agentName = process.env[WORKSPACE_AGENT_ENV];
+      if (secret === undefined || agentName === undefined || agentName.length === 0) return null;
+      const token = extractBearerToken(request.headers.get("authorization"));
+      const result = await verifyJwtHmac(token, {
+        algorithm: "HS256",
+        audiences: [workspaceTokenAudience(agentName)],
+        issuer: WORKSPACE_TOKEN_ISSUER,
+        secret,
+      });
       return result.ok ? result.sessionAuth : null;
     },
     [{ scheme: "Bearer" }],

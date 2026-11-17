@@ -1,3 +1,4 @@
+import { isAllowedCallbackOrigin } from "#internal/workspace/peer-auth.js";
 import { NonRetryableError } from "#shared/run-errors.js";
 import {
   assertPublicHostname,
@@ -83,7 +84,9 @@ async function requestCallback(
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new UnsafeDestinationError("Callback URL must use http or https.");
   }
-  const policy = { allowLoopback: isLocalDevelopmentServer() };
+  const policy = {
+    allowLoopback: isLocalDevelopmentServer() || isAllowedCallbackOrigin(url.origin),
+  };
   assertPublicHostname(url.hostname, policy);
   const dispatcher = await createPublicDispatcher(policy);
   try {
