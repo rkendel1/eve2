@@ -42,7 +42,7 @@ function eveConfigPath(): string {
 const EveConfigSchema = z.looseObject({
   telemetry: z
     .looseObject({
-      enabled: z.boolean().default(true),
+      enabled: z.boolean().default(false),
       installationId: z.string().optional(),
       noticeVersion: z.number().int().positive().optional(),
       notifiedAt: z.string().optional(),
@@ -54,7 +54,7 @@ const EveConfigSchema = z.looseObject({
 function parsePreference(value: unknown): EveTelemetryPreference {
   const telemetry = EveConfigSchema.safeParse(value).data?.telemetry;
   return {
-    enabled: telemetry?.enabled ?? true,
+    enabled: telemetry?.enabled ?? false,
     notified: telemetry?.noticeVersion === EVE_TELEMETRY_NOTICE_VERSION,
   };
 }
@@ -63,7 +63,7 @@ export async function readEveTelemetryPreference(): Promise<EveTelemetryPreferen
   try {
     return parsePreference(JSON.parse(await readFile(eveConfigPath(), "utf8")) as unknown);
   } catch {
-    return { enabled: true, notified: false };
+    return { enabled: false, notified: false };
   }
 }
 

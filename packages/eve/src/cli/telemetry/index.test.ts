@@ -89,6 +89,18 @@ describe("createEveCliTelemetry", () => {
     expect(readOrCreateEveTelemetryIdentity).not.toHaveBeenCalled();
   });
 
+  it.each(["1", "true"])("honors DO_NOT_TRACK=%s", async (value) => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DO_NOT_TRACK", value);
+    const telemetry = createEveCliTelemetry("1.0.0");
+    telemetry.trackCommand("info");
+
+    await telemetry.flush();
+
+    expect(spawn).not.toHaveBeenCalled();
+    expect(readEveTelemetryPreference).not.toHaveBeenCalled();
+  });
+
   it("does not spawn a flush process when the durable preference disables telemetry", async () => {
     vi.mocked(readEveTelemetryPreference).mockResolvedValue({ enabled: false, notified: true });
     const telemetry = createEveCliTelemetry("1.0.0");

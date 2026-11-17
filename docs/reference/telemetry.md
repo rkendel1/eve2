@@ -5,11 +5,11 @@ description: "Learn what eve CLI telemetry collects and how to control it."
 
 # CLI telemetry
 
-eve collects CLI usage data to improve its commands and development experience. You can turn telemetry off at any time.
+eve CLI telemetry is off unless you turn it on with `eve telemetry enable`. When enabled, eve collects CLI usage data to improve its commands and development experience.
 
 ## What eve collects
 
-eve sends the following information to Vercel:
+When telemetry is enabled, eve sends the following information to Vercel:
 
 - The eve version, operating system, CPU architecture, and whether stdin is a terminal.
 - The command you ran, its outcome, and setup or onboarding steps when applicable, including connection-ready and first-response timing. When setup or onboarding fails, eve sends a bounded category describing the failed step. It does not send the underlying error.
@@ -30,27 +30,27 @@ Set `EVE_TELEMETRY_DEBUG=1` to print the telemetry batch to stderr instead of se
 EVE_TELEMETRY_DEBUG=1 eve info
 ```
 
-## Turn telemetry off
+## Turn telemetry on or off
 
-Disable telemetry for this machine:
-
-```bash
-eve telemetry disable
-```
-
-Check its status or turn it back on:
+Telemetry stays off until you enable it for this machine:
 
 ```bash
-eve telemetry status
 eve telemetry enable
 ```
 
-To disable telemetry for one command without changing the saved setting, set `EVE_TELEMETRY_DISABLED=1`:
+Check its status or turn it back off:
+
+```bash
+eve telemetry status
+eve telemetry disable
+```
+
+To disable telemetry for one command without changing the saved setting, set `EVE_TELEMETRY_DISABLED=1` or `DO_NOT_TRACK=1`:
 
 ```bash
 EVE_TELEMETRY_DISABLED=1 eve dev
 ```
 
-On an interactive terminal, eve displays this information once before it collects telemetry. eve saves your preference in your platform user configuration directory. In CI and Docker environments, eve uses fresh in-memory identifiers for each invocation instead of saving them.
+After you enable telemetry, eve displays this information once on an interactive terminal. eve saves your preference in your platform user configuration directory. In CI and Docker environments, eve uses fresh in-memory identifiers for each invocation instead of saving them.
 
 Vercel handles CLI telemetry under the [Vercel Privacy Notice](https://vercel.com/legal/privacy-notice).
