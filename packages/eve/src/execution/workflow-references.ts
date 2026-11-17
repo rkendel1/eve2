@@ -3,6 +3,7 @@ import {
   CONNECTION_EVENT_WORKFLOW_NAME,
   SESSION_TIMEOUT_WORKFLOW_NAME,
   WORKFLOW_ENTRY_NAME,
+  WORKFLOW_SCHEDULE_WORKFLOW_NAME,
   WORKFLOW_TOOL_RUN_WORKFLOW_NAME,
 } from "#execution/stable-workflow-names.js";
 import { EVE_PACKAGE_NAME } from "#internal/package-name.js";
@@ -27,4 +28,8 @@ export const connectionEventWorkflowReference = {
 
 export const connectionEventDeliveryWorkflowReference = {
   workflowId: `workflow//${STABLE_ID_BASE}//${CONNECTION_EVENT_DELIVERY_WORKFLOW_NAME}`,
+};
+
+export const workflowScheduleWorkflowReference = {
+  workflowId: `workflow//${STABLE_ID_BASE}//${WORKFLOW_SCHEDULE_WORKFLOW_NAME}`,
 };
