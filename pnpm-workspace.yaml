@@ -85,6 +85,9 @@ minimumReleaseAge: 2880 # 2 days
 
 minimumReleaseAgeExclude:
   - "@ai-sdk/*"
+  - "@appport/*" # Owned by this fork's maintainer.
+  - "@authboundry/*" # Owned by this fork's maintainer.
+  - "@feltdb/*" # Owned by this fork's maintainer; required by @authboundry/core.
   - ai
   - eve
   - "@vercel/*"
