@@ -44,11 +44,23 @@ const environment = resolveEnvironment({
   name: "development",
   env: {},
 });
+if (process.env.PERSONALOS_PAGE_STUB === "1")
+  // Research reads pages through its page-reader seam; the test supplies the page instead of the web.
+  globalThis[Symbol.for("personalos.research.pageReader")] = async (url) => ({
+    detail: "",
+    finalUrl: url,
+    httpStatus: 200,
+    ms: 1,
+    status: "read",
+    text: "Acme Ops builds internal tools in TypeScript for operations teams.",
+    title: "Acme Ops",
+    url,
+  });
 const runtime = await FeltKitRuntime.start({
   environment,
   logger: silentLogger,
   project,
-  workerIntervalMs: 0,
+  workerIntervalMs: Number(process.env.PERSONALOS_WORKER_MS ?? 0),
 });
 const call = async (who, name, args = {}) => {
   const result = await runtime.call(name, args, { principal: who, via: "test" });
@@ -71,12 +83,15 @@ if (process.argv[2] === "--report") {
       actions: await call(person(id), "actions:list"),
       briefing: await call(person(id), "briefing:today", { today: process.env.PERSONALOS_TODAY }),
       inbox: await call(person(id), "inbox:list"),
+      documents: await call(person(id), "documents:list"),
       memories: await call(person(id), "memory:list"),
+      projects: await call(person(id), "projects:list"),
+      research: await call(person(id), "research:list"),
       tasks: await call(person(id), "tasks:list"),
     };
   }
   const audit = (await runtime.auditTrail()).filter((entry) =>
-    /^(tasks|memory):/u.test(entry.function),
+    /^(tasks|memory|projects|documents|researchstate|research):/u.test(entry.function),
   );
   const reminders = (await runtime.services.jobs.listJobs("personalos"))
     .filter((job) => job.type === "reminder.fire")
@@ -109,6 +124,11 @@ for (const entry of (process.env.PERSONALOS_GRANTS ?? "").split(";").filter(Bool
     agent: AGENT,
     capabilities: capabilities ? capabilities.split("+") : [],
   });
+}
+
+for (const entry of (process.env.PERSONALOS_RESEARCH_BUDGET ?? "").split(";").filter(Boolean)) {
+  const [id, calls] = entry.split("=");
+  await call(person(id), "delegation:setResearchBudget", { agent: AGENT, calls: Number(calls) });
 }
 
 const crashPlan = process.env.PERSONALOS_CRASH_FILE;

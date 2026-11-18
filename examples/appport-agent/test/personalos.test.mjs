@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -43,15 +44,44 @@ const WRITE = `${READ}+tasks.create+tasks.update+tasks.complete`;
 let agent;
 let host;
 
+// The web search provider research calls, as a stand-in owned by the test (the Brave Search API's shape):
+// every request is counted, and a request can be held while the test acts.
+const SEARCH_KEY = "brave_test_key_0123456789abcdef";
+const searchProvider = { hold: null, requests: [], url: "" };
+const searchServer = createServer(async (request, response) => {
+  searchProvider.requests.push(new URL(request.url, "http://x").searchParams.get("q") ?? "");
+  if (searchProvider.hold) await searchProvider.hold(searchProvider.requests.length);
+  if (request.headers["x-subscription-token"] !== SEARCH_KEY) return response.writeHead(401).end();
+  response.writeHead(200, { "content-type": "application/json" }).end(
+    JSON.stringify({
+      query: {},
+      type: "search",
+      web: {
+        results: [
+          {
+            description: "Acme Ops builds internal tools in TypeScript.",
+            title: "Acme Ops",
+            url: "https://www.acme-ops.com/",
+          },
+        ],
+      },
+    }),
+  );
+});
+
 const hostEnv = (extra = {}) =>
   cleanEnv({
     APPPORT_AGENT_CREDENTIAL_FILE: credentialFile,
+    FELTKIT_CREDENTIAL_WEBSEARCH: SEARCH_KEY,
     NODE_ENV: "development",
     PERSONALOS_CRASH_FILE: crashFile,
     PERSONALOS_DIR: personalos,
     PERSONALOS_PORT: String(port),
     PERSONALOS_PROJECT_DIR: join(scratch, "personalos"),
+    PERSONALOS_PAGE_STUB: "1",
     PERSONALOS_TODAY: TODAY,
+    PERSONALOS_WORKER_MS: "200",
+    WEBSEARCH_URL: searchProvider.url,
     ...extra,
   });
 const harness = join(root, "test/personalos-host.mjs");
@@ -81,9 +111,9 @@ async function stopHost() {
   }
 }
 
-async function restartHost(grants) {
+async function restartHost(grants, extra) {
   await stopHost();
-  host = await startHost(grants);
+  host = await startHost(grants, extra);
 }
 
 async function snapshot(extra) {
@@ -102,7 +132,7 @@ const startAgent = () =>
     cleanEnv({
       AGENT_JWT_SECRET,
       APPPORT_AGENT_CAPABILITIES:
-        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today,memory.list,memory.propose,memory.add,memory.confirm",
+        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today,memory.list,memory.propose,memory.add,memory.confirm,projects.list,projects.create,projects.update,documents.list,documents.update,documents.link,research.start,research.list,research.get,research.cancel,research.retry",
       APPPORT_AGENT_CREDENTIAL_FILE: credentialFile,
       APPPORT_AGENT_OPERATOR: "appport-agent-operator:operator",
       APPPORT_AGENT_WORK_DIR: workDir,
@@ -167,6 +197,8 @@ const titled = (state, owner, title) =>
 
 before(async () => {
   if (SKIP) return;
+  await new Promise((resolve) => searchServer.listen(0, "127.0.0.1", resolve));
+  searchProvider.url = `http://127.0.0.1:${searchServer.address().port}`;
   execFileSync(process.execPath, [harness, "--copy-project"], { env: hostEnv() });
   // Ada is signed in somewhere (her phone): FeltKit runs her durable work, reminders included, only while she has a session.
   host = await startHost(`ada=${READ}`, { PERSONALOS_SIGNED_IN: "ada" });
@@ -175,6 +207,8 @@ before(async () => {
 });
 
 after(async () => {
+  searchServer.closeAllConnections?.();
+  searchServer.close();
   if (host) await stopHost();
   await stopAll();
   rmSync(fixture, { force: true, recursive: true });
@@ -566,3 +600,421 @@ describe(
     });
   },
 );
+
+describe(
+  "eve working with Ada's Personal OS projects and documents under her grants",
+  { skip: SKIP },
+  () => {
+    const base = `http://127.0.0.1:${port}`;
+    const bearer = (person) =>
+      `Bearer ${readFileSync(join(scratch, "personalos.tokens", person), "utf8")}`;
+    const asPerson = async (person, fn, args) => {
+      const response = await fetch(`${base}/api/mutation/${fn}`, {
+        body: JSON.stringify({ args }),
+        headers: { authorization: bearer(person), "content-type": "application/json" },
+        method: "POST",
+      });
+      return await response.json();
+    };
+    const project = (state, owner, name) =>
+      state.people[owner].projects.find((entry) => entry.name === name);
+    const doc = (state, owner, name) =>
+      state.people[owner].documents.find((entry) => entry.name === name);
+    let taxes;
+    let kitchen;
+
+    it("reads Ada's projects only with a project grant, and that grant reads no documents", async () => {
+      taxes = (await asPerson("ada", "projects:create", { name: "Taxes" })).value;
+      // A document saved the way the Documents screen saves one: an upload link, the bytes, then attach.
+      for (const [name, text, projectId] of [
+        ["w2.txt", "wages 100", taxes.id],
+        ["lease.txt", "rent 900", undefined],
+      ]) {
+        const link = (
+          await asPerson("ada", "documents:prepareUpload", { contentType: "text/plain", name })
+        ).value;
+        const put = await fetch(new URL(link.url, base), {
+          body: text,
+          headers: { "content-type": "text/plain", "x-file-name": name },
+          method: "PUT",
+        });
+        const file = await put.json();
+        assert.equal(put.ok, true, JSON.stringify(file));
+        const attached = await asPerson("ada", "documents:attach", {
+          fileId: file.id ?? file.file?.id,
+          ...(projectId ? { projectId } : {}),
+        });
+        assert.equal(attached.ok, true, JSON.stringify(attached));
+      }
+      const denied = await work("ada", "projects-denied", invoke("projects.list", {}));
+      assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=projects.list");
+      const listed = await work("ada", "projects-list", invoke("projects.list", {}));
+      assert.equal(listed.status, "completed", JSON.stringify(listed));
+      assert.match(listed.summary, /"name":"Taxes"/u);
+      const docs = await work(
+        "ada",
+        "docs-with-project-grant",
+        invoke("documents.list", { projectId: taxes.id }),
+      );
+      assert.equal(
+        docs.operations[0].errorCode,
+        "FORBIDDEN",
+        "a project grant does not read its documents",
+      );
+      const grace = await work("grace", "grace-projects", invoke("projects.list", {}));
+      assert.equal(grace.operations[0].errorCode, "FORBIDDEN");
+    });
+
+    it("creates and updates a project only with those grants, once for a repeated call, attributed to eve", async () => {
+      const before = await work(
+        "ada",
+        "project-create-denied",
+        invoke("projects.create", { name: "Kitchen" }),
+      );
+      assert.equal(before.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=projects.list+projects.create");
+      const created = await work(
+        "ada",
+        "project-create",
+        `[repeat] ${invoke("projects.create", { name: "Kitchen" })}`,
+      );
+      assert.equal(created.status, "completed", JSON.stringify(created));
+      assert.deepEqual(
+        [created.operations.length, created.operations[0].requestIds.length],
+        [1, 1],
+      );
+      const update = await work(
+        "ada",
+        "project-update-denied",
+        invoke("projects.update", { id: taxes.id, status: "paused" }),
+      );
+      assert.equal(update.operations[0].errorCode, "FORBIDDEN", "update needs its own grant");
+
+      let state = await snapshot();
+      kitchen = project(state, "ada", "Kitchen");
+      assert.equal(state.people.ada.projects.filter((entry) => entry.name === "Kitchen").length, 1);
+      const action = state.people.ada.actions.find(
+        (entry) => entry.kind === "project.create" && entry.evidence.id === kitchen.id,
+      );
+      assert.deepEqual(
+        [action.via, action.delegation.agent, action.delegation.capability],
+        ["agent", "appport-agent", "projects.create"],
+      );
+      const audit = state.audit.find(
+        (entry) => entry.authority.delegation?.decisionId === action.delegation.decisionId,
+      );
+      assert.deepEqual(
+        [audit.function, audit.principal.id, audit.requestId],
+        ["projects:create", "ada", created.operations[0].requestIds[0]],
+      );
+
+      await restartHost("ada=projects.list+projects.create+projects.update");
+      const paused = await work(
+        "ada",
+        "project-update",
+        invoke("projects.update", { id: kitchen.id, status: "paused" }),
+      );
+      assert.equal(paused.status, "completed", JSON.stringify(paused));
+      state = await snapshot();
+      assert.equal(project(state, "ada", "Kitchen").status, "paused");
+    });
+
+    it("refuses a second project with the same name, and leaves that operation unresolved rather than retrying it", async () => {
+      const duplicate = await work(
+        "ada",
+        "project-duplicate",
+        invoke("projects.create", { name: "kitchen" }),
+      );
+      assert.equal(duplicate.status, "blocked");
+      assert.match(duplicate.decisions.at(-1), /^indeterminate: /u);
+      const [operation] = await ledger(duplicate.workId);
+      assert.deepEqual(
+        [operation.state, operation.outcome.error.code],
+        ["indeterminate", "feltkit.FAILED_PRECONDITION"],
+      );
+      const state = await snapshot();
+      assert.equal(
+        state.people.ada.projects.filter((entry) => entry.name.toLowerCase() === "kitchen").length,
+        1,
+      );
+    });
+
+    it("reads and re-files Ada's documents only with document grants, never their contents", async () => {
+      await restartHost("ada=projects.list+documents.list");
+      const listed = await work("ada", "docs-list", invoke("documents.list", {}));
+      assert.equal(listed.status, "completed", JSON.stringify(listed));
+      assert.match(listed.summary, /lease\.txt/u);
+      assert.doesNotMatch(listed.summary, /rent 900|wages 100/u, "names and notes, never contents");
+      const link = await work("ada", "doc-link", invoke("documents.link", { id: "any" }));
+      assert.deepEqual(link.operations, [], "a download link is not a capability");
+
+      let state = await snapshot();
+      const lease = doc(state, "ada", "lease.txt");
+      const denied = await work(
+        "ada",
+        "doc-update-denied",
+        invoke("documents.update", { id: lease.id, projectId: kitchen.id }),
+      );
+      assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=projects.list+documents.list+documents.update");
+      const filed = await work(
+        "ada",
+        "doc-update",
+        invoke("documents.update", {
+          id: lease.id,
+          note: "for the contractor",
+          projectId: kitchen.id,
+        }),
+      );
+      assert.equal(filed.status, "completed", JSON.stringify(filed));
+      state = await snapshot();
+      assert.deepEqual(
+        [doc(state, "ada", "lease.txt").projectId, doc(state, "ada", "lease.txt").note],
+        [kitchen.id, "for the contractor"],
+      );
+      assert.equal(
+        doc(state, "ada", "w2.txt").projectId,
+        taxes.id,
+        "the other relation is untouched",
+      );
+      const action = state.people.ada.actions.find(
+        (entry) => entry.kind === "document.update" && entry.evidence.id === lease.id,
+      );
+      assert.deepEqual(
+        [action.via, action.evidence.verified, action.delegation.capability],
+        ["agent", true, "documents.update"],
+      );
+    });
+
+    it("creates one project when eve crashes after Personal OS committed, and Personal OS restarts too", async () => {
+      await restartHost("ada=projects.list+projects.create");
+      const response = await fetch(new URL("/work", agent.url), {
+        body: JSON.stringify({
+          objective: `[crash:invocation.record] ${invoke("projects.create", { name: "Garage" })}`,
+        }),
+        headers: {
+          authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "ada")}`,
+          "content-type": "application/json",
+          "idempotency-key": "project-crash",
+        },
+        method: "POST",
+      });
+      const { workId } = await response.json();
+      await waitFor(async () => !(await reachable()));
+      await stop(agent.child);
+      await restartHost();
+      agent = await startAgent();
+      assert.equal((await outcome("ada", workId)).status, "completed");
+      const [operation] = await ledger(workId);
+      assert.deepEqual([operation.state, operation.attempts], ["succeeded", 2]);
+      const state = await snapshot();
+      assert.equal(state.people.ada.projects.filter((entry) => entry.name === "Garage").length, 1);
+    });
+
+    it("stops after Ada revokes", async () => {
+      await restartHost("ada=");
+      for (const [key, objective] of [
+        ["projects-after-revoke", invoke("projects.list", {})],
+        ["docs-after-revoke", invoke("documents.list", {})],
+      ]) {
+        const denied = await work("ada", key, objective);
+        assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      }
+    });
+  },
+);
+
+describe("eve running Ada's Personal OS research within the budget she set", { skip: SKIP }, () => {
+  const RESEARCH = "research.start+research.list+research.get+research.cancel+research.retry";
+  const TEXT = "Find me some new customers for FeltKit";
+  const base = `http://127.0.0.1:${port}`;
+  const adaRead = async (fn, args) => {
+    const response = await fetch(`${base}/api/query/${fn}`, {
+      body: JSON.stringify({ args }),
+      headers: {
+        authorization: `Bearer ${readFileSync(join(scratch, "personalos.tokens", "ada"), "utf8")}`,
+        "content-type": "application/json",
+      },
+      method: "POST",
+    });
+    return (await response.json()).value;
+  };
+  const runOf = async (runId) => (await adaRead("research:get", { runId })).run;
+  const until = async (runId, done) => {
+    let run;
+    await waitFor(async () => done((run = await runOf(runId))), { attempts: 600, intervalMs: 100 });
+    return run;
+  };
+  const quiet = () => new Promise((resolve) => setTimeout(resolve, 1500));
+  const runIdOf = (work) => /"runId":"([^"]+)"/u.exec(work.summary)?.[1];
+  let runId;
+
+  it("refuses to start without a grant or without a budget Ada set, before any search", async () => {
+    const before = searchProvider.requests.length;
+    const noGrant = await work(
+      "ada",
+      "research-no-grant",
+      invoke("research.start", { budget: 2, text: TEXT }),
+    );
+    assert.equal(noGrant.operations[0].errorCode, "FORBIDDEN");
+    await restartHost(`ada=${RESEARCH}`);
+    const noBudget = await work(
+      "ada",
+      "research-no-budget",
+      invoke("research.start", { budget: 2, text: TEXT }),
+    );
+    assert.equal(noBudget.operations[0].errorCode, "FORBIDDEN", "a grant is not a budget");
+    await quiet();
+    assert.equal(searchProvider.requests.length, before, "nothing was searched");
+  });
+
+  it("starts research in Ada's Personal OS, stops it at its budget, and records who started it", async () => {
+    await restartHost(`ada=${RESEARCH}`, { PERSONALOS_RESEARCH_BUDGET: "ada=12" });
+    const before = searchProvider.requests.length;
+    const started = await work(
+      "ada",
+      "research-start",
+      invoke("research.start", { budget: 2, text: TEXT }),
+    );
+    assert.equal(started.status, "completed", JSON.stringify(started));
+    runId = runIdOf(started);
+    const run = await until(runId, (r) => r.status !== "running");
+    assert.deepEqual(
+      [run.status, run.blocker.need, run.budget.agent, run.budget.charged],
+      ["blocked", "research budget", "agent:appport-agent", 2],
+    );
+    assert.equal(
+      searchProvider.requests.length - before,
+      2,
+      "exactly the two searches it was given",
+    );
+
+    const state = await snapshot();
+    const action = state.people.ada.actions.find(
+      (entry) => entry.kind === "research.start" && entry.evidence?.id === runId,
+    );
+    assert.deepEqual(
+      [action.via, action.delegation.agent, action.delegation.capability],
+      ["agent", "appport-agent", "research.start"],
+    );
+    const audit = state.audit.find(
+      (entry) => entry.authority.delegation?.decisionId === action.delegation.decisionId,
+    );
+    assert.deepEqual(
+      [audit.function, audit.principal.id, audit.requestId],
+      ["researchstate:start", "ada", started.operations[0].requestIds[0]],
+    );
+  });
+
+  it("reads the run, continues it within budget, and never runs a completed run again", async () => {
+    const read = await work("ada", "research-get", invoke("research.get", { runId }));
+    assert.equal(read.status, "completed", JSON.stringify(read));
+    const resumed = await work(
+      "ada",
+      "research-retry",
+      invoke("research.retry", { budget: 4, runId }),
+    );
+    assert.equal(resumed.status, "completed", JSON.stringify(resumed));
+    const run = await until(runId, (r) => r.status !== "running");
+    assert.equal(run.status, "completed");
+    assert.equal(run.budget.charged, run.usage.searches, "every search was charged");
+    assert.ok(run.budget.charged <= run.budget.allocation);
+    const { sources } = await adaRead("research:get", { runId });
+    assert.ok(
+      sources.length > 0 &&
+        sources.every((source) => source.runId === runId && source.owner === "ada"),
+      "its citations are its own",
+    );
+
+    const searched = searchProvider.requests.length;
+    const again = await work("ada", "research-retry-done", invoke("research.retry", { runId }));
+    // Personal OS refuses (completed research is never run again); eve's ledger keeps that refusal unresolved, never retried.
+    assert.match(again.decisions.at(-1), /^indeterminate: /u);
+    const [refused] = await ledger(again.workId);
+    assert.deepEqual(
+      [refused.state, refused.outcome.error.code],
+      ["indeterminate", "feltkit.FAILED_PRECONDITION"],
+    );
+    await quiet();
+    assert.equal(searchProvider.requests.length, searched, "a completed run is not run again");
+  });
+
+  it("cancels a run mid-search: the search in flight finishes, nothing more is searched, and a restart does not resume it", async () => {
+    let seen;
+    const holding = new Promise((resolve) => (seen = resolve));
+    let release;
+    const released = new Promise((resolve) => (release = resolve));
+    const before = searchProvider.requests.length;
+    searchProvider.hold = async () => {
+      seen();
+      await released;
+    };
+    const started = await work(
+      "ada",
+      "research-live",
+      invoke("research.start", { budget: 5, text: TEXT }),
+    );
+    const live = runIdOf(started);
+    await holding;
+    const cancelled = await work(
+      "ada",
+      "research-cancel",
+      invoke("research.cancel", { runId: live }),
+    );
+    assert.equal(cancelled.status, "completed", JSON.stringify(cancelled));
+    searchProvider.hold = null;
+    release();
+    await quiet();
+    let run = await runOf(live);
+    assert.deepEqual(
+      [run.status, run.cancelledBy, run.budget.charged, run.budget.released],
+      ["cancelled", "agent:appport-agent", 1, true],
+    );
+    assert.equal(searchProvider.requests.length - before, 1, "only the search in flight");
+    const repeat = await work(
+      "ada",
+      "research-cancel-again",
+      invoke("research.cancel", { runId: live }),
+    );
+    assert.equal(repeat.status, "completed");
+
+    await restartHost();
+    await quiet();
+    run = await runOf(live);
+    assert.equal(run.status, "cancelled");
+    assert.equal(searchProvider.requests.length - before, 1, "nothing ran after the restart");
+  });
+
+  it("starts once when eve crashes after Personal OS committed, and Personal OS restarts too", async () => {
+    const response = await fetch(new URL("/work", agent.url), {
+      body: JSON.stringify({
+        objective: `[crash:invocation.record] ${invoke("research.start", { budget: 1, text: "Find me some new customers for Brightpipe" })}`,
+      }),
+      headers: {
+        authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "ada")}`,
+        "content-type": "application/json",
+        "idempotency-key": "research-crash",
+      },
+      method: "POST",
+    });
+    const { workId } = await response.json();
+    await waitFor(async () => !(await reachable()));
+    await stop(agent.child);
+    await restartHost();
+    agent = await startAgent();
+    assert.equal((await outcome("ada", workId)).status, "completed");
+    const [operation] = await ledger(workId);
+    assert.deepEqual([operation.state, operation.attempts], ["succeeded", 2]);
+    const runs = (await adaRead("research:list", {})).filter((entry) =>
+      /Brightpipe/u.test(entry.request),
+    );
+    assert.equal(runs.length, 1, "one run");
+  });
+
+  it("stops after Ada revokes", async () => {
+    await restartHost("ada=");
+    const denied = await work("ada", "research-after-revoke", invoke("research.list", {}));
+    assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+  });
+});
