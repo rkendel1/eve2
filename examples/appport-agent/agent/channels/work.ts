@@ -1,15 +1,20 @@
 import { defineChannel, GET, POST } from "eve/channels";
 import { jwtHmac, routeAuth } from "eve/channels/auth";
-import { call, reply } from "eve/events";
+import { call } from "eve/events";
 import { toolResultFrom } from "eve/tools";
 
+import { fault } from "../lib/faults";
+import { invokeCallsOf, reconcileAll, replyOf } from "../lib/recovery";
 import {
   acceptWork,
-  currentWork,
+  bindSession,
+  citeNew,
+  decideOutcome,
+  invocationId,
   readInvocation,
+  readSubmission,
   readWork,
   recordProgress,
-  workEvidence,
 } from "../lib/work";
 import appportInvoke from "../tools/appport_invoke";
 
@@ -28,9 +33,20 @@ const auth = [
 const problem = (status: number, code: string, message: string) =>
   Response.json({ code, message, ok: false }, { status });
 
+type Operations = Parameters<typeof reconcileAll>[0];
+let startupReconciliation: Promise<unknown> | undefined;
+
+function reconcileOnce(ops: Operations) {
+  startupReconciliation ??= reconcileAll(ops).catch((error: unknown) => {
+    startupReconciliation = undefined;
+    throw error;
+  });
+  return startupReconciliation;
+}
+
 export default defineChannel({
   routes: [
-    POST("/work", async (request, { from }) => {
+    POST("/work", async (request, { from, resolveSession }) => {
       const caller = await routeAuth(request, auth);
       if (caller instanceof Response) return caller;
       const principalId = caller.principalId;
@@ -46,28 +62,31 @@ export default defineChannel({
         objective.length > MAX_OBJECTIVE_LENGTH
       )
         return problem(400, "INVALID_OBJECTIVE", "objective must be a non-empty string.");
+      await reconcileOnce({ from, resolveSession });
 
-      const submission = await acceptWork(principalId, key, objective);
-      if (submission.outcome === "conflict")
+      const acceptance = await acceptWork({ ...caller, principalId }, key, objective);
+      if (acceptance.outcome === "conflict")
         return problem(
           409,
           "IDEMPOTENCY_KEY_REUSED",
           "This key was used for a different objective.",
         );
-      const workId = submission.task.task_id;
+      const { workId } = acceptance;
+      await fault("work.accepted", { objective, workId });
       const delivery = await from(workId).send(objective, {
         auth: caller,
         idempotencyKey: `work:${workId}`,
       });
       return Response.json(
-        { replayed: submission.outcome === "replayed", sessionId: delivery.sessionId, workId },
-        { status: submission.outcome === "accepted" ? 201 : 200 },
+        { replayed: acceptance.outcome === "replayed", sessionId: delivery.sessionId, workId },
+        { status: acceptance.outcome === "accepted" ? 201 : 200 },
       );
     }),
 
-    GET("/work/:workId", async (request, { params, resolveSession }) => {
+    GET("/work/:workId", async (request, { from, params, resolveSession }) => {
       const caller = await routeAuth(request, auth);
       if (caller instanceof Response) return caller;
+      await reconcileOnce({ from, resolveSession });
       const workId = params.workId ?? "";
       const work =
         caller.principalId === undefined ? null : await readWork(caller.principalId, workId);
@@ -75,67 +94,72 @@ export default defineChannel({
       const live = await resolveSession(workId);
       return Response.json({ ...work, liveSessionId: live?.id ?? null });
     }),
+
+    POST("/work/reconcile", async (request, { from, resolveSession }) => {
+      const caller = await routeAuth(request, auth);
+      if (caller instanceof Response) return caller;
+      const operator = process.env.APPPORT_AGENT_OPERATOR;
+      if (operator === undefined || caller.principalId !== operator)
+        return problem(403, "FORBIDDEN", "Only the operator may reconcile work.");
+      const results = await reconcileAll({ from, resolveSession });
+      return Response.json({ results });
+    }),
   ],
 
   events: {
     async "turn.started"(_event, ctx) {
       const workId = ctx.channel.continuation?.token;
       if (workId === undefined) return;
-      currentWork.update(() => workId);
-      await recordProgress(workId, {
-        execution: { adapter: "eve", conversation_id: ctx.session.id },
-        status: "running",
-        summary: `Running in eve session ${ctx.session.id}.`,
-      });
+      await bindSession(ctx.session.id, workId);
+      await recordProgress(workId, (current) =>
+        current.task.status === "running" &&
+        current.checkpoint.execution?.conversation_id === ctx.session.id
+          ? null
+          : {
+              execution: { adapter: "eve", conversation_id: ctx.session.id },
+              status: "running",
+              summary: `Running in eve session ${ctx.session.id}.`,
+            },
+      );
     },
 
     async "call.settled"(event, ctx) {
-      const result = toolResultFrom(call(ctx.view, event.data.callId), appportInvoke);
-      if (result === undefined || !("requestId" in result.output)) return;
-      const invocation = await readInvocation(result.output.requestId);
-      if (invocation === null) return;
-      const outcome = result.output.ok ? "succeeded" : `was rejected (${result.output.error.code})`;
       const workId = ctx.channel.continuation?.token;
       if (workId === undefined) return;
-      await recordProgress(workId, {
-        evidence: [
-          { collection: "appport_invocations", id: result.output.requestId, kind: "record" },
-        ],
-        status: "running",
-        summary: `AppPort ${String(invocation.capability)} ${outcome}.`,
+      const result = toolResultFrom(call(ctx.view, event.data.callId), appportInvoke);
+      if (result === undefined) return;
+      const invocation = await readInvocation(workId, result.callId);
+      if (invocation === null) return;
+      const outcome =
+        invocation.ok === true ? "succeeded" : `was rejected (${String(invocation.error_code)})`;
+      await recordProgress(workId, (current) => {
+        const evidence = citeNew(current.checkpoint, [invocationId(workId, result.callId)]);
+        if (evidence.length === 0) return null;
+        return {
+          evidence,
+          status: "running",
+          summary: `AppPort ${String(invocation.capability)} ${outcome}.`,
+        };
       });
     },
 
     async "turn.settled"(event, ctx) {
       const workId = ctx.channel.continuation?.token;
       if (workId === undefined) return;
-      const invocations = await Promise.all(
-        (await workEvidence(workId)).map((requestId) => readInvocation(requestId)),
+      const outcome = await decideOutcome(
+        workId,
+        event.data.outcome,
+        invokeCallsOf(ctx.view),
+        replyOf(ctx.view, event.data.turnId),
       );
-      const succeeded = invocations.filter((entry) => entry?.ok === true).length;
-      const text = reply(ctx.view, event.data.turnId)
-        .map((part) => (part.kind === "text" ? String(part.value ?? "") : ""))
-        .join("")
-        .slice(0, 2000);
-      if (event.data.outcome !== "completed") {
-        await recordProgress(workId, {
-          decisions: [`failed: the eve turn ended ${event.data.outcome}`],
-          status: "blocked",
-          summary: `Failed: the eve turn ended ${event.data.outcome}.`,
-        });
-      } else if (invocations.length > 0 && succeeded === 0) {
-        await recordProgress(workId, {
-          decisions: ["waiting: every AppPort invocation was rejected"],
-          status: "blocked",
-          summary: `Blocked: no capability invocation was authorized. Agent reply: ${text}`,
-        });
-      } else {
-        await recordProgress(workId, {
-          decisions: [`completed after ${succeeded} authorized invocation(s)`],
-          status: "completed",
-          summary: `Completed. Agent reply: ${text}`,
-        });
-      }
+      const submission = await readSubmission(workId);
+      await fault("checkpoint.final", { objective: submission?.objective ?? "", workId });
+      await recordProgress(workId, (current) => ({
+        decisions: [outcome.decision],
+        evidence: citeNew(current.checkpoint, outcome.evidence),
+        status: outcome.status,
+        summary: outcome.summary,
+      }));
     },
   },
 });
