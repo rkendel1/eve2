@@ -201,21 +201,24 @@ This slice:
 - X and Multiplayer: linking is implemented. X is tested against a local X API stand-in, not real X.
 - Chrome and iOS: they sign in as the person, so there is nothing to link.
 
-## 6. AnywhereAide integration (EXT)
+## 6. AnywhereAide integration (EXT). **Done:** [ANYWHEREAIDE-INTEGRATION-REPORT.md](ANYWHEREAIDE-INTEGRATION-REPORT.md)
 
-|               |                                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source        | PO-41–43 (`@anywhereaide` X intake, reply, publish) and PO-45 (Chrome and iOS clients)                                                                        |
-| Destination   | A surface request resolved to its linked person (slice 5), then run by the existing AppPort and AuthBoundry delegation path; no new agent or execution system |
-| Depends on    | 2.0, 5. An X API credential (operational)                                                                                                                     |
-| Must preserve | Content is data, never instructions; shared-audience privacy; per-step authority; once-only delivery (from the `interactions.ts` and `invocations.ts` tests)  |
+A linked person's request from Multiplayer or X reaches the eve agent and runs under that person's own grants:
+
+```
+surface → Personal OS (Resolver) → eve /work → delegated /appport → AuthBoundry
+```
+
+Personal OS asserts the person with its own ES256 identity token, and keeps the reply route: the reply is written to the record the request arrived on. Execution and delivery are separate records.
 
 **Acceptance:**
 
-- [ ] An unlinked handle gets no action.
-- [ ] A linked handle's request runs under that person's delegation.
-- [ ] A post never leaks another person's data.
-- [ ] Repeated delivery produces one reply.
+- [x] An unlinked handle gets no action (also revoked and ambiguous).
+- [x] A linked handle's request runs under that person's delegation, operation by operation.
+- [x] A post never leaks another person's data: X gets only the generic acknowledgement; shared conversations get "done" or "not finished".
+- [x] Repeated delivery produces one piece of work and one reply sequence.
+
+**Not live-verified:** real X (stand-in only) and the Multiplayer side (the bridge was played by the test).
 
 ## 7. voice-agent delegated tools (EXT)
 

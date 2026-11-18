@@ -93,6 +93,14 @@ if (process.argv[2] === "--report") {
   const audit = (await runtime.auditTrail()).filter((entry) =>
     /^(tasks|memory|projects|documents|researchstate|research):/u.test(entry.function),
   );
+  const raw = (name) => runtime.instance.handle("app").collection(name).find({});
+  const surfaces = {
+    actions: await raw("actions"),
+    interactions: await raw("interactions"),
+    invocations: await raw("invocations"),
+    xPosts: await raw("xPosts"),
+  };
+  const fullAudit = await runtime.auditTrail();
   const reminders = (await runtime.services.jobs.listJobs("personalos"))
     .filter((job) => job.type === "reminder.fire")
     .map((job) => ({
@@ -100,7 +108,7 @@ if (process.argv[2] === "--report") {
       status: job.status,
       taskId: job.payload.taskId,
     }));
-  console.log(JSON.stringify({ audit, people, reminders }));
+  console.log(JSON.stringify({ audit, fullAudit, people, reminders, surfaces }));
   await runtime.close();
   process.exit(0);
 }
@@ -117,6 +125,24 @@ for (const id of (process.env.PERSONALOS_SIGNED_IN ?? "").split(",").filter(Bool
   const { token } = await runtime.issueSession(person(id), { kind: "dev", via: "cli" });
   mkdirSync(`${projectDir}.tokens`, { recursive: true });
   writeFileSync(join(`${projectDir}.tokens`, id), token, { mode: 0o600 });
+}
+// Operator-issued service sessions (`feltkit session create --type service --id <id> --role <role>`):
+// the surfaces' bridge and X adapter, as `id=role;…`.
+for (const entry of (process.env.PERSONALOS_SERVICE_SESSIONS ?? "").split(";").filter(Boolean)) {
+  const [id, role] = entry.split("=");
+  const { token } = await runtime.issueSession(
+    { id, roles: [role], type: "service" },
+    { kind: "service", via: "cli" },
+  );
+  mkdirSync(`${projectDir}.tokens`, { recursive: true });
+  writeFileSync(join(`${projectDir}.tokens`, id), token, { mode: 0o600 });
+}
+// What each person lets PersonalOS's own executor do for them (Settings), as `person=cap+cap;…`.
+for (const entry of (process.env.PERSONALOS_EXECUTOR_GRANTS ?? "").split(";").filter(Boolean)) {
+  const [id, capabilities] = entry.split("=");
+  await call(person(id), "delegation:set", {
+    capabilities: capabilities ? capabilities.split("+") : [],
+  });
 }
 for (const entry of (process.env.PERSONALOS_GRANTS ?? "").split(";").filter(Boolean)) {
   const [id, capabilities] = entry.split("=");

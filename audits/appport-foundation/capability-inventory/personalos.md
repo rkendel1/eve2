@@ -290,6 +290,8 @@ Paths relative to `personalOS/`. "Pub" = published on `/appport`+`/mcp`; "Tool" 
 
 ### PO-36 Surface interactions (receive/status/cancel) — AnywhereAide — Duplicate
 
+- **Slice 6:** with `PERSONALOS_AGENT_URL` set, linked requests are handed to the eve agent (`feltkit/anywhere.ts`); see [ANYWHEREAIDE-INTEGRATION-REPORT.md](../ANYWHEREAIDE-INTEGRATION-REPORT.md).
+
 - `feltkit/interactions.ts:83` (7-step pipeline: authenticate bridge, idempotency per adapter key, identity via Resolver, audience private/shared, understand, execute via `_ops.ts`, record), `:368` status (`afterSeq` updates, `revoked`), `:382` cancel. Contract `personalos.interaction/1` (`_interaction.ts`, states `received…refused`). Bridge role `interactions.receive`. AuthBoundry `capabilityFor(intent)` with `onBehalfOf user:<owner>`.
 - Tests: `tests/interactions.test.ts` (37). Complete (Multiplayer bridge).
 - **Rationale:** eve channels (Slack, Telegram, custom HTTP, etc.) plus the appport-agent's per-user delegation and `POST /work` already provide "a surface hands the agent a request"; the Multiplayer bridge contract would not be re-implemented. Preserve its invariants as tests (see port notes).
@@ -314,6 +316,8 @@ Paths relative to `personalOS/`. "Pub" = published on `/appport`+`/mcp`; "Tool" 
 - `feltkit/invocationstate.ts:97,108`; `invocations.read`. Receipt: state accepted|processing|needs_approval|completed|failed, work refs. Duplicates the destination's work-record status.
 
 ### PO-41 X mention intake (@anywhereaide) — AnywhereAide — Integration required
+
+- **Slice 6:** with `PERSONALOS_AGENT_URL` set, linked requests are handed to the eve agent (`feltkit/anywhere.ts`); see [ANYWHEREAIDE-INTEGRATION-REPORT.md](../ANYWHEREAIDE-INTEGRATION-REPORT.md).
 
 - **Source:** `feltkit/xsurface.ts:86` startPolling / `:100` stopPolling (xadapter session), `:170` poll job (`x.poll`, backoff `nextDelay`, cursor `sinceId`, baseline so old mentions aren't requests), `:249` receive (one record per post id; link code / unlinked / linked → invocation surface `x`); parsing `_x.ts`. X integration `app.ts:261` (OAuth2 PKCE bot credential managed by FeltKit: refresh, rotation, revoke).
 - **Auth:** role `xadapter` (`x.read`, `x.poll`, `x.receive`); author resolved via Resolver link; AuthBoundry per intent.
