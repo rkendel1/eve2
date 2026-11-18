@@ -134,7 +134,7 @@ PO-17, 18 (projects list, create) and PO-20 (documents list). Reading a document
 - **Not delegable:** uploads (bytes travel outside AppPort), download links (bearer URLs) and document removal (the person's own act).
 - **Deferred finding:** eve's ledger marks FeltKit's `feltkit.FAILED_PRECONDITION` refusals indeterminate rather than failed.
 
-## 3. Research runs (POS)
+## 3. Research runs (POS). **Done:** [RESEARCH-RUNS-REPORT.md](RESEARCH-RUNS-REPORT.md)
 
 |                 |                                                                                                             |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -145,10 +145,17 @@ PO-17, 18 (projects list, create) and PO-20 (documents list). Reading a document
 
 **Acceptance:**
 
-- [ ] A delegated start returns a run id.
-- [ ] Reading it shows citations.
-- [ ] Cancel stops spend.
-- [ ] Retry of a completed run is idempotent.
+- [x] A delegated start returns a run id.
+- [x] Reading it shows citations.
+- [x] Cancel stops spend.
+- [x] Retry of a completed run is idempotent.
+
+**As built:**
+
+- **Capabilities:** `research.start` and `research.retry` (new mutations: FeltKit refuses actions as capabilities), plus `research.list`, `research.get` and `research.cancel`.
+- **Budget:** a per-person, per-agent budget in billable calls (model generations and web searches) that only the person sets. Each start reserves from it atomically; each call is charged before it is made.
+- **Stops:** cancellation and revocation stop further calls at the next step.
+- **Not measured:** dollars, and page reads.
 
 ## 4. Runtime safety mechanisms (INT)
 

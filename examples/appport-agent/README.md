@@ -235,7 +235,9 @@ Memory works the same way, with `memory.list` and `memory.propose`. A proposal i
 
 Projects and documents use `projects.list`, `projects.create`, `projects.update`, `documents.list` and `documents.update`, each granted separately. A project grant never exposes documents. Uploading a document, a download link, and removing a document are never available to an agent.
 
-The agent adds no task, memory, project or document logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
+Research uses `research.start`, `research.list`, `research.get`, `research.cancel` and `research.retry`, and is bounded by a research budget the person sets for the agent, in billable calls (model generations and web searches). Starting with no budget, or beyond what is left, is refused. Personal OS charges each call to the run before making it, stops the run when its calls are used, and makes no further call once it is cancelled or the grant is revoked.
+
+The agent adds no task, memory, project, document or research logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
 
 ## Operator settlement
 
@@ -400,6 +402,14 @@ Every rejected call is checked to have no `execution` record.
     - document reads without contents, and re-filing a document to a project;
     - no download link;
     - one project across an eve and Personal OS crash;
+    - revocation;
+  - research, against a stand-in web search provider owned by the test, which counts every search:
+    - no start without a grant or a budget;
+    - a run stopping at exactly its budget;
+    - retry within budget, and a completed run never run again;
+    - its citations;
+    - a cancel mid-search with nothing searched afterwards, even after a restart;
+    - one run across an eve and Personal OS crash;
     - revocation.
 - **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;
