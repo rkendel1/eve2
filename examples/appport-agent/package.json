@@ -19,6 +19,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@appport/resolver": "0.4.1",
     "@appport/sdk": "1.9.0",
     "@authboundry/core": "1.20.0",
     "@authboundry/local": "0.1.1",

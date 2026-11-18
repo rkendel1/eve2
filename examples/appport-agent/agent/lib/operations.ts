@@ -5,8 +5,10 @@ import type { CapabilityManifestEntry } from "@appport/protocol";
 
 import {
   contractPin,
+  loadManifest,
   resolveCapability,
   sendRequest,
+  type Resolution,
   verifyContract,
   type Caller,
   type ContractPin,
@@ -79,6 +81,8 @@ export interface OperationRecord {
   readonly resolution: string | null;
   /** The capability contract this operation was prepared against (AppPort `capabilityDigest`), never replaced. */
   readonly contract?: ContractPin;
+  /** The implementation it was prepared against (Resolver reference, revision, origin), never replaced: every attempt goes there. */
+  readonly implementation?: Resolution;
   /** The capability's declared effect when the operation was prepared. */
   readonly effect?: string | null;
   /** Each time the contract served before a dispatch differed from the pinned one, and what was decided. */
@@ -165,6 +169,8 @@ export interface OperationRequest {
   /** The work was submitted read-only (its durable submission): only observation capabilities may run. */
   readonly readOnly: boolean;
   readonly workId: string;
+  /** The resolution the entry and manifest came from: where a new operation is prepared. */
+  readonly resolution: Resolution;
 }
 
 export type OperationResult =
@@ -226,6 +232,7 @@ export async function runOperation(request: OperationRequest): Promise<Operation
           created_at: now,
           effect: request.entry.effect ?? null,
           executor: null,
+          implementation: request.resolution,
           idempotency_key: safety === "idempotency-key" ? operationId : null,
           input_digest: fingerprint,
           operation_id: operationId,
@@ -301,9 +308,19 @@ async function attempt_(
   }
 
   // The contract is verified before every dispatch, the first and any retry or recovery alike.
-  const verdict: ContractVerdict = current.contract
-    ? verifyContract(current.contract, request.manifest)
-    : { kind: "unavailable", reason: "the operation has no pinned contract" };
+  // Against the implementation the operation was prepared against, whatever resolves now.
+  const at = current.implementation ?? request.resolution;
+  let served: AppPortManifest | null = request.manifest;
+  if (at.endpoint !== request.resolution.endpoint)
+    served = await loadManifest(request.caller, at).catch(() => null);
+  const verdict: ContractVerdict = !current.contract
+    ? { kind: "unavailable", reason: "the operation has no pinned contract" }
+    : served === null
+      ? {
+          kind: "unavailable",
+          reason: `${at.origin ?? at.endpoint}, where it was prepared, cannot be reached`,
+        }
+      : verifyContract(current.contract, served);
   if (verdict.kind !== "same") {
     const check = {
       at: new Date().toISOString(),
@@ -361,6 +378,7 @@ async function attempt_(
     request.workId,
     current.idempotency_key ?? undefined,
     current.capability_version,
+    at,
   );
   await fault("invocation.record", { objective: request.objective, workId: request.workId });
 
@@ -511,11 +529,25 @@ export async function reconcileOperation(current: OperationRecord): Promise<Oper
   let status: DestinationStatus;
   let check: BusinessCheck | undefined;
   let requestId: string | null = null;
-  const resolved = await resolveCapability(caller, reader);
+  // Read where the operation was sent, never where the dependency resolves now.
+  const resolved = await resolveCapability(caller, reader, current.implementation);
   if (!resolved.ok || resolved.entry.effect !== "observation") {
-    status = { kind: "unknown", reason: `${reader} is not an exposed read-only capability` };
+    status = {
+      kind: "unknown",
+      reason: resolved.ok
+        ? `${reader} is not an exposed read-only capability`
+        : `${reader}: ${resolved.result.ok ? "" : resolved.result.error.code}`,
+    };
   } else {
-    const answer = await sendRequest(caller, resolved.entry, { key }, current.work_id, undefined);
+    const answer = await sendRequest(
+      caller,
+      resolved.entry,
+      { key },
+      current.work_id,
+      undefined,
+      resolved.entry.latestVersion,
+      resolved.resolution,
+    );
     requestId = answer.requestId;
     if (!answer.ok) {
       status = { kind: "unknown", reason: `${reader} answered ${answer.error.code}` };

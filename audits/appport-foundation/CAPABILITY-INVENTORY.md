@@ -131,7 +131,7 @@ None of the contract tooling is an agent tool.
 - **Messaging:** no X channel.
 - **Research:** no citation-tracking research store.
 - **Memory provenance:** eve's file memory has no provenance.
-- **Contract safety:** no contract pinning. _Since built in the destination (slice 4)._
+- **Contract safety:** no contract pinning. _Since built in the destination (slice 4)._ _Slice 8: contract-verified replacement of an AppPort dependency through Resolver `agent` references; Resolver is not yet a platform-level runtime capability._
 - **Loop protection:** no loop or stuck guard. _Slice 4 added stuck-run detection; a repeated-call guard is still absent._
 - **Completion:** no completion gate over recorded outcomes. _Since built in the destination (slice 4)._
 - **Uncertain operations:** no operator resolution of indeterminate operations.

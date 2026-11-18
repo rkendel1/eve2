@@ -34,7 +34,15 @@ export default defineTool({
           ok: false,
         };
       }
-      return await sendRequest(caller, resolved.entry, input, ctx.session.id, undefined);
+      return await sendRequest(
+        caller,
+        resolved.entry,
+        input,
+        ctx.session.id,
+        undefined,
+        resolved.entry.latestVersion,
+        resolved.resolution,
+      );
     }
 
     const submission = await readSubmission(workId);
@@ -44,6 +52,7 @@ export default defineTool({
       entry: resolved.entry,
       input,
       manifest: resolved.manifest,
+      resolution: resolved.resolution,
       objective: submission?.objective ?? "",
       operationKey,
       readOnly: submission?.read_only === true,

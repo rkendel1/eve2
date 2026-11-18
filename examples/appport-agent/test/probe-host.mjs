@@ -19,7 +19,8 @@ const applied = (entry) =>
     : 0;
 
 // PROBE_CONTRACT changes probe.applykeyed's contract for this start: "compatible" (an optional input field
-// and new words), "breaking" (a new required input field), "removed" (not served at all).
+// and new words), "breaking" (a new required input field), "effect" (declared an observation instead of
+// consequential, nothing else changed), "removed" (not served at all).
 const contract = process.env.PROBE_CONTRACT ?? "";
 // While PROBE_HOLD_FILE exists, a probe handler waits: an operation that legitimately takes long.
 const holdFile = process.env.PROBE_HOLD_FILE;
@@ -35,7 +36,7 @@ const probe = (name, idempotency, effect = "consequential") => {
       changed === "compatible"
         ? "Test-only side effect, appended to a file outside this process (reworded)."
         : "Test-only side effect, appended to a file outside this process.",
-    ...(effect ? { effect } : {}),
+    ...(effect ? { effect: changed === "effect" ? "observation" : effect } : {}),
     async handler({ token }) {
       await held();
       appendFileSync(effectsFile, `${name}:${token}\n`);

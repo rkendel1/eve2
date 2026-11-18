@@ -203,6 +203,13 @@ export async function readWork(requester: string, workId: string) {
       effect: record.effect ?? null,
       errorCode: record.outcome?.error?.code ?? null,
       operationId: record.operation_id,
+      implementation: record.implementation
+        ? {
+            origin: record.implementation.origin,
+            ref: record.implementation.ref,
+            revision: record.implementation.revision,
+          }
+        : null,
       requestIds: record.request_ids ?? [],
       resolution: record.resolution ?? null,
       settlement: record.settlement ?? null,

@@ -40,16 +40,122 @@ function onBehalfOf(caller: Caller): string {
   return caller.principalId.slice(prefix.length);
 }
 
-function clientFor(caller: Caller) {
+/**
+ * Which implementation satisfies this agent's AppPort dependency. With `APPPORT_AGENT_DEPENDENCY` (a
+ * Resolver `agent` reference), Resolver says, and its binding pins the contract (`name@version` →
+ * `capabilityDigest`) that Resolver verified the origin serves before storing it. Without it, the static
+ * `APPPORT_URL`, unverified, as before. An operation records the resolution it was prepared against
+ * and is only ever sent there.
+ */
+export interface Resolution {
+  readonly endpoint: string;
+  readonly ref: string | null;
+  readonly revision: number | null;
+  readonly origin: string | null;
+  readonly application: string | null;
+  readonly pinned: Readonly<Record<string, string>>;
+}
+
+export class DependencyError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+function resolverClient() {
+  return createClient({
+    transport: createHttpTransport({
+      headers: { authorization: `Bearer ${requireEnv("RESOLVER_API_KEY")}` },
+      url: new URL("/appport", requireEnv("RESOLVER_URL")).href,
+    }),
+  });
+}
+
+/** The current resolution. A dependency that cannot be resolved fails closed: there is no fallback. */
+export async function currentResolution(): Promise<Resolution> {
+  const ref = process.env.APPPORT_AGENT_DEPENDENCY;
+  if (!ref) {
+    return {
+      application: null,
+      endpoint: requireEnv("APPPORT_URL"),
+      origin: null,
+      pinned: {},
+      ref: null,
+      revision: null,
+    };
+  }
+  let response: AppResponse;
+  try {
+    response = await resolverClient().send({
+      capability: { name: "resolver.resolve", version: 1 },
+      input: { ref },
+      protocol: "appport/1",
+      requestId: `eve_${randomUUID()}`,
+      type: "request",
+    });
+  } catch (error) {
+    throw new DependencyError(
+      "DEPENDENCY_UNRESOLVED",
+      `Resolver could not be reached for ${ref}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (response.type !== "response" || !response.ok)
+    throw new DependencyError(
+      "DEPENDENCY_UNRESOLVED",
+      `Resolver did not resolve ${ref}${response.type === "response" && !response.ok ? ` (${response.error.code}: ${response.error.message})` : ""}.`,
+    );
+  const output = response.output as {
+    revision?: number;
+    selected?: {
+      value?: { origin?: string; application?: string; capabilities?: Record<string, string> };
+    };
+  };
+  const target = output.selected?.value;
+  if (typeof target?.origin !== "string")
+    throw new DependencyError("DEPENDENCY_UNRESOLVED", `${ref} is not an AppPort agent reference.`);
+  let endpoint: string;
+  try {
+    const discovery = await fetch(new URL("/.well-known/appport", target.origin), {
+      signal: AbortSignal.timeout(5000),
+    });
+    const document = (await discovery.json()) as { endpoint?: string };
+    endpoint = new URL(document.endpoint ?? "/appport", target.origin).href;
+  } catch (error) {
+    throw new DependencyError(
+      "DEPENDENCY_UNAVAILABLE",
+      `${target.origin} (${ref} at revision ${output.revision}) could not be discovered: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return {
+    application: target.application ?? null,
+    endpoint,
+    origin: target.origin,
+    pinned: { ...target.capabilities },
+    ref,
+    revision: typeof output.revision === "number" ? output.revision : null,
+  };
+}
+
+function clientFor(caller: Caller, endpoint: string) {
   return createClient({
     transport: createHttpTransport({
       headers: {
         authorization: `Bearer ${agentCredential()}`,
         "x-appport-on-behalf-of": onBehalfOf(caller),
       },
-      url: requireEnv("APPPORT_URL"),
+      url: endpoint,
     }),
   });
+}
+
+/** The manifest served at one resolution's endpoint. */
+export async function loadManifest(
+  caller: Caller,
+  resolution: Resolution,
+): Promise<AppPortManifest> {
+  return (await clientFor(caller, resolution.endpoint).load()) as AppPortManifest;
 }
 
 function allowedCapabilities(): ReadonlySet<string> {
@@ -72,7 +178,7 @@ export interface CapabilitySummary {
 }
 
 export async function listCapabilities(caller: Caller): Promise<CapabilitySummary[]> {
-  const manifest = await clientFor(caller).load();
+  const manifest = await loadManifest(caller, await currentResolution());
   const allowed = allowedCapabilities();
   return manifest.capabilities
     .filter((entry) => !entry.name.startsWith("appport."))
@@ -88,7 +194,7 @@ export async function listCapabilities(caller: Caller): Promise<CapabilitySummar
 }
 
 export async function readContract(caller: Caller, name: string) {
-  const manifest = await clientFor(caller).load();
+  const manifest = await loadManifest(caller, await currentResolution());
   const entry = manifest.capabilities.find((candidate) => candidate.name === name);
   if (entry === undefined) return { found: false as const, name };
   return {
@@ -125,6 +231,7 @@ export type ResolvedCapability =
       readonly ok: true;
       readonly entry: CapabilityManifestEntry;
       readonly manifest: AppPortManifest;
+      readonly resolution: Resolution;
     }
   | { readonly ok: false; readonly result: InvocationResult };
 
@@ -205,12 +312,29 @@ function unavailable(requestId: string, error: unknown): InvocationResult {
   );
 }
 
-export async function resolveCapability(caller: Caller, name: string): Promise<ResolvedCapability> {
+/**
+ * The capability as the dependency serves it now (or, with `at`, as one recorded resolution serves it).
+ * Through Resolver, it is used only if the served contract is exactly the one the binding pins: a
+ * resolution is not proof of compatibility, and an origin that changed behind an unchanged binding is refused.
+ */
+export async function resolveCapability(
+  caller: Caller,
+  name: string,
+  at?: Resolution,
+): Promise<ResolvedCapability> {
   const requestId = `eve_${randomUUID()}`;
   let entry;
   let manifest;
+  let resolution: Resolution;
   try {
-    manifest = (await clientFor(caller).load()) as AppPortManifest;
+    resolution = at ?? (await currentResolution());
+  } catch (error) {
+    if (error instanceof DependencyError)
+      return { ok: false, result: refused(requestId, error.code, error.message) };
+    throw error;
+  }
+  try {
+    manifest = await loadManifest(caller, resolution);
     entry = manifest.capabilities.find((candidate) => candidate.name === name);
   } catch (error) {
     return { ok: false, result: unavailable(requestId, error) };
@@ -225,7 +349,39 @@ export async function resolveCapability(caller: Caller, name: string): Promise<R
       ),
     };
   }
-  return { entry, manifest, ok: true };
+  if (resolution.ref !== null) {
+    if (resolution.application !== null && manifest.application.id !== resolution.application)
+      return {
+        ok: false,
+        result: refused(
+          requestId,
+          "DEPENDENCY_MISMATCH",
+          `${resolution.origin} serves ${manifest.application.id}, not ${resolution.application} (${resolution.ref} at revision ${resolution.revision}).`,
+        ),
+      };
+    const reference = `${name}@${entry.latestVersion}`;
+    const pinned = resolution.pinned[reference];
+    const served = capabilityDigest(manifest, name, entry.latestVersion);
+    if (pinned === undefined)
+      return {
+        ok: false,
+        result: refused(
+          requestId,
+          "CONTRACT_NOT_PINNED",
+          `${resolution.ref} at revision ${resolution.revision} pins no contract for ${reference}; it is not used unverified.`,
+        ),
+      };
+    if (served !== pinned)
+      return {
+        ok: false,
+        result: refused(
+          requestId,
+          "CONTRACT_MISMATCH",
+          `${resolution.origin} serves ${reference} as ${served ?? "nothing"}, not the pinned ${pinned} (${resolution.ref} at revision ${resolution.revision}).`,
+        ),
+      };
+  }
+  return { entry, manifest, ok: true, resolution };
 }
 
 export async function sendRequest(
@@ -235,6 +391,7 @@ export async function sendRequest(
   traceId: string | undefined,
   idempotencyKey: string | undefined,
   version: number = entry.latestVersion,
+  resolution?: Resolution,
 ): Promise<InvocationResult> {
   const requestId = `eve_${randomUUID()}`;
   const request: AppRequest = {
@@ -248,8 +405,11 @@ export async function sendRequest(
   if (idempotencyKey !== undefined) request.idempotencyKey = idempotencyKey;
   let response: AppResponse;
   try {
-    response = await clientFor(caller).send(request);
+    response = await clientFor(caller, (resolution ?? (await currentResolution())).endpoint).send(
+      request,
+    );
   } catch (error) {
+    if (error instanceof DependencyError) return refused(requestId, error.code, error.message);
     return unavailable(requestId, error);
   }
   if (response.type !== "response")
@@ -279,5 +439,13 @@ export async function invokeCapability(
       `${name} changes state; it is invoked only through a durable operation within accepted work.`,
     );
   }
-  return await sendRequest(caller, resolved.entry, input, traceId, undefined);
+  return await sendRequest(
+    caller,
+    resolved.entry,
+    input,
+    traceId,
+    undefined,
+    resolved.entry.latestVersion,
+    resolved.resolution,
+  );
 }
