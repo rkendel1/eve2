@@ -5,13 +5,12 @@ import { toolResultFrom } from "eve/tools";
 
 import { fault } from "../lib/faults";
 import { invokeCallsOf, reconcileAll, replyOf } from "../lib/recovery";
+import { decideOutcome, readOperation } from "../lib/operations";
 import {
   acceptWork,
   bindSession,
   citeNew,
-  decideOutcome,
-  invocationId,
-  readInvocation,
+  readCallLink,
   readSubmission,
   readWork,
   recordProgress,
@@ -128,17 +127,22 @@ export default defineChannel({
       if (workId === undefined) return;
       const result = toolResultFrom(call(ctx.view, event.data.callId), appportInvoke);
       if (result === undefined) return;
-      const invocation = await readInvocation(workId, result.callId);
-      if (invocation === null) return;
+      const link = await readCallLink(workId, result.callId);
+      if (link === null || link.operation_id === null) return;
+      const operation = await readOperation(String(link.operation_id));
+      if (operation === null || operation.work_id !== workId) return;
+      if (operation.state !== "succeeded" && operation.state !== "failed") return;
       const outcome =
-        invocation.ok === true ? "succeeded" : `was rejected (${String(invocation.error_code)})`;
+        operation.state === "succeeded"
+          ? "succeeded"
+          : `was rejected (${operation.outcome?.error?.code ?? "unknown"})`;
       await recordProgress(workId, (current) => {
-        const evidence = citeNew(current.checkpoint, [invocationId(workId, result.callId)]);
+        const evidence = citeNew(current.checkpoint, [operation.operation_id]);
         if (evidence.length === 0) return null;
         return {
           evidence,
           status: "running",
-          summary: `AppPort ${String(invocation.capability)} ${outcome}.`,
+          summary: `AppPort ${operation.capability} ${outcome}.`,
         };
       });
     },
