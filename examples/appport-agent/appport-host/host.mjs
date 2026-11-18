@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -8,7 +8,6 @@ import { serve } from "@appport/sdk/node";
 
 export const APPLICATION_ID = "inventory";
 export const AGENT_ID = "agent:appport-agent";
-const CAPABILITIES = ["catalog.read"];
 const here = (file) => new URL(file, import.meta.url);
 
 function readSecret(file) {
@@ -27,6 +26,8 @@ function sameSecret(presented, held) {
 }
 
 export async function startInventoryHost({
+  extraCapabilities = [],
+  extraPermissions = [],
   adminSecret,
   agentCredentialFile,
   authorityLogger,
@@ -35,6 +36,7 @@ export async function startInventoryHost({
   port = 4317,
   provenanceFile,
 }) {
+  const permissions = ["catalog.read", ...extraPermissions];
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const checkCredentialFile = join(dataDir, "check-credential");
   const record = (entry) =>
@@ -47,14 +49,14 @@ export async function startInventoryHost({
     adminSecret,
     agents: [
       {
-        capabilities: CAPABILITIES,
+        capabilities: permissions,
         credential: readSecret(agentCredentialFile),
         id: AGENT_ID,
         name: "eve AppPort agent",
         onCredential: (secret) => writeSecret(agentCredentialFile, secret),
       },
     ],
-    application: { capabilities: CAPABILITIES, id: APPLICATION_ID, name: "Inventory" },
+    application: { capabilities: permissions, id: APPLICATION_ID, name: "Inventory" },
     checkCredential: readSecret(checkCredentialFile),
     dataDir: join(dataDir, "authority"),
     executor: { id: `agent:${APPLICATION_ID}`, name: "Inventory" },
@@ -147,7 +149,7 @@ export async function startInventoryHost({
   const application = createApplication({
     application: { id: APPLICATION_ID, name: "Inventory", version: "1.0.0" },
     authorizer: delegatedAuthority,
-    capabilities: [catalogLookup],
+    capabilities: [catalogLookup, ...extraCapabilities],
     mode: "production",
     telemetry: { record: (entry) => record({ ...entry, kind: "request" }) },
   });
@@ -163,7 +165,7 @@ export async function startInventoryHost({
       const session = {
         applicationId: APPLICATION_ID,
         createdAt: new Date().toISOString(),
-        id: `agent_${randomUUID()}`,
+        id: `agent_${createHash("sha256").update(`${AGENT_ID}\n${onBehalfOf}`).digest("hex").slice(0, 32)}`,
         principal,
       };
       return { principal, session };

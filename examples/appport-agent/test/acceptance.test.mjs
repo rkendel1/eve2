@@ -83,6 +83,7 @@ describe("AppPort with AuthBoundry delegation (real servers, no model)", () => {
         authorization: ["catalog.read"],
         description: "Reads one catalog item by SKU. Read-only.",
         effect: "observation",
+        idempotency: "unsupported",
         invocable: true,
         name: "catalog.lookup",
         version: 1,

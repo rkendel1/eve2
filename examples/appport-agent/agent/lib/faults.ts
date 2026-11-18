@@ -1,4 +1,8 @@
-export type FaultPoint = "work.accepted" | "invocation.record" | "checkpoint.final";
+export type FaultPoint =
+  | "work.accepted"
+  | "operation.prepared"
+  | "invocation.record"
+  | "checkpoint.final";
 
 export interface FaultContext {
   readonly objective: string;

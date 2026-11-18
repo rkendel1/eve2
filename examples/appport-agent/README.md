@@ -20,7 +20,7 @@ Authentication, delegation and capability authorization are separate steps, each
    - it allows only on `allow`, which comes with the person's `delegation_id`;
    - any other answer is `FORBIDDEN` (`delegation_missing`, `delegation_revoked`, `delegation_expired`, and so on);
    - if AuthBoundry is unreachable the call fails closed (`INTERNAL_ERROR`).
-5. **Exposure.** Only `effect: "observation"` capabilities listed in `APPPORT_AGENT_CAPABILITIES` are ever sent.
+5. **Exposure.** Only capabilities listed in `APPPORT_AGENT_CAPABILITIES` are ever sent (the default lists only `catalog.lookup`). A capability that is not `effect: "observation"` is sent only as a durable operation within accepted work; see [Durable operations](#durable-operations).
 6. **Provenance** goes to `APPPORT_PROVENANCE_FILE`, joined by `requestId`:
    - `authorization`: agent, person, decision, `decisionId`, `delegationId`, reason;
    - `execution`: written by the handler, only when it ran;
@@ -58,20 +58,71 @@ curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
 | `call.settled` for `appport_invoke` | `running`, citing the invocation record as evidence (verified by FeltDB inside the commit)                                                  |
 | `turn.settled`                      | One of the three outcomes below, decided from recorded evidence, never from the model's text                                                |
 
-| Outcome                                                                            | When                                                                                                                            |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `completed`                                                                        | At least one invocation was authorized                                                                                          |
-| `blocked` with `waiting: every AppPort invocation was rejected`                    | Every invocation was rejected                                                                                                   |
-| `blocked` with `failed: the eve turn ended failed`                                 | The turn failed                                                                                                                 |
-| `blocked` with `indeterminate: N AppPort invocation(s) without committed evidence` | eve recorded an `appport_invoke` call that settled without committed evidence (for example, interrupted after AppPort answered) |
+| Outcome                                                                               | When                                                                                               |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `completed`                                                                           | At least one invocation was authorized                                                             |
+| `blocked` with `waiting: every AppPort invocation was rejected`                       | Every invocation was rejected                                                                      |
+| `blocked` with `failed: the eve turn ended failed`                                    | The turn failed                                                                                    |
+| `blocked` with `indeterminate: N AppPort operation(s) without an established outcome` | An `appport_invoke` call settled while its operation's outcome is unknown (see Durable operations) |
 
 The agent's reply is kept in the summary as the agent's claim.
 
-**Invocation evidence.** The `appport_invoke` tool commits an `appport_invocations` record from AppPort's response, keyed by work id and eve call id. It holds the work id, caller, agent, capability, outcome, output digest and `requestId`. AppPort's `traceId` is the work id, so the host's provenance carries the work id beside the AuthBoundry `delegationId`, `decisionId` and authority.
+**Invocation evidence.** Each call is a durable operation (below). The work cites `appport_operations` records, never model text. AppPort's `traceId` is the work id, so the host's provenance carries the work id beside the AuthBoundry `delegationId`, `decisionId` and authority.
 
 **Reading work.** `GET /work/:id` returns a requester's own work only; anyone else gets 404. The response includes status, history, decisions, evidence, invocation outcomes, the recorded session, and the session eve currently holds for that address.
 
 Only one eve process may open the work store: FeltDB holds an exclusive lock.
+
+## Durable operations
+
+Within accepted work, every `appport_invoke` call is a durable operation in the FeltDB work store (`appport_operations`). Each eve call is linked to its operation, or recorded as refused, in `appport_invocations`.
+
+**Identity.** `op_` + SHA-256 of (work id, capability, then either `operationKey` if the model passed one, or the RFC 8785 canonical digest of capability, version and input).
+
+- A repeated call with the same input, or the same key, resolves to the same operation. That includes a call the model re-issues after eve abandoned an interrupted one.
+- Different input is a different operation.
+- The same key with different input or capability is refused as `OPERATION_CONFLICT`, and the recorded intent is never overwritten.
+- eve call ids and AppPort request ids are **not** used as identity: neither is stable across retries.
+
+**Lifecycle.**
+
+```
+prepared ─▶ executing ─▶ succeeded | failed | indeterminate
+```
+
+1. `prepared` is committed, and the call linked, before anything is sent.
+2. `executing` is committed, naming this process, before the request is sent.
+3. The request is sent with the operation id as AppPort's `idempotencyKey`, when the manifest declares `idempotency: "supported"`.
+4. The outcome is committed from AppPort's actual response.
+
+Transitions are compare-and-set on the record version.
+
+**Repeated attempts.**
+
+| Recorded state                          | What happens                                                          |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| `succeeded`, `failed`                   | The recorded outcome is returned; nothing is sent                     |
+| `indeterminate`                         | Returned as `OPERATION_INDETERMINATE`; never sent again automatically |
+| `prepared`                              | Sent: nothing was sent before                                         |
+| `executing` from a process that is gone | Depends on the downstream guarantee (next table)                      |
+
+| Downstream guarantee (from the AppPort manifest) | `executing` after an interruption                                                                                                                                          |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `idempotency: "supported"`                       | Sent again with the **same** key. AppPort replays the recorded response, so the effect does not run again. An `IDEMPOTENCY_OUTCOME_UNKNOWN` answer becomes `indeterminate` |
+| `effect: "observation"` (no effect declared)     | Sent again (a repeated read)                                                                                                                                               |
+| Neither                                          | `indeterminate`, with a resolution note. A person must establish whether it took effect                                                                                    |
+
+**How answers are classified.**
+
+- An answer that proves the capability did not run is `failed`, and is not retried: `UNAUTHORIZED`, `FORBIDDEN`, `INVALID_INPUT`, `INVALID_REQUEST`, `NOT_FOUND`, `UNKNOWN_CAPABILITY` or `UNSUPPORTED_CAPABILITY_VERSION`.
+- Any other error is `indeterminate`.
+- An unreachable AppPort leaves a keyed or observation operation reconcilable by a later attempt. An operation with neither guarantee becomes `indeterminate`.
+
+**Not guaranteed.**
+
+- **Exactly-once effects.** Only the downstream key gives at-most-once execution, and only while AppPort's idempotency store holds the key. AppPort's default store is in memory, so a restart of the AppPort host loses it.
+- **Calls outside accepted work.** Consequential capabilities are refused outside accepted work.
+- **A model that changes the input on retry.** That creates a new operation.
 
 ## Recovery
 
@@ -162,6 +213,11 @@ Every rejected call is checked to have no `execution` record.
   - before the final checkpoint;
 - a failed checkpoint write stays visible until reconciliation;
 - a call without committed evidence is never cited;
+- durable operations, with test-only `probe.applykeyed` (`idempotency: "supported"`) and `probe.applyunkeyed` capabilities that count their effects:
+  - intent is committed before invocation;
+  - a crash after the effect is replayed through the key once (keyed) or becomes indeterminate (unkeyed), and is never repeated;
+  - indeterminate stays indeterminate across recovery passes;
+  - repeats, conflicts, distinct operations, failures and Bob's authority are covered;
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;
 - a replayed key after restarts runs nothing;

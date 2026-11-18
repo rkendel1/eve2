@@ -1,41 +1,79 @@
-import { createHash } from "node:crypto";
-
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 
-import { invokeCapability } from "../lib/appport";
-import { fault } from "../lib/faults";
-import { AGENT_ID, readSubmission, recordInvocation, workForSession } from "../lib/work";
+import { resolveCapability, sendRequest } from "../lib/appport";
+import { recordRefusedCall, runOperation } from "../lib/operations";
+import { readSubmission, workForSession } from "../lib/work";
 
 export default defineTool({
   description:
-    "Invokes one read-only AppPort capability as the current caller. Input must match the capability's input schema. Returns the result or AppPort's rejection, with the invocation's requestId.",
+    "Invokes one AppPort capability as the current caller. Input must match the capability's input schema. Within accepted work every call is a durable operation: repeating the same capability with the same input (or the same operationKey) returns the recorded outcome instead of acting again, and an operation whose outcome is uncertain is never retried automatically. Pass operationKey (letters, digits, . _ -) only to tell two deliberately identical actions apart.",
   inputSchema: z.object({
     input: z.record(z.string(), z.unknown()),
     name: z.string().min(1),
+    operationKey: z.string().min(1).max(64).optional(),
   }),
-  async execute({ input, name }, ctx) {
+  async execute({ input, name, operationKey }, ctx) {
     const principalId = ctx.session.auth?.current?.principalId;
     if (principalId === undefined) return { error: "No authenticated caller." };
+    const caller = { principalId };
     const workId = await workForSession(ctx.session.id);
-    const result = await invokeCapability({ principalId }, name, input, workId ?? ctx.session.id);
-    if (workId !== null) {
-      const submission = await readSubmission(workId);
-      await fault("invocation.record", { objective: submission?.objective ?? "", workId });
-      await recordInvocation({
-        agent: AGENT_ID,
-        callId: ctx.callId,
-        capability: name,
-        caller: principalId,
-        errorCode: result.ok ? null : result.error.code,
-        ok: result.ok,
-        outputDigest: result.ok
-          ? `sha256:${createHash("sha256").update(JSON.stringify(result.output)).digest("hex")}`
-          : null,
-        requestId: result.requestId,
-        workId,
-      });
+    const resolved = await resolveCapability(caller, name);
+    if (!resolved.ok) {
+      if (workId !== null && !resolved.result.ok)
+        await recordRefusedCall(workId, ctx.callId, resolved.result.error.code);
+      return resolved.result;
     }
-    return result;
+    if (workId === null) {
+      if (resolved.entry.effect !== "observation") {
+        return {
+          error: {
+            code: "NOT_EXPOSED",
+            message: `${name} changes state; it is invoked only through a durable operation within accepted work.`,
+          },
+          ok: false,
+        };
+      }
+      return await sendRequest(caller, resolved.entry, input, ctx.session.id, undefined);
+    }
+
+    const submission = await readSubmission(workId);
+    const result = await runOperation({
+      callId: ctx.callId,
+      caller,
+      entry: resolved.entry,
+      input,
+      objective: submission?.objective ?? "",
+      operationKey,
+      workId,
+    });
+    if (result.kind === "conflict") {
+      return {
+        error: { code: "OPERATION_CONFLICT", message: result.message },
+        ok: false,
+        operationId: result.operationId,
+      };
+    }
+    const { invoked, operation } = result;
+    const recorded = {
+      operationId: operation.operation_id,
+      operationState: operation.state,
+      replayedFromLedger: !invoked,
+      requestId: operation.outcome?.request_id ?? null,
+    };
+    if (operation.state === "succeeded")
+      return { ...recorded, ok: true, output: operation.outcome?.output };
+    if (operation.state === "failed")
+      return { ...recorded, error: operation.outcome?.error ?? null, ok: false };
+    return {
+      ...recorded,
+      error: {
+        code: "OPERATION_INDETERMINATE",
+        message:
+          operation.resolution ??
+          "The outcome of this operation is not established. It is not retried automatically.",
+      },
+      ok: false,
+    };
   },
 });

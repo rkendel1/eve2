@@ -3,9 +3,10 @@ import type { SessionView } from "eve/events";
 import type { RouteHandlerArgs } from "eve/channels";
 import { sessions } from "eve/server";
 
+import { decideOutcome } from "./operations";
+
 import {
   citeNew,
-  decideOutcome,
   lastDecision,
   readSubmission,
   recordedSession,

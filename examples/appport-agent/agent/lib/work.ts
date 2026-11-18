@@ -12,7 +12,6 @@ import {
 
 export const AGENT_ID = "agent:appport-agent";
 export const APPLICATION_SCOPE = "inventory";
-export const INVOCATIONS = "appport_invocations";
 export const SUBMISSIONS = "work_submissions";
 export const SESSIONS = "work_sessions";
 const MAX_HISTORY = 50;
@@ -157,16 +156,21 @@ export async function readWork(requester: string, workId: string) {
   const current = await state.getTask(workId);
   if (current === null || current.task.scope.workspace !== requester) return null;
   const entries = await history(state, current.task);
-  const invocations = [];
+  const operations = [];
   for (const entry of current.checkpoint.evidence) {
-    if (entry.kind !== "record" || entry.collection !== INVOCATIONS) continue;
-    const record = await readCited(entry.id);
-    invocations.push({
-      callId: record?.call_id ?? null,
+    if (entry.kind !== "record" || entry.collection !== OPERATIONS) continue;
+    const record = await readOperationRecord(entry.id);
+    const outcome = record?.outcome as
+      | { ok?: boolean; error?: { code?: string } | null; request_id?: string }
+      | null
+      | undefined;
+    operations.push({
       capability: record?.capability ?? null,
-      errorCode: record?.error_code ?? null,
-      ok: record?.ok === true,
-      requestId: record?.request_id ?? null,
+      errorCode: outcome?.error?.code ?? null,
+      ok: outcome?.ok === true,
+      operationId: entry.id,
+      requestIds: record?.request_ids ?? [],
+      state: record?.state ?? null,
     });
   }
   return {
@@ -181,7 +185,7 @@ export async function readWork(requester: string, workId: string) {
       summary: entry.summary,
       version: entry.version,
     })),
-    invocations,
+    operations,
     objective: current.task.objective,
     requester: current.task.scope.workspace,
     scope: current.task.scope,
@@ -242,59 +246,26 @@ export async function unfinishedWork(): Promise<AgentTask[]> {
   return found;
 }
 
-export interface InvocationEvidence {
-  readonly agent: string;
-  readonly callId: string;
-  readonly capability: string;
-  readonly caller: string;
-  readonly errorCode: string | null;
-  readonly ok: boolean;
-  readonly outputDigest: string | null;
-  readonly requestId: string;
-  readonly workId: string;
-}
-
+export const OPERATIONS = "appport_operations";
+export const CALLS = "appport_invocations";
 const CITABLE_ID = /^[A-Za-z0-9._-]{1,80}$/u;
 
-export function invocationId(workId: string, callId: string): string {
+export function callLinkId(workId: string, callId: string): string {
   const call = CITABLE_ID.test(callId)
     ? callId
     : createHash("sha256").update(callId).digest("hex").slice(0, 40);
   return `${workId}.${call}`;
 }
 
-export async function recordInvocation(evidence: InvocationEvidence): Promise<void> {
+export async function readCallLink(workId: string, callId: string) {
   const { db } = await workStore();
-  await db.collection(INVOCATIONS).insert(
-    {
-      agent: evidence.agent,
-      appport_provenance: `appport-provenance:${APPLICATION_SCOPE}/${evidence.requestId}`,
-      call_id: evidence.callId,
-      capability: evidence.capability,
-      caller: evidence.caller,
-      error_code: evidence.errorCode,
-      ok: evidence.ok,
-      output_digest: evidence.outputDigest,
-      recorded_at: new Date().toISOString(),
-      request_id: evidence.requestId,
-      work_id: evidence.workId,
-    },
-    invocationId(evidence.workId, evidence.callId),
-    { requireAbsent: true },
-  );
+  const link = await db.collection<Record<string, unknown>>(CALLS).get(callLinkId(workId, callId));
+  return link !== null && link.work_id === workId && link.call_id === callId ? link : null;
 }
 
-export async function readInvocation(workId: string, callId: string) {
+export async function readOperationRecord(operationId: string) {
   const { db } = await workStore();
-  const record = await db
-    .collection<Record<string, unknown>>(INVOCATIONS)
-    .get(invocationId(workId, callId));
-  return record !== null && record.work_id === workId && record.call_id === callId ? record : null;
-}
-
-async function readCited(id: string) {
-  const { db } = await workStore();
-  return await db.collection<Record<string, unknown>>(INVOCATIONS).get(id);
+  return await db.collection<Record<string, unknown>>(OPERATIONS).get(operationId);
 }
 
 export interface ObservedCall {
@@ -309,66 +280,13 @@ export interface Outcome {
   readonly summary: string;
 }
 
-export async function decideOutcome(
-  workId: string,
-  turnOutcome: string,
-  invokeCalls: readonly ObservedCall[],
-  reply: string,
-): Promise<Outcome> {
-  const said = reply.length > 0 ? ` Agent reply: ${reply.slice(0, 2000)}` : "";
-  const recorded = [];
-  let missing = 0;
-  for (const call of invokeCalls) {
-    const record = await readInvocation(workId, call.callId);
-    if (record !== null)
-      recorded.push({ id: invocationId(workId, call.callId), ok: record.ok === true });
-    else if (call.settled) missing += 1;
-  }
-  const evidence = recorded.map((entry) => entry.id);
-  const succeeded = recorded.filter((entry) => entry.ok).length;
-  if (turnOutcome !== "completed") {
-    const decision = `failed: the eve turn ended ${turnOutcome}`;
-    return {
-      decision,
-      evidence,
-      status: "blocked",
-      summary: `Failed: the eve turn ended ${turnOutcome}.`,
-    };
-  }
-  if (missing > 0) {
-    const decision = `indeterminate: ${missing} AppPort invocation(s) without committed evidence`;
-    return {
-      decision,
-      evidence,
-      status: "blocked",
-      summary: `Indeterminate: eve recorded ${missing} AppPort invocation(s) whose outcome was never committed; see AppPort provenance for this work's trace id.`,
-    };
-  }
-  if (recorded.length > 0 && succeeded === 0) {
-    const decision = "waiting: every AppPort invocation was rejected";
-    return {
-      decision,
-      evidence,
-      status: "blocked",
-      summary: `Blocked: no capability invocation was authorized.${said}`,
-    };
-  }
-  const decision = `completed after ${succeeded} authorized invocation(s)`;
-  return {
-    decision,
-    evidence,
-    status: "completed",
-    summary: `Completed after ${succeeded} authorized invocation(s).${said}`,
-  };
-}
-
-export function citeNew(current: AgentCheckpoint, callIds: readonly string[]) {
+export function citeNew(current: AgentCheckpoint, operationIds: readonly string[]) {
   const cited = new Set(
     current.evidence.flatMap((entry) => (entry.kind === "record" ? [entry.id] : [])),
   );
-  return callIds
+  return [...new Set(operationIds)]
     .filter((id) => !cited.has(id))
-    .map((id) => ({ collection: INVOCATIONS, id, kind: "record" as const }));
+    .map((id) => ({ collection: OPERATIONS, id, kind: "record" as const }));
 }
 
 export function lastDecision(checkpoint: AgentCheckpoint): string | undefined {

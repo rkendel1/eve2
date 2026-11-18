@@ -7,6 +7,7 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { createFeltDB, openAgentState } from "@feltdb/core";
+import { defineCapability, s } from "@appport/sdk";
 
 import { AGENT_ID, startInventoryHost } from "../appport-host/host.mjs";
 import {
@@ -48,6 +49,26 @@ export default defineAgent({
         return toolResults.length === 0
           ? { toolCalls: [{ name: "await_approval", input: {} }] }
           : "Approved.";
+      const apply = /Apply (\\S+) via (\\S+)/u.exec(String(lastUserMessage));
+      if (apply !== null) {
+        const message = String(lastUserMessage);
+        const tokens = apply[1].split(",");
+        const plan = message.includes("[repeat]")
+          ? [{ token: tokens[0] }, { token: tokens[0] }]
+          : message.includes("[conflict]")
+            ? [
+                { operationKey: "step-1", token: tokens[0] },
+                { operationKey: "step-1", token: tokens[0] + "-changed" },
+              ]
+            : message.includes("[invalid]")
+              ? [{ token: 5 }, { token: 5 }]
+              : tokens.map((token) => ({ token }));
+        const step = plan[toolResults.length];
+        if (step === undefined) return "Results: " + JSON.stringify(toolResults.map((entry) => entry.output));
+        const call = { input: { token: step.token }, name: apply[2] };
+        if (step.operationKey !== undefined) call.operationKey = step.operationKey;
+        return { toolCalls: [{ name: "appport_invoke", input: call }] };
+      }
       const sku = /SKU (\\S+)/u.exec(String(lastUserMessage))?.[1];
       if (sku === undefined) return "No SKU was given.";
       if (toolResults.length === 0)
@@ -96,6 +117,25 @@ export default defineTool({
 });
 `;
 
+const effects = new Map();
+const effectCount = (capability, token) => effects.get(`${capability}:${token}`) ?? 0;
+const probe = (name, idempotency) =>
+  defineCapability({
+    authorization: ["probe.write"],
+    description: "Test-only side effect with an observable counter.",
+    effect: "consequential",
+    handler({ token }) {
+      const applied = effectCount(name, token) + 1;
+      effects.set(`${name}:${token}`, applied);
+      return { applied, token };
+    },
+    idempotency,
+    input: s.object({ token: s.string() }),
+    name,
+    output: s.object({ applied: s.integer(), token: s.string() }),
+    version: 1,
+  });
+
 let host;
 let agent;
 let aliceGrant;
@@ -108,7 +148,7 @@ const startAgent = () =>
     ["start", "--host", "127.0.0.1"],
     cleanEnv({
       AGENT_JWT_SECRET,
-      APPPORT_AGENT_CAPABILITIES: "catalog.lookup",
+      APPPORT_AGENT_CAPABILITIES: "catalog.lookup,probe.applykeyed,probe.applyunkeyed",
       APPPORT_AGENT_CREDENTIAL_FILE: agentCredentialFile,
       APPPORT_AGENT_OPERATOR: OPERATOR,
       APPPORT_AGENT_WORK_DIR: workDir,
@@ -189,6 +229,11 @@ async function settled(user, workId) {
 
 before(async () => {
   host = await startInventoryHost({
+    extraCapabilities: [
+      probe("probe.applykeyed", "supported"),
+      probe("probe.applyunkeyed", "unsupported"),
+    ],
+    extraPermissions: ["probe.write"],
     adminSecret: "acceptance-authority-admin-secret-0123456789",
     agentCredentialFile,
     dataDir: join(scratch, "host"),
@@ -197,7 +242,7 @@ before(async () => {
   });
   aliceGrant = await host.authority.grant({
     agent: AGENT_ID,
-    capabilities: ["catalog.read"],
+    capabilities: ["catalog.read", "probe.write"],
     delegator: ALICE,
   });
   rmSync(fixture, { force: true, recursive: true });
@@ -245,14 +290,12 @@ describe("durable work in FeltDB (real eve, FeltDB, AppPort and AuthBoundry; scr
     assert.match(body.workId, /^work_[0-9a-f]{32}$/u);
     alphaWork = await settled(ALICE, body.workId);
 
-    assert.equal(alphaWork.invocations.length, 1);
-    assert.equal(
-      `${alphaWork.workId}.${alphaWork.invocations[0].callId}`,
-      alphaWork.evidence[0].id,
-    );
-    assert.equal(alphaWork.invocations[0].capability, "catalog.lookup");
-    assert.equal(alphaWork.invocations[0].ok, true);
-    assert.match(alphaWork.invocations[0].requestId, /^eve_/u);
+    assert.equal(alphaWork.operations.length, 1);
+    assert.equal(alphaWork.operations[0].operationId, alphaWork.evidence[0].id);
+    assert.equal(alphaWork.operations[0].capability, "catalog.lookup");
+    assert.equal(alphaWork.operations[0].state, "succeeded");
+    assert.equal(alphaWork.operations[0].ok, true);
+    assert.match(alphaWork.operations[0].requestIds[0], /^eve_/u);
     assert.equal(alphaWork.status, "completed");
     assert.equal(alphaWork.requester, ALICE);
     assert.equal(alphaWork.agent, AGENT_ID);
@@ -268,11 +311,11 @@ describe("durable work in FeltDB (real eve, FeltDB, AppPort and AuthBoundry; scr
     assert.deepEqual(alphaWork.decisions, ["completed after 1 authorized invocation(s)"]);
     assert.equal(alphaWork.evidence.length, 1);
     assert.equal(alphaWork.evidence[0].verified, true);
-    assert.equal(alphaWork.evidence[0].collection, "appport_invocations");
+    assert.equal(alphaWork.evidence[0].collection, "appport_operations");
   });
 
   it("links AppPort's own provenance to the work record and Alice's delegation", () => {
-    const requestId = alphaWork.invocations[0].requestId;
+    const requestId = alphaWork.operations[0].requestIds[0];
     const records = provenance().filter((entry) => entry.requestId === requestId);
     const request = records.find((entry) => entry.kind === "request");
     const decision = records.find((entry) => entry.kind === "authorization");
@@ -311,10 +354,10 @@ describe("durable work in FeltDB (real eve, FeltDB, AppPort and AuthBoundry; scr
     const work = await settled(BOB, bobs.body.workId);
     assert.equal(work.status, "blocked");
     assert.deepEqual(work.decisions, ["waiting: every AppPort invocation was rejected"]);
-    assert.equal(work.invocations[0].errorCode, "FORBIDDEN");
+    assert.equal(work.operations[0].errorCode, "FORBIDDEN");
     const decision = provenance().find(
       (entry) =>
-        entry.requestId === work.invocations[0].requestId && entry.kind === "authorization",
+        entry.requestId === work.operations[0].requestIds[0] && entry.kind === "authorization",
     );
     assert.equal(decision.reason, "delegation_missing");
   });
@@ -325,7 +368,7 @@ describe("durable work in FeltDB (real eve, FeltDB, AppPort and AuthBoundry; scr
       const { body } = await submit(ALICE, "after-revoke", "Look up SKU BETA-2");
       const work = await settled(ALICE, body.workId);
       assert.equal(work.status, "blocked");
-      const requestId = work.invocations[0].requestId;
+      const requestId = work.operations[0].requestIds[0];
       const records = provenance().filter((entry) => entry.requestId === requestId);
       assert.equal(
         records.find((entry) => entry.kind === "authorization").reason,
@@ -338,7 +381,7 @@ describe("durable work in FeltDB (real eve, FeltDB, AppPort and AuthBoundry; scr
     } finally {
       aliceGrant = await host.authority.grant({
         agent: AGENT_ID,
-        capabilities: ["catalog.read"],
+        capabilities: ["catalog.read", "probe.write"],
         delegator: ALICE,
       });
     }
@@ -384,7 +427,7 @@ describe("durable work recovery (process-group crashes and restarts)", () => {
     assert.equal(lookupsFor(workId).length, 1);
   });
 
-  it("does not resubmit or claim completion for a turn interrupted after AppPort answered", async () => {
+  it("repeats an interrupted read, because the capability declares no effect, without resubmitting work", async () => {
     const { body } = await submit(
       ALICE,
       "crash-mid-turn",
@@ -398,17 +441,11 @@ describe("durable work recovery (process-group crashes and restarts)", () => {
       work.decisions.some((entry) => entry.startsWith("recovered: submitted")),
       false,
     );
-    assert.equal(work.status, "blocked");
-    assert.match(
-      work.decisions.at(-1),
-      /^indeterminate: \d+ AppPort invocation\(s\) without committed evidence$/u,
-    );
+    assert.equal(work.status, "completed");
+    assert.equal(work.operations.length, 1);
     assert.equal(lookupsFor(body.workId).length, 2);
-    assert.equal(work.invocations.length, 1);
-    assert.equal(
-      work.decisions.at(-1),
-      "indeterminate: 1 AppPort invocation(s) without committed evidence",
-    );
+    assert.equal(work.operations[0].requestIds.length, 1);
+    assert.equal(work.operations[0].requestIds[0], lookupsFor(body.workId)[1].requestId);
   });
 
   it("reconstructs a completed execution whose final work checkpoint was lost", async () => {
@@ -457,7 +494,7 @@ describe("durable work recovery (process-group crashes and restarts)", () => {
     const work = await settled(ALICE, body.workId);
     assert.equal(work.status, "blocked");
     assert.deepEqual(work.decisions, [
-      "indeterminate: 1 AppPort invocation(s) without committed evidence",
+      "indeterminate: 1 AppPort operation(s) without an established outcome",
     ]);
     assert.deepEqual(work.evidence, []);
     assert.equal(lookupsFor(body.workId).length, 1);
@@ -521,6 +558,164 @@ describe("durable work recovery (process-group crashes and restarts)", () => {
   });
 });
 
+describe("durable operations (crash-after-effect boundary)", () => {
+  const appportRequests = (workId, capability) =>
+    provenance().filter(
+      (entry) =>
+        entry.kind === "request" && entry.capability === capability && entry.traceId === workId,
+    );
+
+  async function ledgerOf(workId) {
+    await stop(agent.child);
+    assert.equal(groupAlive(agent.child.pid), false);
+    const db = createFeltDB({ namespace: "appport-agent-work", path: workDir });
+    try {
+      return {
+        links: await db.collection("appport_invocations").find({ work_id: workId }),
+        operations: await db.collection("appport_operations").find({ work_id: workId }),
+      };
+    } finally {
+      await db.close?.();
+    }
+  }
+
+  const operationsOf = async (workId) => (await ledgerOf(workId)).operations;
+
+  it("persists the intent before invoking, and resumes an operation that never reached AppPort", async () => {
+    const workId = workIdFor(ALICE, "op-prepared");
+    await submit(
+      ALICE,
+      "op-prepared",
+      "[crash:operation.prepared] Apply P1 via probe.applyunkeyed",
+    ).catch(() => undefined);
+    await waitFor(async () => !(await reachable()));
+    const [before] = await operationsOf(workId);
+    assert.equal(before.state, "prepared");
+    assert.equal(effectCount("probe.applyunkeyed", "P1"), 0);
+    assert.equal(appportRequests(workId, "probe.applyunkeyed").length, 0);
+    agent = await startAgent();
+    const work = await settled(ALICE, workId);
+    assert.equal(work.status, "completed");
+    assert.equal(work.operations[0].state, "succeeded");
+    assert.equal(effectCount("probe.applyunkeyed", "P1"), 1);
+  });
+
+  it("does not repeat an idempotent action after a crash between the effect and its record", async () => {
+    const { body } = await submit(
+      ALICE,
+      "op-keyed",
+      "[crash:invocation.record] Apply K1 via probe.applykeyed",
+    );
+    await waitFor(async () => !(await reachable()));
+    const [during] = await operationsOf(body.workId);
+    assert.equal(during.state, "executing");
+    assert.equal(effectCount("probe.applykeyed", "K1"), 1);
+    agent = await startAgent();
+    const work = await settled(ALICE, body.workId);
+    assert.equal(work.status, "completed");
+    assert.equal(effectCount("probe.applykeyed", "K1"), 1);
+    const requests = appportRequests(body.workId, "probe.applykeyed");
+    assert.equal(requests.length, 2);
+    assert.equal(requests[1].idempotentReplay, true);
+    const [after] = await operationsOf(body.workId);
+    assert.equal(after.state, "succeeded");
+    assert.equal(after.outcome.reconciled_after_interruption, true);
+    assert.equal(after.idempotency_key, after.operation_id);
+    agent = await startAgent();
+  });
+
+  it("marks a non-idempotent action indeterminate after the same crash, and never repeats it", async () => {
+    const { body } = await submit(
+      ALICE,
+      "op-unkeyed",
+      "[crash:invocation.record] Apply U1 via probe.applyunkeyed",
+    );
+    await crashThenRestart();
+    const work = await settled(ALICE, body.workId);
+    assert.equal(work.status, "blocked");
+    assert.equal(
+      work.decisions.at(-1),
+      "indeterminate: 1 AppPort operation(s) without an established outcome",
+    );
+    assert.deepEqual(work.evidence, []);
+    assert.equal(effectCount("probe.applyunkeyed", "U1"), 1);
+    assert.equal(appportRequests(body.workId, "probe.applyunkeyed").length, 1);
+    const [operation] = await operationsOf(body.workId);
+    assert.equal(operation.state, "indeterminate");
+    assert.equal(operation.idempotency_key, null);
+    agent = await startAgent();
+  });
+
+  it("keeps an indeterminate operation indeterminate across repeated recovery passes", async () => {
+    const workId = workIdFor(ALICE, "op-unkeyed");
+    await reconcile();
+    await reconcile();
+    await restartAgent();
+    await reconcile();
+    assert.equal(effectCount("probe.applyunkeyed", "U1"), 1);
+    assert.equal(appportRequests(workId, "probe.applyunkeyed").length, 1);
+    const [operation] = await operationsOf(workId);
+    assert.equal(operation.state, "indeterminate");
+    agent = await startAgent();
+  });
+
+  it("returns the recorded result when the same operation is requested again", async () => {
+    const { body } = await submit(ALICE, "op-repeat", "[repeat] Apply R1 via probe.applykeyed");
+    const work = await settled(ALICE, body.workId);
+    assert.equal(work.status, "completed");
+    assert.equal(work.operations.length, 1);
+    assert.equal(effectCount("probe.applykeyed", "R1"), 1);
+    assert.equal(appportRequests(body.workId, "probe.applykeyed").length, 1);
+  });
+
+  it("refuses the same operation key with different input and never overwrites the intent", async () => {
+    const { body } = await submit(ALICE, "op-conflict", "[conflict] Apply C1 via probe.applykeyed");
+    const work = await settled(ALICE, body.workId);
+    assert.equal(effectCount("probe.applykeyed", "C1"), 1);
+    assert.equal(effectCount("probe.applykeyed", "C1-changed"), 0);
+    assert.equal(appportRequests(body.workId, "probe.applykeyed").length, 1);
+    assert.equal(work.operations.length, 1);
+    const { links, operations } = await ledgerOf(body.workId);
+    assert.equal(operations.length, 1);
+    assert.equal(operations[0].operation_key, "step-1");
+    assert.equal(operations[0].state, "succeeded");
+    assert.deepEqual(
+      links.map((link) => link.refusal ?? link.operation_id).sort(),
+      ["OPERATION_CONFLICT", operations[0].operation_id].sort(),
+    );
+    agent = await startAgent();
+  });
+
+  it("keeps different operations within one work distinct", async () => {
+    const { body } = await submit(ALICE, "op-two", "Apply A1,B1 via probe.applykeyed");
+    const work = await settled(ALICE, body.workId);
+    assert.equal(work.status, "completed");
+    assert.equal(work.operations.length, 2);
+    assert.notEqual(work.operations[0].operationId, work.operations[1].operationId);
+    assert.equal(effectCount("probe.applykeyed", "A1"), 1);
+    assert.equal(effectCount("probe.applykeyed", "B1"), 1);
+  });
+
+  it("records a failed operation once and does not silently retry it", async () => {
+    const { body } = await submit(ALICE, "op-invalid", "[invalid] Apply 5 via probe.applykeyed");
+    const work = await settled(ALICE, body.workId);
+    assert.equal(work.status, "blocked");
+    assert.equal(work.decisions.at(-1), "waiting: every AppPort invocation was rejected");
+    assert.equal(work.operations[0].state, "failed");
+    assert.equal(work.operations[0].errorCode, "INVALID_INPUT");
+    assert.equal(appportRequests(body.workId, "probe.applykeyed").length, 1);
+  });
+
+  it("still enforces delegation: Bob's operation fails and causes no effect", async () => {
+    const { body } = await submit(BOB, "op-bob", "Apply BOB1 via probe.applykeyed");
+    const work = await settled(BOB, body.workId);
+    assert.equal(work.operations[0].state, "failed");
+    assert.equal(work.operations[0].errorCode, "FORBIDDEN");
+    assert.equal(effectCount("probe.applykeyed", "BOB1"), 0);
+    assert.equal((await read(ALICE, body.workId)).status, 404);
+  });
+});
+
 describe("FeltDB is the authority", () => {
   const alphaWork = { workId: workIdFor(ALICE, "alpha-1") };
   it("is authoritative in FeltDB itself, readable without eve", async () => {
@@ -543,12 +738,21 @@ describe("FeltDB is the authority", () => {
     assert.equal(task.owner, AGENT_ID);
     assert.equal(task.scope.workspace, ALICE);
     assert.equal(checkpoint.version, 4);
-    const invocation = await db.collection("appport_invocations").get(checkpoint.evidence[0].id);
-    assert.equal(invocation.work_id, alphaWork.workId);
-    assert.equal(invocation.caller, ALICE);
-    assert.equal(invocation.agent, AGENT_ID);
-    assert.equal(invocation.capability, "catalog.lookup");
-    assert.equal(invocation.ok, true);
+    const operation = await db.collection("appport_operations").get(checkpoint.evidence[0].id);
+    assert.equal(operation.work_id, alphaWork.workId);
+    assert.equal(operation.requester, ALICE);
+    assert.equal(operation.agent, AGENT_ID);
+    assert.equal(operation.capability, "catalog.lookup");
+    assert.equal(operation.state, "succeeded");
+    for (const workId of submitted) {
+      for (const link of await db.collection("appport_invocations").find({ work_id: workId })) {
+        if (link.operation_id === null) continue;
+        const linked = await db.collection("appport_operations").get(link.operation_id);
+        assert.equal(linked.work_id, workId, `${workId} links another work's operation`);
+      }
+      for (const linked of await db.collection("appport_operations").find({ work_id: workId }))
+        assert.equal(linked.operation_id.startsWith("op_"), true);
+    }
     await db.close?.();
   });
 });

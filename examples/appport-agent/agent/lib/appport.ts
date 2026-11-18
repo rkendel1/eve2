@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { createClient } from "@appport/client";
-import type { AppRequest, AppResponse } from "@appport/protocol";
+import type { AppRequest, AppResponse, CapabilityManifestEntry } from "@appport/protocol";
 import { createHttpTransport } from "@appport/transport-http";
 
 export interface Caller {
@@ -42,6 +42,7 @@ function allowedCapabilities(): ReadonlySet<string> {
 
 export interface CapabilitySummary {
   readonly authorization: readonly string[];
+  readonly idempotency: string;
   readonly description?: string;
   readonly effect?: string;
   readonly invocable: boolean;
@@ -58,7 +59,8 @@ export async function listCapabilities(caller: Caller): Promise<CapabilitySummar
       authorization: entry.authorization,
       description: entry.description,
       effect: entry.effect,
-      invocable: entry.effect === "observation" && allowed.has(entry.name),
+      idempotency: entry.idempotency ?? "unsupported",
+      invocable: allowed.has(entry.name),
       name: entry.name,
       version: entry.latestVersion,
     }));
@@ -97,59 +99,70 @@ export type InvocationResult =
       readonly requestId: string;
     };
 
-export async function invokeCapability(
-  caller: Caller,
-  name: string,
-  input: unknown,
-  traceId: string | undefined,
-): Promise<InvocationResult> {
-  const requestId = `eve_${randomUUID()}`;
-  const unavailable = (error: unknown): InvocationResult => ({
-    error: {
-      code: "UNAVAILABLE",
-      message: `AppPort did not answer: ${error instanceof Error ? error.message : String(error)}`,
-    },
-    ok: false,
+export type ResolvedCapability =
+  | { readonly ok: true; readonly entry: CapabilityManifestEntry }
+  | { readonly ok: false; readonly result: InvocationResult };
+
+function refused(requestId: string, code: string, message: string): InvocationResult {
+  return { error: { code, message }, ok: false, requestId };
+}
+
+function unavailable(requestId: string, error: unknown): InvocationResult {
+  return refused(
     requestId,
-  });
-  const client = clientFor(caller);
+    "UNAVAILABLE",
+    `AppPort did not answer: ${error instanceof Error ? error.message : String(error)}`,
+  );
+}
+
+export async function resolveCapability(caller: Caller, name: string): Promise<ResolvedCapability> {
+  const requestId = `eve_${randomUUID()}`;
   let entry;
   try {
-    entry = (await client.load()).capabilities.find((candidate) => candidate.name === name);
+    entry = (await clientFor(caller).load()).capabilities.find(
+      (candidate) => candidate.name === name,
+    );
   } catch (error) {
-    return unavailable(error);
+    return { ok: false, result: unavailable(requestId, error) };
   }
-  if (entry === undefined || entry.effect !== "observation" || !allowedCapabilities().has(name)) {
+  if (entry === undefined || !allowedCapabilities().has(name)) {
     return {
-      error: {
-        code: "NOT_EXPOSED",
-        message: `This agent may only invoke read-only capabilities its operator allows; ${name} is not one of them.`,
-      },
       ok: false,
-      requestId,
+      result: refused(
+        requestId,
+        "NOT_EXPOSED",
+        `This agent may only invoke capabilities its operator allows; ${name} is not one of them.`,
+      ),
     };
   }
+  return { entry, ok: true };
+}
+
+export async function sendRequest(
+  caller: Caller,
+  entry: CapabilityManifestEntry,
+  input: unknown,
+  traceId: string | undefined,
+  idempotencyKey: string | undefined,
+): Promise<InvocationResult> {
+  const requestId = `eve_${randomUUID()}`;
   const request: AppRequest = {
-    capability: { name, version: entry.latestVersion },
+    capability: { name: entry.name, version: entry.latestVersion },
     input,
     protocol: "appport/1",
     requestId,
     type: "request",
   };
   if (traceId !== undefined) request.traceId = traceId;
+  if (idempotencyKey !== undefined) request.idempotencyKey = idempotencyKey;
   let response: AppResponse;
   try {
-    response = await client.send(request);
+    response = await clientFor(caller).send(request);
   } catch (error) {
-    return unavailable(error);
+    return unavailable(requestId, error);
   }
-  if (response.type !== "response") {
-    return {
-      error: { code: "UNEXPECTED_RESPONSE", message: "AppPort returned a non-response envelope." },
-      ok: false,
-      requestId,
-    };
-  }
+  if (response.type !== "response")
+    return refused(requestId, "UNEXPECTED_RESPONSE", "AppPort returned a non-response envelope.");
   return response.ok
     ? {
         authorizationDecision: response.authorizationDecision,
@@ -158,4 +171,22 @@ export async function invokeCapability(
         requestId,
       }
     : { error: response.error, ok: false, requestId };
+}
+
+export async function invokeCapability(
+  caller: Caller,
+  name: string,
+  input: unknown,
+  traceId: string | undefined,
+): Promise<InvocationResult> {
+  const resolved = await resolveCapability(caller, name);
+  if (!resolved.ok) return resolved.result;
+  if (resolved.entry.effect !== "observation") {
+    return refused(
+      `eve_${randomUUID()}`,
+      "NOT_EXPOSED",
+      `${name} changes state; it is invoked only through a durable operation within accepted work.`,
+    );
+  }
+  return await sendRequest(caller, resolved.entry, input, traceId, undefined);
 }
