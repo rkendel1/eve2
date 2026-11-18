@@ -102,14 +102,22 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 **As built:** six capabilities, each granted separately: `tasks.list`, `tasks.create`, `tasks.update`, `tasks.complete`, `tasks.reopen` (newly published) and `briefing.today`. **Delete stays the person's own act**, as Personal OS's source states, and is not delegable; changing that is a product decision. Reminders remain Personal OS jobs. Running from npm still needs a FeltKit release from main (after 0.3.32).
 
-### 2b. Memory
+### 2b. Memory. **Done:** [PERSONALOS-MEMORY-REPORT.md](PERSONALOS-MEMORY-REPORT.md)
 
 PO-13, 14, 16 (list, add, forget). Memory written by an agent is held **unconfirmed** until the person confirms it (PO-15 stays internal). Forgetting is consequential and requires its own grant.
 
 **Acceptance:**
 
-- [ ] An agent-added memory carries agent provenance and is unconfirmed.
-- [ ] Forget without a grant is refused.
+- [x] An agent-added memory carries agent provenance and is unconfirmed.
+- [x] Forget without a grant is refused. Forgetting is never delegable: it removes trusted memory.
+
+**As built:**
+
+- **Delegable:** `memory.list`, and `memory.propose` (new; always `inferred`).
+- **Not delegable:** `memory.add` (it writes `confirmed`), `confirm`, `update` and `remove`.
+- **Enforcement:** Personal OS's data operations refuse every trusted-memory change under an agent's delegation. Only the person confirms or drops a proposal, in the Memory screen or in conversation.
+
+**Revised from the plan:** forgetting was planned as a grantable write. It is not delegable, because it removes trusted memory.
 
 ### 2c. Projects and documents
 

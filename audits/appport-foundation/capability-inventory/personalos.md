@@ -10,18 +10,21 @@
 
 Personal OS branch `claude/dreamy-galileo-4z03p5`, on FeltKit main `d68219c`; see [`../PERSONALOS-TASKS-BRIEFING-REPORT.md`](../PERSONALOS-TASKS-BRIEFING-REPORT.md). The tables below keep the original Phase 1 classification; this supersedes it for these rows.
 
-| ID                                   | Now                         | How                                                                                                                    |
-| ------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| PO-06 `tasks.list`                   | Available to eve, delegated | Listed in `authority.capabilities`; a person grants it to an agent (`delegation.set {agent}`)                          |
-| PO-07 `tasks.create` (and reminders) | Available to eve, delegated | Same; the reminder is Personal OS's own `reminder.fire` job, queued as the person                                      |
-| PO-08 `tasks.update`                 | Available to eve, delegated | Same                                                                                                                   |
-| PO-09 `tasks.complete`               | Available to eve, delegated | Same                                                                                                                   |
-| PO-10 `tasks.reopen`                 | Available to eve, delegated | **Newly published** (`tasks.ts`, the existing `reopen` function), with its own grant                                   |
-| PO-11 delete                         | **Not delegable**           | Kept as the person's own act, as the source states (`tasks.ts` `remove`); not published, and not grantable to an agent |
-| PO-25 `briefing.today`               | Available to eve, delegated | Same as PO-06                                                                                                          |
-| PO-23 action log                     | Records delegated actions   | `via: "agent"` plus `delegation` (agent, AuthBoundry decision and delegation ids, capability)                          |
+| ID                                     | Now                                    | How                                                                                                                                              |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PO-06 `tasks.list`                     | Available to eve, delegated            | Listed in `authority.capabilities`; a person grants it to an agent (`delegation.set {agent}`)                                                    |
+| PO-07 `tasks.create` (and reminders)   | Available to eve, delegated            | Same; the reminder is Personal OS's own `reminder.fire` job, queued as the person                                                                |
+| PO-08 `tasks.update`                   | Available to eve, delegated            | Same                                                                                                                                             |
+| PO-09 `tasks.complete`                 | Available to eve, delegated            | Same                                                                                                                                             |
+| PO-10 `tasks.reopen`                   | Available to eve, delegated            | **Newly published** (`tasks.ts`, the existing `reopen` function), with its own grant                                                             |
+| PO-11 delete                           | **Not delegable**                      | Kept as the person's own act, as the source states (`tasks.ts` `remove`); not published, and not grantable to an agent                           |
+| PO-25 `briefing.today`                 | Available to eve, delegated            | Same as PO-06                                                                                                                                    |
+| PO-23 action log                       | Records delegated actions              | `via: "agent"` plus `delegation` (agent, AuthBoundry decision and delegation ids, capability)                                                    |
+| PO-13 `memory.list`                    | Available to eve, delegated (Slice 2b) | Listed; its own grant                                                                                                                            |
+| PO-14 `memory.add`                     | **Not delegable** (Slice 2b)           | It stores what the person states as `confirmed`. Agents use the new `memory.propose`, which always stores `inferred` with `source.kind: "agent"` |
+| PO-15 confirm, PO-16 forget (and edit) | **Person only** (Slice 2b)             | Not published; `_ops.ts` refuses them under any agent delegation ([`../PERSONALOS-MEMORY-REPORT.md`](../PERSONALOS-MEMORY-REPORT.md))            |
 
-Tests now run: Personal OS's full suite, 150 of 150 on FeltKit main (see the report).
+Tests now run: Personal OS's full suite, 150 of 150 on FeltKit main after 2a, and 151 of 151 after 2b (see the reports).
 
 ## Key structural findings
 
