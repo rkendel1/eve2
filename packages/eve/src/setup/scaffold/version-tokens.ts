@@ -34,7 +34,7 @@ const TOKEN_SOURCES: Readonly<Record<string, TokenSource>> = {
   [versionToken("TYPES_REACT_DOM")]: { kind: "catalog", packageName: "@types/react-dom" },
 };
 
-const EVE_PACKAGE_NAME = "eve";
+const EVE_PACKAGE_NAMES: ReadonlySet<string> = new Set(["eve", "@appport/eve"]);
 
 const DEV_TREE_MARKER = "scripts/stamp-version-tokens.mjs";
 
@@ -46,7 +46,7 @@ function findEvePackageRoot(): string | undefined {
     const packageJsonPath = join(directory, "package.json");
     if (existsSync(packageJsonPath)) {
       const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { name?: unknown };
-      if (packageJson.name === EVE_PACKAGE_NAME) return directory;
+      if (EVE_PACKAGE_NAMES.has(String(packageJson.name))) return directory;
     }
     const parent = dirname(directory);
     if (parent === directory) return undefined;

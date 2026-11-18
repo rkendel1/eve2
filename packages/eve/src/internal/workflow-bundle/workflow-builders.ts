@@ -2,7 +2,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { STABLE_WORKFLOW_NAMES } from "#execution/stable-workflow-names.js";
-import { EVE_PACKAGE_NAME } from "#internal/package-name.js";
+import { canonicalPackageName, EVE_PACKAGE_NAME } from "#internal/package-name.js";
 import { AGENT_TOOL_SERVE_WORKFLOW_NAME } from "#runtime/subagents/workflow-reference.js";
 import { prepareAuthoredWorkflowDirectives } from "#internal/workflow-bundle/authored-workflow-directives.js";
 import {
@@ -282,7 +282,7 @@ function findPackageJson(filePath: string): PackageInfo | null {
             exports: parsed.exports,
             main: parsed.main,
             module: parsed.module,
-            name: parsed.name,
+            name: canonicalPackageName(parsed.name),
             version: parsed.version,
           };
           packageJsonCache.set(dir, result);

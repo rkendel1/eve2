@@ -1,0 +1,49 @@
+# Publishes this repository's eve framework as @appport/eve (scripts/publish-packages.mjs).
+# Run by hand from the Actions tab. Needs the repository secret NPM_TOKEN: a granular token with
+# read-write access to @appport and "Bypass two-factor authentication", or an Automation token.
+name: Publish packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (default: packages/eve's version)"
+        required: false
+      dry_run:
+        description: "Pack and check without publishing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish @appport/eve
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -- ${VERSION:+--version "$VERSION"}
+          [ "$DRY_RUN" = "true" ] && set -- "$@" --dry-run
+          npm run publish:packages -- "$@"

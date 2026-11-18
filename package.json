@@ -29,6 +29,7 @@
     "lint": "oxlint --fix",
     "prepare": "node ./scripts/install-git-hooks.mjs",
     "release": "pnpm build && node ./scripts/assert-changeset-publish-packages.mjs && changeset publish",
+    "publish:packages": "node --env-file-if-exists=.env.local ./scripts/publish-packages.mjs",
     "sandbox-image:tag": "node ./scripts/sandbox-image-tag.mjs",
     "sync:template-files": "node ./scripts/sync-template-files.mjs",
     "test": "pnpm test:unit && pnpm test:integration",
