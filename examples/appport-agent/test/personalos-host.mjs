@@ -71,10 +71,13 @@ if (process.argv[2] === "--report") {
       actions: await call(person(id), "actions:list"),
       briefing: await call(person(id), "briefing:today", { today: process.env.PERSONALOS_TODAY }),
       inbox: await call(person(id), "inbox:list"),
+      memories: await call(person(id), "memory:list"),
       tasks: await call(person(id), "tasks:list"),
     };
   }
-  const audit = (await runtime.auditTrail()).filter((entry) => entry.function.startsWith("tasks:"));
+  const audit = (await runtime.auditTrail()).filter((entry) =>
+    /^(tasks|memory):/u.test(entry.function),
+  );
   const reminders = (await runtime.services.jobs.listJobs("personalos"))
     .filter((job) => job.type === "reminder.fire")
     .map((job) => ({
@@ -95,8 +98,11 @@ if (!existsSync(credentialFile)) {
   );
   writeFileSync(credentialFile, `${token}\n`, { mode: 0o600 });
 }
-for (const id of (process.env.PERSONALOS_SIGNED_IN ?? "").split(",").filter(Boolean))
-  await runtime.issueSession(person(id), { kind: "dev", via: "cli" });
+for (const id of (process.env.PERSONALOS_SIGNED_IN ?? "").split(",").filter(Boolean)) {
+  const { token } = await runtime.issueSession(person(id), { kind: "dev", via: "cli" });
+  mkdirSync(`${projectDir}.tokens`, { recursive: true });
+  writeFileSync(join(`${projectDir}.tokens`, id), token, { mode: 0o600 });
+}
 for (const entry of (process.env.PERSONALOS_GRANTS ?? "").split(";").filter(Boolean)) {
   const [id, capabilities] = entry.split("=");
   await call(person(id), "delegation:set", {

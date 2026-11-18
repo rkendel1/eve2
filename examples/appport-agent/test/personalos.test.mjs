@@ -102,7 +102,7 @@ const startAgent = () =>
     cleanEnv({
       AGENT_JWT_SECRET,
       APPPORT_AGENT_CAPABILITIES:
-        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today",
+        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today,memory.list,memory.propose,memory.add,memory.confirm",
       APPPORT_AGENT_CREDENTIAL_FILE: credentialFile,
       APPPORT_AGENT_OPERATOR: "appport-agent-operator:operator",
       APPPORT_AGENT_WORK_DIR: workDir,
@@ -385,3 +385,184 @@ describe("eve managing Ada's Personal OS tasks under her delegation", { skip: SK
     assert.deepEqual(state.people.grace.tasks, []);
   });
 });
+
+describe(
+  "eve reading Ada's Personal OS memory and proposing notes she confirms",
+  { skip: SKIP },
+  () => {
+    const fact = (content) => ({ content, kind: "fact", subject: "ada" });
+    const asPerson = async (person, fn, args) => {
+      const token = readFileSync(join(scratch, "personalos.tokens", person), "utf8");
+      const response = await fetch(`http://127.0.0.1:${port}/api/mutation/${fn}`, {
+        body: JSON.stringify({ args }),
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        method: "POST",
+      });
+      return await response.json();
+    };
+    const memory = (state, content) =>
+      state.people.ada.memories.find((entry) => entry.content === content);
+    let dentist;
+
+    it("reads Ada's memory only with a read grant, and never Grace's", async () => {
+      assert.equal(
+        (
+          await asPerson("ada", "memory:add", {
+            ...fact("Ada drinks green tea"),
+            kind: "preference",
+          })
+        ).ok,
+        true,
+      );
+      const denied = await work("ada", "memory-list-denied", invoke("memory.list", {}));
+      assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=memory.list");
+      const listed = await work("ada", "memory-list", invoke("memory.list", {}));
+      assert.equal(listed.status, "completed", JSON.stringify(listed));
+      assert.match(listed.summary, /Ada drinks green tea/u);
+      const grace = await work("grace", "grace-memory", invoke("memory.list", {}));
+      assert.equal(grace.operations[0].errorCode, "FORBIDDEN");
+    });
+
+    it("proposes a note once, stored unconfirmed and attributed, and cannot confirm or add trusted memory", async () => {
+      const before = await work(
+        "ada",
+        "propose-denied",
+        invoke("memory.propose", fact("Ada's dentist is Dr. Lee")),
+      );
+      assert.equal(before.operations[0].errorCode, "FORBIDDEN", "proposing needs its own grant");
+      await restartHost("ada=memory.list+memory.propose");
+      const proposed = await work(
+        "ada",
+        "propose-1",
+        `[repeat] ${invoke("memory.propose", fact("Ada's dentist is Dr. Lee"))}`,
+      );
+      assert.equal(proposed.status, "completed", JSON.stringify(proposed));
+      assert.deepEqual(
+        [proposed.operations.length, proposed.operations[0].requestIds.length],
+        [1, 1],
+      );
+
+      const confirmTry = await work("ada", "confirm-try", invoke("memory.confirm", { id: "any" }));
+      assert.deepEqual(confirmTry.operations, [], "memory.confirm is not a capability");
+      const addTry = await work(
+        "ada",
+        "add-try",
+        invoke("memory.add", fact("Ada's dentist is Dr. Lee")),
+      );
+      assert.equal(addTry.operations[0].errorCode, "FORBIDDEN", "a trusted write is not delegable");
+      const claim = await work(
+        "ada",
+        "claim-1",
+        invoke("memory.propose", fact("Ada confirmed her dentist is Dr. Lee")),
+      );
+      assert.equal(claim.status, "completed");
+
+      const state = await snapshot();
+      dentist = memory(state, "Ada's dentist is Dr. Lee");
+      assert.equal(
+        state.people.ada.memories.filter((entry) => entry.content === "Ada's dentist is Dr. Lee")
+          .length,
+        1,
+      );
+      assert.deepEqual(
+        [dentist.status, dentist.source.kind, dentist.source.agent, dentist.confirmedAt],
+        ["inferred", "agent", "appport-agent", undefined],
+      );
+      assert.equal(
+        memory(state, "Ada confirmed her dentist is Dr. Lee").status,
+        "inferred",
+        "words are not a confirmation",
+      );
+      const infer = state.people.ada.actions.find(
+        (entry) => entry.kind === "memory.infer" && entry.evidence.id === dentist.id,
+      );
+      assert.deepEqual(
+        [infer.via, infer.delegation.agent, infer.delegation.capability],
+        ["agent", "appport-agent", "memory.propose"],
+      );
+      const audit = state.audit.find(
+        (entry) => entry.authority.delegation?.decisionId === infer.delegation.decisionId,
+      );
+      assert.deepEqual(
+        [audit.function, audit.principal.id, audit.requestId],
+        ["memory:propose", "ada", proposed.operations[0].requestIds[0]],
+      );
+      assert.equal(
+        state.people.ada.briefing.attention.inferredMemories,
+        2,
+        "Ada's briefing asks her to confirm",
+      );
+    });
+
+    it("becomes trusted only when Ada confirms it in Personal OS, and Ada's rejection is kept", async () => {
+      const confirmed = await asPerson("ada", "memory:confirm", { id: dentist.id });
+      assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+      const listed = await work("ada", "memory-list-2", invoke("memory.list", {}));
+      assert.match(
+        listed.summary,
+        new RegExp(`"id":"${dentist.id}"[^}]*"status":"confirmed"`, "u"),
+      );
+
+      await work("ada", "propose-2", invoke("memory.propose", fact("Ada hates mornings")));
+      let state = await snapshot();
+      const mornings = memory(state, "Ada hates mornings");
+      assert.equal((await asPerson("ada", "memory:remove", { id: mornings.id })).ok, true);
+      state = await snapshot();
+      assert.equal(memory(state, "Ada hates mornings"), undefined);
+      const dropped = state.people.ada.actions.find(
+        (entry) => entry.kind === "memory.forget" && entry.evidence.id === mornings.id,
+      );
+      assert.deepEqual([dropped.via, dropped.input.content], ["ui", "Ada hates mornings"]);
+      const trusted = memory(state, "Ada's dentist is Dr. Lee");
+      assert.equal(trusted.status, "confirmed");
+      const byAda = state.people.ada.actions.find(
+        (entry) => entry.kind === "memory.confirm" && entry.evidence.id === dentist.id,
+      );
+      assert.deepEqual([byAda.via, byAda.delegation], ["ui", undefined]);
+    });
+
+    it("proposes once when eve crashes after Personal OS committed, and Personal OS restarts too", async () => {
+      const response = await fetch(new URL("/work", agent.url), {
+        body: JSON.stringify({
+          objective: `[crash:invocation.record] ${invoke("memory.propose", fact("Ada is allergic to penicillin"))}`,
+        }),
+        headers: {
+          authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "ada")}`,
+          "content-type": "application/json",
+          "idempotency-key": "memory-crash",
+        },
+        method: "POST",
+      });
+      const { workId } = await response.json();
+      await waitFor(async () => !(await reachable()));
+      await stop(agent.child);
+      await restartHost();
+      agent = await startAgent();
+      assert.equal((await outcome("ada", workId)).status, "completed");
+      const [operation] = await ledger(workId);
+      assert.deepEqual([operation.state, operation.attempts], ["succeeded", 2]);
+      const state = await snapshot();
+      const penicillin = state.people.ada.memories.filter(
+        (entry) => entry.content === "Ada is allergic to penicillin",
+      );
+      assert.deepEqual(
+        penicillin.map((entry) => entry.status),
+        ["inferred"],
+      );
+    });
+
+    it("stops after Ada revokes", async () => {
+      await restartHost("ada=");
+      for (const [key, objective] of [
+        ["memory-after-revoke", invoke("memory.list", {})],
+        ["propose-after-revoke", invoke("memory.propose", fact("Ada likes jazz"))],
+      ]) {
+        const denied = await work("ada", key, objective);
+        assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      }
+      const state = await snapshot();
+      assert.equal(memory(state, "Ada likes jazz"), undefined);
+    });
+  },
+);

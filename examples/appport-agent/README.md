@@ -231,7 +231,9 @@ FeltKit decides each call with AuthBoundry as this agent, proven by its own cred
 
 Personal OS's tasks, reminders and daily briefing are published FeltKit capabilities: `tasks.list`, `tasks.create`, `tasks.update`, `tasks.complete`, `tasks.reopen` and `briefing.today`. A person grants each one to the agent separately in Personal OS (`delegation.set` with `agent`), after an administrator registers the agent (`delegation.registerAgent`). Deleting a task stays the person's own act and is not available to an agent.
 
-The agent adds no task logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
+Memory works the same way, with `memory.list` and `memory.propose`. A proposal is stored as an unconfirmed (inferred) note, attributed to the agent; only the person confirms or drops it in Personal OS. Personal OS refuses every trusted-memory change made under an agent's delegation.
+
+The agent adds no task or memory logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
 
 ## Operator settlement
 
@@ -381,7 +383,14 @@ Every rejected call is checked to have no `execution` record.
   - Personal OS dying before recording its answer (left indeterminate, never re-sent);
   - the briefing reflecting eve's changes;
   - the reminder firing through Personal OS's own job with eve stopped;
-  - eve's operation, FeltKit's audit record and Personal OS's action linked by request and decision ids.
+  - eve's operation, FeltKit's audit record and Personal OS's action linked by request and decision ids;
+  - memory:
+    - reads only with a grant, and never another person's;
+    - a repeated proposal stored once, unconfirmed and attributed;
+    - `memory.confirm` and `memory.add` refused;
+    - Ada confirming and dropping proposals through Personal OS's own HTTP API;
+    - one proposal across an eve and Personal OS crash;
+    - revocation.
 - **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;
