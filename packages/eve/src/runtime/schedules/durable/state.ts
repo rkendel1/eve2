@@ -30,3 +30,22 @@ export function nextScheduleOccurrence(expression: ScheduleExpression, after: Da
       : { paused: true, timezone: expression.timezone };
   return new Cron(pattern, options).nextRun(after);
 }
+
+const MAXIMUM_SKIPPED_OCCURRENCES = 1_000_000;
+
+export function nextDueScheduleOccurrence(
+  expression: ScheduleExpression,
+  after: Date,
+  now: Date,
+): Date | null {
+  let next = nextScheduleOccurrence(expression, after);
+  let latestDue: Date | null = null;
+  for (let skipped = 0; next !== null && next <= now; skipped += 1) {
+    if (skipped >= MAXIMUM_SKIPPED_OCCURRENCES) {
+      throw new Error("The schedule missed too many occurrences to find the latest due one.");
+    }
+    latestDue = next;
+    next = nextScheduleOccurrence(expression, next);
+  }
+  return latestDue ?? next;
+}

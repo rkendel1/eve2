@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { nextScheduleOccurrence, workflowScheduleToken } from "./state.js";
+import {
+  nextDueScheduleOccurrence,
+  nextScheduleOccurrence,
+  workflowScheduleToken,
+} from "./state.js";
 
 describe("nextScheduleOccurrence", () => {
   it("computes the next cron occurrence in the schedule's timezone", () => {
@@ -49,5 +53,48 @@ describe("workflowScheduleToken", () => {
       workflowScheduleToken({ ...base, collection: "other" }),
     );
     expect(workflowScheduleToken(base)).toMatch(/^eve:schedule:[0-9a-f]{64}$/u);
+  });
+});
+
+describe("nextDueScheduleOccurrence", () => {
+  const everyMinute = { cron: "* * * * *", type: "cron" } as const;
+
+  it("coalesces occurrences missed during downtime into the latest one", () => {
+    expect(
+      nextDueScheduleOccurrence(
+        everyMinute,
+        new Date("2026-11-17T00:00:00Z"),
+        new Date("2026-11-18T00:00:30Z"),
+      )?.toISOString(),
+    ).toBe("2026-11-18T00:00:00.000Z");
+  });
+
+  it("returns the next future occurrence when none was missed", () => {
+    expect(
+      nextDueScheduleOccurrence(
+        everyMinute,
+        new Date("2026-11-18T00:00:00Z"),
+        new Date("2026-11-18T00:00:30Z"),
+      )?.toISOString(),
+    ).toBe("2026-11-18T00:01:00.000Z");
+  });
+
+  it("still delivers a one-time occurrence that came due while down", () => {
+    const at = { at: "2026-11-18T00:00", type: "single" } as const;
+
+    expect(
+      nextDueScheduleOccurrence(
+        at,
+        new Date("2026-11-17T00:00:00Z"),
+        new Date("2026-11-18T06:00:00Z"),
+      )?.toISOString(),
+    ).toBe("2026-11-18T00:00:00.000Z");
+    expect(
+      nextDueScheduleOccurrence(
+        at,
+        new Date("2026-11-18T00:00:00Z"),
+        new Date("2026-11-18T06:00:00Z"),
+      ),
+    ).toBeNull();
   });
 });

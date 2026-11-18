@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -62,6 +62,38 @@ export default defineAgent({
 });
 `;
 
+const spanFileExporter = `import { appendFileSync } from "node:fs";
+import { join } from "node:path";
+import { otelIntegration } from "eve/instrumentation/otel";
+
+export default otelIntegration({
+  traceExporter: {
+    export(spans, done) {
+      for (const span of spans) {
+        const context = span.spanContext();
+        appendFileSync(
+          join(process.cwd(), "spans.jsonl"),
+          JSON.stringify({
+            attributes: span.attributes,
+            links: (span.links ?? []).map((link) => ({
+              attributes: link.attributes,
+              spanId: link.context.spanId,
+              traceId: link.context.traceId,
+            })),
+            name: span.name,
+            parentSpanId: span.parentSpanContext?.spanId ?? span.parentSpanId,
+            spanId: context.spanId,
+            traceId: context.traceId,
+          }) + "\\n",
+        );
+      }
+      done({ code: 0 });
+    },
+    async shutdown() {},
+  },
+});
+`;
+
 function signWorkspaceToken(secret: string, audience: string): string {
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
@@ -105,6 +137,7 @@ beforeAll(async () => {
     files: {
       "agents/coordinator/agent/agent.ts": coordinatorModel,
       "agents/coordinator/agent/instructions.md": "Delegate research to the research agent.\n",
+      "agents/coordinator/agent/instrumentation/spans.ts": spanFileExporter,
       "agents/coordinator/agent/subagents/research.ts": `import { defineWorkspaceAgent } from "eve/experimental/workspace";
 
 export default defineWorkspaceAgent({ name: "research", description: "Researches facts." });
@@ -116,6 +149,7 @@ export default eveChannel({ auth: httpBasic({ username: "alice", password: "fixt
 `,
       "agents/research/agent/agent.ts": researchModel,
       "agents/research/agent/instructions.md": "Answer research questions.\n",
+      "agents/research/agent/instrumentation/spans.ts": spanFileExporter,
       "agents/research/agent/tools/whoami.ts": `import { defineTool } from "eve/tools";
 
 export default defineTool({
@@ -183,6 +217,62 @@ describe("self-hosted multi-agent workspace", () => {
     expect(reply).toContain('"principalId":"eve-workspace:coordinator"');
     expect(reply).toContain('"principalType":"service"');
     expect(reply).not.toContain("alice");
+  });
+
+  it("exports nested and linked traces through OpenTelemetry without Vercel", async () => {
+    type ExportedSpan = {
+      attributes: Record<string, unknown>;
+      links: { attributes: Record<string, unknown>; spanId: string; traceId: string }[];
+      name: string;
+      parentSpanId?: string;
+      spanId: string;
+      traceId: string;
+    };
+    const read = (agent: string): ExportedSpan[] => {
+      const path = join(app.appRoot, "agents", agent, "spans.jsonl");
+      if (!existsSync(path)) return [];
+      return readFileSync(path, "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as ExportedSpan);
+    };
+    await expect
+      .poll(() => read("research").some((span) => span.name.startsWith("invoke_agent")), {
+        timeout: 30_000,
+      })
+      .toBe(true);
+    await expect
+      .poll(() => read("coordinator").some((span) => span.name === "execute_tool research"), {
+        timeout: 30_000,
+      })
+      .toBe(true);
+
+    const coordinator = read("coordinator");
+    const tool = coordinator.find((span) => span.name === "execute_tool research")!;
+    const ancestors = new Set<string>();
+    for (
+      let parent = coordinator.find((span) => span.spanId === tool.parentSpanId);
+      parent !== undefined;
+      parent = coordinator.find((span) => span.spanId === parent!.parentSpanId)
+    ) {
+      expect(parent.traceId).toBe(tool.traceId);
+      ancestors.add(parent.name);
+    }
+    expect([...ancestors].some((name) => name.startsWith("invoke_agent"))).toBe(true);
+
+    const research = read("research").find((span) => span.name.startsWith("invoke_agent"))!;
+    expect(research.traceId).not.toBe(tool.traceId);
+    expect(
+      read("research").some((span) =>
+        span.links.some(
+          (link) =>
+            link.traceId === tool.traceId && link.attributes["eve.link.type"] === "agent.dispatch",
+        ),
+      ),
+    ).toBe(true);
+
+    const exported = JSON.stringify([...coordinator, ...read("research")]);
+    expect(exported).not.toContain("Please research the codeword");
   });
 
   it("rejects callers that are not workspace peers", async () => {

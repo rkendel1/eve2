@@ -63,9 +63,9 @@ export { default } from "@acme/research-search";
 
 Local `eve dev` also adds the bundled `self-modification__agent` subagent. Production builds don't include it. See [Self-Modification](/docs/guides/self-modification).
 
-### Vercel workspace peers
+### Workspace peers
 
-In a Vercel agent workspace, `defineWorkspaceAgent` from `eve/experimental/workspace` lets one member call another as a subagent. Add a file under the caller's `agent/subagents/`. The filename is the tool name, and `name` is the peer's directory under `agents/`:
+In an agent workspace, `defineWorkspaceAgent` from `eve/experimental/workspace` lets one member call another as a subagent. Add a file under the caller's `agent/subagents/`. The filename is the tool name, and `name` is the peer's directory under `agents/`:
 
 ```ts title="agents/foreman/agent/subagents/research.ts"
 import { defineWorkspaceAgent } from "eve/experimental/workspace";
@@ -76,7 +76,12 @@ export default defineWorkspaceAgent({
 });
 ```
 
-Omit `transport` to use the built-in one. Local `vercel dev` routes calls without credentials, and on Vercel, calls reach the peer's `/eve/<name>` mount authenticated with the caller's Vercel OIDC token. Elsewhere, set a transport:
+Omit `transport` to use the built-in one:
+
+- On Vercel, calls reach the peer's `/eve/<name>` mount authenticated with the caller's Vercel OIDC token. Local `vercel dev` routes calls without credentials.
+- Under `eve start` from the workspace root, calls go to the peer's own process with a short-lived token signed with the workspace secret. The peer admits the call when its channel auth includes `workspacePeers()` from `eve/experimental/workspace`; the default `agent/channels/eve.ts` policy does. The caller becomes the service principal `eve-workspace:<name>` and gains no user's authority unless the peer's `trustedForwarders` accepts a [forwarded principal](./guides/remote-agents#forward-the-callers-identity). See [Self-host a workspace](/docs/guides/deployment/self-hosted-operations#run-a-workspace).
+
+Elsewhere, set a transport:
 
 ```ts title="agents/foreman/agent/subagents/research.ts"
 import { defineWorkspaceAgent } from "eve/experimental/workspace";
@@ -93,9 +98,9 @@ export default defineWorkspaceAgent({
 
 An explicit transport replaces the default completely, and the peer's channel authentication must accept its credentials. Set `forwardPrincipal: true` only when the peer trusts the caller to pass along the user's identity; see [Remote agents](./guides/remote-agents#forward-the-callers-identity).
 
-`defineWorkspaceAgent` and its `WorkspaceAgentDefinition` and `WorkspaceAgentTransport` types are experimental and have no compatibility promise. The `agents/<name>/` workspace layout and the `eve/vercel` integration are stable.
+`defineWorkspaceAgent`, `workspacePeers`, and the `WorkspaceAgentDefinition` and `WorkspaceAgentTransport` types are experimental and have no compatibility promise. The `agents/<name>/` workspace layout and the `eve/vercel` integration are stable.
 
-To start every member locally, run `vercel dev --local` with a root `vercel.ts` composed by `withEve`. `eve dev` starts only the selected agent, so use an explicit transport to reach a peer you run separately.
+To start every member locally, run `vercel dev --local` with a root `vercel.ts` composed by `withEve`, or build and run the workspace with `eve build` and `eve start` from its root. `eve dev` starts only the selected agent, so use an explicit transport to reach a peer you run separately.
 
 ### Conditional availability
 

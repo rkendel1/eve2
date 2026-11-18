@@ -10,7 +10,7 @@ import { dispatchScheduledOccurrence } from "#runtime/schedules/dispatch-occurre
 import { loadScheduleCollectionDefinition } from "#runtime/schedules/load-collection.js";
 import { parseSchedulePayload } from "#runtime/schedules/payload.js";
 import {
-  nextScheduleOccurrence,
+  nextDueScheduleOccurrence,
   WORKFLOW_SCHEDULE_PROVIDER_KIND,
 } from "#runtime/schedules/durable/state.js";
 import type { WorkflowScheduleVersion } from "#runtime/schedules/durable/types.js";
@@ -21,7 +21,10 @@ export async function nextWorkflowScheduleOccurrenceStep(input: {
   readonly expression: ScheduleExpression;
 }): Promise<string | null> {
   "use step";
-  return nextScheduleOccurrence(input.expression, new Date(input.after))?.toISOString() ?? null;
+  return (
+    nextDueScheduleOccurrence(input.expression, new Date(input.after), new Date())?.toISOString() ??
+    null
+  );
 }
 
 export async function startWorkflowScheduleVersionStep(
