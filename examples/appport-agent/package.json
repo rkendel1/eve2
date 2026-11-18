@@ -19,6 +19,8 @@
   },
   "devDependencies": {
     "@appport/sdk": "1.9.0",
+    "@authboundry/core": "1.20.0",
+    "@authboundry/local": "0.1.1",
     "@types/node": "26.6.6",
     "typescript": "7.0.2"
   }

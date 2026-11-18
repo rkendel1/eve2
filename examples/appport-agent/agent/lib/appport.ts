@@ -1,10 +1,9 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import { createClient } from "@appport/client";
 import type { AppRequest, AppResponse } from "@appport/protocol";
 import { createHttpTransport } from "@appport/transport-http";
-
-const ASSERTION_TTL_SECONDS = 60;
 
 export interface Caller {
   readonly principalId: string;
@@ -16,28 +15,17 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function callerAssertion(caller: Caller): string {
-  const secret = requireEnv("APPPORT_AGENT_ASSERTION_SECRET");
-  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const now = Math.floor(Date.now() / 1000);
-  const header = encode({ alg: "HS256", typ: "JWT" });
-  const payload = encode({
-    act: "appport-agent",
-    aud: "appport:inventory",
-    exp: now + ASSERTION_TTL_SECONDS,
-    iat: now,
-    iss: "appport-agent",
-    jti: randomUUID(),
-    sub: caller.principalId,
-  });
-  const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
-  return `${header}.${payload}.${signature}`;
+function agentCredential(): string {
+  return readFileSync(requireEnv("APPPORT_AGENT_CREDENTIAL_FILE"), "utf8").trim();
 }
 
 function clientFor(caller: Caller) {
   return createClient({
     transport: createHttpTransport({
-      headers: { authorization: `Bearer ${callerAssertion(caller)}` },
+      headers: {
+        authorization: `Bearer ${agentCredential()}`,
+        "x-appport-on-behalf-of": caller.principalId,
+      },
       url: requireEnv("APPPORT_URL"),
     }),
   });
@@ -116,8 +104,21 @@ export async function invokeCapability(
   traceId: string | undefined,
 ): Promise<InvocationResult> {
   const requestId = `eve_${randomUUID()}`;
+  const unavailable = (error: unknown): InvocationResult => ({
+    error: {
+      code: "UNAVAILABLE",
+      message: `AppPort did not answer: ${error instanceof Error ? error.message : String(error)}`,
+    },
+    ok: false,
+    requestId,
+  });
   const client = clientFor(caller);
-  const entry = (await client.load()).capabilities.find((candidate) => candidate.name === name);
+  let entry;
+  try {
+    entry = (await client.load()).capabilities.find((candidate) => candidate.name === name);
+  } catch (error) {
+    return unavailable(error);
+  }
   if (entry === undefined || entry.effect !== "observation" || !allowedCapabilities().has(name)) {
     return {
       error: {
@@ -136,7 +137,12 @@ export async function invokeCapability(
     type: "request",
   };
   if (traceId !== undefined) request.traceId = traceId;
-  const response: AppResponse = await client.send(request);
+  let response: AppResponse;
+  try {
+    response = await client.send(request);
+  } catch (error) {
+    return unavailable(error);
+  }
   if (response.type !== "response") {
     return {
       error: { code: "UNEXPECTED_RESPONSE", message: "AppPort returned a non-response envelope." },

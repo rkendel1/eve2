@@ -34,13 +34,13 @@ caller --JWT--> eve channel (jwtHmac) --> agent turn (Workflow world, SQLite)
                                        TelemetrySink -> provenance JSONL
 ```
 
-| Responsibility                                             | Owner                                                             | Notes                                                            |
-| ---------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Harness, turns, durable sessions, route auth               | eve (unchanged)                                                   | No parallel orchestration, tool registry, or memory              |
-| Capability discovery, contracts, authorization, invocation | AppPort (existing HTTP binding, manifest, `permissionAuthorizer`) | No new AppPort abstraction                                       |
-| Caller identity into AppPort                               | Host `authenticate` hook (AppPort's own design)                   | Interim HS256 assertion; AuthBoundry recommended next (see gaps) |
-| Execution provenance                                       | AppPort `TelemetrySink` → JSONL; eve's session history            | Not yet in FeltDB                                                |
-| Durable work state                                         | eve Workflow world                                                | FeltDB not wired; see gaps                                       |
+| Responsibility                                             | Owner                                                             | Notes                                               |
+| ---------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------- |
+| Harness, turns, durable sessions, route auth               | eve (unchanged)                                                   | No parallel orchestration, tool registry, or memory |
+| Capability discovery, contracts, authorization, invocation | AppPort (existing HTTP binding, manifest, `permissionAuthorizer`) | No new AppPort abstraction                          |
+| Caller identity into AppPort                               | AuthBoundry delegation via an AppPort `Authorizer`                | See `AUTHBOUNDRY-DELEGATION-REPORT.md`              |
+| Execution provenance                                       | AppPort `TelemetrySink` → JSONL; eve's session history            | Not yet in FeltDB                                   |
+| Durable work state                                         | eve Workflow world                                                | FeltDB not wired; see gaps                          |
 
 Model exposure: three tools. Invocation is limited to operator-allowlisted capabilities with an explicit `effect: "observation"`. There are no raw privileged operations.
 
@@ -102,10 +102,7 @@ Result: 10/10 with the key; 7/7 plus the e2e suite skipped without it. The key n
 
 ## Remaining gaps
 
-1. **Identity and authority.**
-   - _Now:_ a shared-secret assertion with permissions in a JSON file.
-   - _Recommended:_ `@authboundry/local`. Register the eve agent as an AuthBoundry agent, let people grant capabilities, and have the AppPort host authorize with `check(capability, on_behalf_of, { agent })`. That gives revocation, expiry, and a `delegation_id` for provenance.
-   - Needs a decision; it adds a supervised native server. Exempt `@authboundry/*` from the release-age gate as for `@appport/*`.
+1. **Identity and authority.** Done in the next slice: see `AUTHBOUNDRY-DELEGATION-REPORT.md`.
 2. **FeltDB is not wired.** Provenance lives in JSONL plus eve's Workflow world. The natural first FeltDB use is the provenance and intent record per AppPort invocation, as a `TelemetrySink` writing to FeltDB. Defer until the first consequential capability needs reconciliation.
 3. **Republish `@appport/client` and `@appport/protocol`** so `authorizationDecision` reaches callers.
 4. **Resolver is not used.** Runtime dependency resolution isn't needed for one HTTP endpoint.

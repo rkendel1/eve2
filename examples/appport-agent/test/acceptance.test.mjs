@@ -1,25 +1,43 @@
 import { spawn, execFileSync } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 
+import { AGENT_ID, startInventoryHost } from "../appport-host/host.mjs";
+
 const root = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "appport-agent-acceptance-"));
 const provenanceFile = join(scratch, "provenance.jsonl");
-const ASSERTION_SECRET = "acceptance-assertion-secret-0123456789abcdef";
+const agentCredentialFile = join(scratch, "agent-credential");
+const hostDataDir = join(scratch, "host");
+const ADMIN_SECRET = "acceptance-authority-admin-secret-0123456789";
 const AGENT_JWT_SECRET = "acceptance-agent-jwt-secret-0123456789abcdef";
 const APPPORT_PORT = 4400 + Math.floor(Math.random() * 400);
 const APPPORT_URL = `http://127.0.0.1:${APPPORT_PORT}/appport`;
 const ANTHROPIC_API_KEY = process.env.APPPORT_AGENT_E2E_ANTHROPIC_API_KEY ?? "";
 const ALICE = "appport-agent-operator:alice";
 const BOB = "appport-agent-operator:bob";
+const CAROL = "appport-agent-operator:carol";
 const catalog = JSON.parse(readFileSync(join(root, "appport-host/catalog.json"), "utf8"));
+const ALPHA = catalog.items.find((item) => item.sku === "ALPHA-1");
 
 const children = [];
+let host;
+let lib;
+let aliceGrant;
+
+const startHost = () =>
+  startInventoryHost({
+    adminSecret: ADMIN_SECRET,
+    agentCredentialFile,
+    dataDir: hostDataDir,
+    port: APPPORT_PORT,
+    provenanceFile,
+  });
 
 function cleanEnv(extra) {
   const env = {};
@@ -66,31 +84,43 @@ function provenance() {
     .map((line) => JSON.parse(line));
 }
 
-let lib;
+const recordsFor = (requestId, kind) =>
+  provenance().filter((entry) => entry.requestId === requestId && entry.kind === kind);
+
+const lookup = (principalId, input = { sku: "ALPHA-1" }) =>
+  lib.invokeCapability({ principalId }, "catalog.lookup", input, undefined);
+
+function assertRejectedBeforeExecution(result, code, reason) {
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, code);
+  assert.deepEqual(recordsFor(result.requestId, "execution"), []);
+  if (reason !== undefined)
+    assert.equal(recordsFor(result.requestId, "authorization")[0].reason, reason);
+}
+
+async function waitFor(condition) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.fail("condition not met in time");
+}
 
 before(async () => {
-  await startProcess(
-    process.execPath,
-    ["appport-host/server.mjs"],
-    cleanEnv({
-      APPPORT_AGENT_ASSERTION_SECRET: ASSERTION_SECRET,
-      APPPORT_PORT: String(APPPORT_PORT),
-      APPPORT_PROVENANCE_FILE: provenanceFile,
-    }),
-    /\[appport\] inventory listening at (\S+)/u,
-  );
+  host = await startHost();
   process.env.APPPORT_URL = APPPORT_URL;
-  process.env.APPPORT_AGENT_ASSERTION_SECRET = ASSERTION_SECRET;
+  process.env.APPPORT_AGENT_CREDENTIAL_FILE = agentCredentialFile;
   process.env.APPPORT_AGENT_CAPABILITIES = "catalog.lookup";
   lib = await import("../agent/lib/appport.ts");
 });
 
 after(async () => {
   await Promise.all(children.map(stop));
+  await host?.close();
   rmSync(scratch, { force: true, recursive: true });
 });
 
-describe("AppPort integration (real AppPort over HTTP, no model)", () => {
+describe("AppPort with AuthBoundry delegation (real servers, no model)", () => {
   it("discovers the read-only capability and marks it invocable", async () => {
     const capabilities = await lib.listCapabilities({ principalId: ALICE });
     assert.deepEqual(capabilities, [
@@ -113,65 +143,102 @@ describe("AppPort integration (real AppPort over HTTP, no model)", () => {
     assert.equal(contract.inputSchema.properties.sku.type, "string");
   });
 
-  it("invokes it for an authorized caller with a result that matches the source data", async () => {
-    const result = await lib.invokeCapability(
-      { principalId: ALICE },
-      "catalog.lookup",
-      { sku: "ALPHA-1" },
-      "trace-alice",
-    );
+  it("rejects a user who has granted nothing", async () => {
+    assertRejectedBeforeExecution(await lookup(ALICE), "FORBIDDEN", "delegation_missing");
+  });
+
+  it("invokes for Alice once she grants the agent catalog.read, with attributable provenance", async () => {
+    aliceGrant = await host.authority.grant({
+      agent: AGENT_ID,
+      capabilities: ["catalog.read"],
+      delegator: ALICE,
+    });
+    const result = await lookup(ALICE);
     assert.equal(result.ok, true);
-    assert.deepEqual(
-      result.output,
-      catalog.items.find((item) => item.sku === "ALPHA-1"),
-    );
-    const record = provenance().find((entry) => entry.requestId === result.requestId);
-    assert.equal(record.success, true);
-    assert.equal(record.principal, ALICE);
-    assert.match(record.sessionId, /^agent_[0-9a-f-]{36}$/u);
-    assert.equal(record.capability, "catalog.lookup");
+    assert.deepEqual(result.output, ALPHA);
+
+    const [decision] = recordsFor(result.requestId, "authorization");
+    assert.equal(decision.decision, "allow");
+    assert.equal(decision.agent, AGENT_ID);
+    assert.equal(decision.onBehalfOf, ALICE);
+    assert.equal(decision.delegationId, aliceGrant.id);
+    assert.match(decision.decisionId, /^inventory-decision-/u);
+    const [execution] = recordsFor(result.requestId, "execution");
+    assert.equal(execution.delegationId, aliceGrant.id);
+    const [request] = recordsFor(result.requestId, "request");
+    assert.equal(request.success, true);
+    assert.equal(request.principal, ALICE);
+    assert.equal(request.capability, "catalog.lookup");
   });
 
-  it("rejects a caller without the permission", async () => {
-    const result = await lib.invokeCapability(
-      { principalId: BOB },
-      "catalog.lookup",
-      { sku: "ALPHA-1" },
-      undefined,
-    );
-    assert.equal(result.ok, false);
-    assert.equal(result.error.code, "FORBIDDEN");
-    const record = provenance().find((entry) => entry.requestId === result.requestId);
-    assert.equal(record.errorCode, "FORBIDDEN");
-    assert.equal(record.principal, BOB);
-  });
-
-  it("treats a forged caller assertion as anonymous", async () => {
-    process.env.APPPORT_AGENT_ASSERTION_SECRET = "not-the-shared-secret-0123456789abcdef";
-    try {
-      const result = await lib.invokeCapability(
-        { principalId: ALICE },
-        "catalog.lookup",
-        { sku: "ALPHA-1" },
-        undefined,
-      );
-      assert.equal(result.ok, false);
-      assert.equal(result.error.code, "UNAUTHORIZED");
-    } finally {
-      process.env.APPPORT_AGENT_ASSERTION_SECRET = ASSERTION_SECRET;
-    }
+  it("does not let Bob use Alice's delegation", async () => {
+    assertRejectedBeforeExecution(await lookup(BOB), "FORBIDDEN", "delegation_missing");
   });
 
   it("rejects input that violates the contract", async () => {
     for (const input of [{}, { sku: 5 }]) {
-      const result = await lib.invokeCapability(
-        { principalId: ALICE },
-        "catalog.lookup",
-        input,
-        undefined,
-      );
+      const result = await lookup(ALICE, input);
+      assertRejectedBeforeExecution(result, "INVALID_INPUT");
+    }
+  });
+
+  it("stops invoking once Alice revokes, and a new grant is a new delegation", async () => {
+    await host.authority.revoke(aliceGrant.id);
+    assertRejectedBeforeExecution(await lookup(ALICE), "FORBIDDEN", "delegation_revoked");
+    const renewed = await host.authority.grant({
+      agent: AGENT_ID,
+      capabilities: ["catalog.read"],
+      delegator: ALICE,
+    });
+    assert.notEqual(renewed.id, aliceGrant.id);
+    aliceGrant = renewed;
+    assert.equal((await lookup(ALICE)).ok, true);
+  });
+
+  it("rejects a delegation once it has expired", async () => {
+    await host.authority.grant({
+      agent: AGENT_ID,
+      capabilities: ["catalog.read"],
+      delegator: CAROL,
+      expiresAt: Date.now() + 1500,
+    });
+    assert.equal((await lookup(CAROL)).ok, true);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    assertRejectedBeforeExecution(await lookup(CAROL), "FORBIDDEN", "delegation_expired");
+  });
+
+  it("treats a forged agent credential as unauthenticated", async () => {
+    const forged = join(scratch, "forged-credential");
+    writeFileSync(forged, "aga_forged.0000000000000000000000000000000000000000\n");
+    process.env.APPPORT_AGENT_CREDENTIAL_FILE = forged;
+    try {
+      const result = await lookup(ALICE);
+      assertRejectedBeforeExecution(result, "UNAUTHORIZED");
+      assert.deepEqual(recordsFor(result.requestId, "authorization"), []);
+    } finally {
+      process.env.APPPORT_AGENT_CREDENTIAL_FILE = agentCredentialFile;
+    }
+  });
+
+  it("fails closed while AuthBoundry is down and recovers when it is restarted", async () => {
+    process.kill(-host.authority.process.pid, "SIGKILL");
+    const result = await lookup(ALICE);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, "INTERNAL_ERROR");
+    assert.equal(recordsFor(result.requestId, "authorization")[0].decision, "unavailable");
+    assert.deepEqual(recordsFor(result.requestId, "execution"), []);
+    await waitFor(async () => (await lookup(ALICE)).ok);
+    assert.equal(host.authority.restarts, 1);
+  });
+
+  it("reports an unreachable AppPort as a failure, never a result", async () => {
+    process.env.APPPORT_URL = "http://127.0.0.1:9/appport";
+    try {
+      const result = await lookup(ALICE);
       assert.equal(result.ok, false);
-      assert.equal(result.error.code, "INVALID_INPUT");
+      assert.equal(result.error.code, "UNAVAILABLE");
+    } finally {
+      process.env.APPPORT_URL = APPPORT_URL;
     }
   });
 
@@ -181,18 +248,25 @@ describe("AppPort integration (real AppPort over HTTP, no model)", () => {
       const lookups = () =>
         provenance().filter((entry) => entry.capability === "catalog.lookup").length;
       const before = lookups();
-      const result = await lib.invokeCapability(
-        { principalId: ALICE },
-        "catalog.lookup",
-        { sku: "ALPHA-1" },
-        undefined,
-      );
+      const result = await lookup(ALICE);
       assert.equal(result.ok, false);
       assert.equal(result.error.code, "NOT_EXPOSED");
       assert.equal(lookups(), before);
     } finally {
       process.env.APPPORT_AGENT_CAPABILITIES = "catalog.lookup";
     }
+  });
+
+  it("keeps grants and the agent's credential across a restart of the application", async () => {
+    const credential = readFileSync(agentCredentialFile, "utf8");
+    await host.close();
+    host = await startHost();
+    assert.equal(host.authority.issuedCheckCredential, false);
+    assert.equal(host.authority.registeredAgents[0].issuedAgentCredential, false);
+    assert.equal(readFileSync(agentCredentialFile, "utf8"), credential);
+    const result = await lookup(ALICE);
+    assert.equal(result.ok, true);
+    assert.equal(recordsFor(result.requestId, "authorization")[0].delegationId, aliceGrant.id);
   });
 });
 
@@ -256,7 +330,7 @@ describe("eve agent end to end (real Anthropic model)", { skip: ANTHROPIC_API_KE
     cleanEnv({
       AGENT_JWT_SECRET,
       ANTHROPIC_API_KEY,
-      APPPORT_AGENT_ASSERTION_SECRET: ASSERTION_SECRET,
+      APPPORT_AGENT_CREDENTIAL_FILE: agentCredentialFile,
       APPPORT_AGENT_CAPABILITIES: "catalog.lookup",
       APPPORT_URL,
       PORT: "0",
@@ -296,6 +370,11 @@ describe("eve agent end to end (real Anthropic model)", { skip: ANTHROPIC_API_KE
       .slice(before)
       .filter((entry) => entry.capability === "catalog.lookup");
     assert.ok(invocations.some((entry) => entry.success && entry.principal === ALICE));
+    assert.ok(
+      provenance()
+        .slice(before)
+        .some((entry) => entry.kind === "execution" && entry.delegationId === aliceGrant.id),
+    );
 
     await stop(agent.child);
     agent = await startAgent();
@@ -314,7 +393,16 @@ describe("eve agent end to end (real Anthropic model)", { skip: ANTHROPIC_API_KE
     const invocations = provenance()
       .slice(before)
       .filter((entry) => entry.capability === "catalog.lookup");
-    assert.ok(invocations.length > 0, "the agent did not attempt the invocation");
-    assert.ok(invocations.every((entry) => !entry.success && entry.principal === BOB));
+    assert.ok(
+      invocations.some((entry) => entry.kind === "request"),
+      "the agent did not attempt the invocation",
+    );
+    assert.ok(
+      invocations.every(
+        (entry) =>
+          entry.kind !== "execution" &&
+          (entry.kind !== "request" || (!entry.success && entry.principal === BOB)),
+      ),
+    );
   });
 });

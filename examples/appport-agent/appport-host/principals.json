@@ -1,4 +1,0 @@
-{
-  "appport-agent-operator:alice": ["catalog.read"],
-  "appport-agent-operator:bob": []
-}
