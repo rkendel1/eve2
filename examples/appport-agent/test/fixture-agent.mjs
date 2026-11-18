@@ -32,6 +32,13 @@ export default defineAgent({
           };
         return "Reserved: " + JSON.stringify(toolResults.map((entry) => entry.output));
       }
+      const invoke = /Invoke (\\S+) with (\\{.*\\})/u.exec(String(lastUserMessage));
+      if (invoke !== null) {
+        const calls = String(lastUserMessage).includes("[repeat]") ? 2 : 1;
+        if (toolResults.length < calls)
+          return { toolCalls: [{ name: "appport_invoke", input: { input: JSON.parse(invoke[2]), name: invoke[1] } }] };
+        return "Result: " + JSON.stringify(toolResults.at(-1)?.output);
+      }
       const listing = /List via (\\S+)/u.exec(String(lastUserMessage));
       if (listing !== null) {
         if (toolResults.length === 0)

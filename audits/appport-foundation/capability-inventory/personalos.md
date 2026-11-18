@@ -6,6 +6,23 @@
 - **NOT inspected in depth:** `src/*.tsx` UI rendering beyond call sites; `e2e/*.mjs` scripts (names only); `docs/evidence/*` JSON; iOS Swift beyond the client; `feltkit/_generated/`; `scripts/`; FeltKit internals beyond the capability-publishing rule.
 - **Tests:** NOT run. `node_modules` is absent in the repo and installing was out of scope. All "tested" labels below mean _test exists and targets this behavior (by source reading)_, not _observed passing_. Tests marked `{ skip: SKIP }` need a real AuthBoundry/model and are skipped by default.
 
+## Slice 2a update (tasks, reminders, briefing)
+
+Personal OS branch `claude/dreamy-galileo-4z03p5`, on FeltKit main `d68219c`; see [`../PERSONALOS-TASKS-BRIEFING-REPORT.md`](../PERSONALOS-TASKS-BRIEFING-REPORT.md). The tables below keep the original Phase 1 classification; this supersedes it for these rows.
+
+| ID                                   | Now                         | How                                                                                                                    |
+| ------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| PO-06 `tasks.list`                   | Available to eve, delegated | Listed in `authority.capabilities`; a person grants it to an agent (`delegation.set {agent}`)                          |
+| PO-07 `tasks.create` (and reminders) | Available to eve, delegated | Same; the reminder is Personal OS's own `reminder.fire` job, queued as the person                                      |
+| PO-08 `tasks.update`                 | Available to eve, delegated | Same                                                                                                                   |
+| PO-09 `tasks.complete`               | Available to eve, delegated | Same                                                                                                                   |
+| PO-10 `tasks.reopen`                 | Available to eve, delegated | **Newly published** (`tasks.ts`, the existing `reopen` function), with its own grant                                   |
+| PO-11 delete                         | **Not delegable**           | Kept as the person's own act, as the source states (`tasks.ts` `remove`); not published, and not grantable to an agent |
+| PO-25 `briefing.today`               | Available to eve, delegated | Same as PO-06                                                                                                          |
+| PO-23 action log                     | Records delegated actions   | `via: "agent"` plus `delegation` (agent, AuthBoundry decision and delegation ids, capability)                          |
+
+Tests now run: Personal OS's full suite, 150 of 150 on FeltKit main (see the report).
+
 ## Key structural findings
 
 1. **PersonalOS already exposes AppPort capabilities.** FeltKit publishes any function declaring `capability: {...}` at `POST /appport` and as an MCP tool at `/mcp` (FeltKit `README.md` §Capabilities). Queries → `effect: observation`; mutations → `consequential` with `idempotency: "supported"` (FeltKit `runtime/capabilities.ts:37-40`); version defaults to 1. **14 functions are published:** `actions.list`, `assistant.send`, `briefing.today`, `conversations.list`, `conversations.messages`, `documents.list`, `memory.list`, `memory.add`, `projects.list`, `tasks.list`, `tasks.create`, `tasks.update`, `tasks.complete` (13 functions) + integration ops that are not `expose:false`: `websearch.search`, `openaisearch.search`, `identity.lookup`, `identity.resolve`, `identitylinks.put`, `identitylinks.revoke` (the last four are refused to every person/bridge role). `x.*` is `expose: false` (`app.ts:266`).

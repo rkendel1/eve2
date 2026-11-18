@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -141,4 +141,18 @@ const server = await startServer({
   port: Number(required("FELTKIT_PORT")),
   dashboard: { enabled: false, adminToken: `fka_${"x".repeat(43)}`, dir: null },
 });
+const authorityPids = readdirSync("/proc")
+  .filter((entry) => /^\d+$/u.test(entry))
+  .filter((pid) => {
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      return (
+        Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]) === process.pid &&
+        readFileSync(`/proc/${pid}/cmdline`, "utf8").includes("authboundry")
+      );
+    } catch {
+      return false;
+    }
+  });
+writeFileSync(`${projectDir}.authority-pids`, authorityPids.join("\n"));
 console.log(`[feltkit-host] listening at ${server.url}`);

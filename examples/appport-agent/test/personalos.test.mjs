@@ -1,0 +1,387 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, describe, it } from "node:test";
+import assert from "node:assert/strict";
+
+import { createFeltDB } from "@feltdb/core";
+
+import { buildScriptedAgent } from "./fixture-agent.mjs";
+import {
+  cleanEnv,
+  groupAlive,
+  root,
+  signJwt,
+  startProcess,
+  stop,
+  stopAll,
+  waitFor,
+} from "./support.mjs";
+
+const personalos = process.env.PERSONALOS_DIR ?? "";
+const SKIP =
+  personalos &&
+  existsSync(join(personalos, "node_modules/@feltdb/feltkit/dist/runtime/delegation.js")) &&
+  existsSync(join(personalos, "feltkit/delegation.ts"))
+    ? false
+    : "set PERSONALOS_DIR to a Personal OS checkout with agent delegation, its dependencies installed and a FeltKit with delegated /appport";
+
+const scratch = mkdtempSync(join(tmpdir(), "appport-personalos-"));
+const fixture = join(root, ".personalos-agent");
+const workDir = join(scratch, "work");
+const credentialFile = join(scratch, "agent-session");
+const crashFile = join(scratch, "crash-after-commit");
+const AGENT_JWT_SECRET = "personalos-agent-jwt-secret-0123456789abcdef";
+const port = 6600 + Math.floor(Math.random() * 300);
+const day = (offset) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+const TODAY = day(0);
+const TOMORROW = day(1);
+const READ = "tasks.list+briefing.today";
+const WRITE = `${READ}+tasks.create+tasks.update+tasks.complete`;
+
+let agent;
+let host;
+
+const hostEnv = (extra = {}) =>
+  cleanEnv({
+    APPPORT_AGENT_CREDENTIAL_FILE: credentialFile,
+    NODE_ENV: "development",
+    PERSONALOS_CRASH_FILE: crashFile,
+    PERSONALOS_DIR: personalos,
+    PERSONALOS_PORT: String(port),
+    PERSONALOS_PROJECT_DIR: join(scratch, "personalos"),
+    PERSONALOS_TODAY: TODAY,
+    ...extra,
+  });
+const harness = join(root, "test/personalos-host.mjs");
+const startHost = (grants, extra = {}) =>
+  startProcess(
+    process.execPath,
+    [harness],
+    hostEnv({ ...(grants === undefined ? {} : { PERSONALOS_GRANTS: grants }), ...extra }),
+    /\[personalos-host\] listening at (\S+)/u,
+  );
+const report = (extra) =>
+  JSON.parse(
+    execFileSync(process.execPath, [harness, "--report"], {
+      env: hostEnv(extra),
+      encoding: "utf8",
+    }),
+  );
+
+async function stopHost() {
+  await stop(host.child);
+  const pids = join(scratch, "personalos.authority-pids");
+  for (const pid of existsSync(pids)
+    ? readFileSync(pids, "utf8").split("\n").filter(Boolean).map(Number)
+    : []) {
+    if (groupAlive(pid)) process.kill(-pid, "SIGKILL");
+    await waitFor(() => !groupAlive(pid));
+  }
+}
+
+async function restartHost(grants) {
+  await stopHost();
+  host = await startHost(grants);
+}
+
+async function snapshot(extra) {
+  await stopHost();
+  try {
+    return report(extra);
+  } finally {
+    host = await startHost();
+  }
+}
+
+const startAgent = () =>
+  startProcess(
+    join(root, "node_modules/.bin/eve"),
+    ["start", "--host", "127.0.0.1"],
+    cleanEnv({
+      AGENT_JWT_SECRET,
+      APPPORT_AGENT_CAPABILITIES:
+        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today",
+      APPPORT_AGENT_CREDENTIAL_FILE: credentialFile,
+      APPPORT_AGENT_OPERATOR: "appport-agent-operator:operator",
+      APPPORT_AGENT_WORK_DIR: workDir,
+      APPPORT_ON_BEHALF_OF: "subject",
+      APPPORT_URL: `http://127.0.0.1:${port}/appport`,
+      PORT: "0",
+    }),
+    /\[START\] server listening at (\S+)/u,
+    fixture,
+  );
+
+async function reachable() {
+  try {
+    await fetch(agent.url, { signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function work(person, key, objective) {
+  const response = await fetch(new URL("/work", agent.url), {
+    body: JSON.stringify({ objective }),
+    headers: {
+      authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, person)}`,
+      "content-type": "application/json",
+      "idempotency-key": key,
+    },
+    method: "POST",
+  });
+  const { workId } = await response.json();
+  return await outcome(person, workId);
+}
+
+async function outcome(person, workId) {
+  let result;
+  await waitFor(async () => {
+    const response = await fetch(new URL(`/work/${workId}`, agent.url), {
+      headers: { authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, person)}` },
+    });
+    result = await response.json();
+    return result.status === "completed" || result.status === "blocked";
+  });
+  return result;
+}
+
+const invoke = (capability, input) => `Invoke ${capability} with ${JSON.stringify(input)}`;
+
+async function ledger(workId) {
+  await stop(agent.child);
+  const db = createFeltDB({ namespace: "appport-agent-work", path: workDir });
+  try {
+    return await db.collection("appport_operations").find({ work_id: workId });
+  } finally {
+    await db.close?.();
+    agent = await startAgent();
+  }
+}
+
+const titled = (state, owner, title) =>
+  state.people[owner].tasks.filter((task) => task.title === title);
+
+before(async () => {
+  if (SKIP) return;
+  execFileSync(process.execPath, [harness, "--copy-project"], { env: hostEnv() });
+  // Ada is signed in somewhere (her phone): FeltKit runs her durable work, reminders included, only while she has a session.
+  host = await startHost(`ada=${READ}`, { PERSONALOS_SIGNED_IN: "ada" });
+  buildScriptedAgent(fixture);
+  agent = await startAgent();
+});
+
+after(async () => {
+  if (host) await stopHost();
+  await stopAll();
+  rmSync(fixture, { force: true, recursive: true });
+  rmSync(scratch, { force: true, recursive: true });
+});
+
+describe("eve managing Ada's Personal OS tasks under her delegation", { skip: SKIP }, () => {
+  let dentist;
+  let rent;
+
+  it("lists Ada's tasks with a read grant, and cannot create with it", async () => {
+    const listed = await work("ada", "list-1", invoke("tasks.list", {}));
+    assert.equal(listed.status, "completed", JSON.stringify(listed));
+    const denied = await work("ada", "create-denied", invoke("tasks.create", { title: "Not yet" }));
+    assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+    const state = await snapshot();
+    assert.equal(titled(state, "ada", "Not yet").length, 0, "nothing created");
+  });
+
+  it("creates a task with a reminder in Ada's space, once for a repeated call, through Personal OS's own code", async () => {
+    await restartHost(`ada=${WRITE}`);
+    const input = {
+      due: TOMORROW,
+      reminder: true,
+      time: "10:00",
+      title: "Call the dentist",
+      tzOffset: 0,
+    };
+    const created = await work("ada", "create-1", `[repeat] ${invoke("tasks.create", input)}`);
+    assert.equal(created.status, "completed", JSON.stringify(created));
+    assert.equal(created.operations.length, 1);
+    assert.equal(created.operations[0].requestIds.length, 1, "one request for the repeated call");
+
+    const state = await snapshot();
+    [dentist] = titled(state, "ada", "Call the dentist");
+    assert.equal(titled(state, "ada", "Call the dentist").length, 1);
+    assert.deepEqual([dentist.owner, dentist.due, dentist.remindTime], ["ada", TOMORROW, "10:00"]);
+    assert.deepEqual(
+      state.reminders.filter((job) => job.taskId === dentist.id),
+      [{ principal: "ada", status: "scheduled", taskId: dentist.id }],
+      "one reminder job, queued by Personal OS as Ada",
+    );
+    const action = state.people.ada.actions.find((entry) => entry.evidence?.id === dentist.id);
+    assert.deepEqual(
+      [
+        action.kind,
+        action.status,
+        action.via,
+        action.evidence.verified,
+        action.delegation.agent,
+        action.delegation.capability,
+      ],
+      ["reminder.create", "succeeded", "agent", true, "appport-agent", "tasks.create"],
+    );
+    const audit = state.audit.find(
+      (entry) => entry.authority.delegation?.decisionId === action.delegation.decisionId,
+    );
+    assert.equal(
+      audit.requestId,
+      created.operations[0].requestIds[0],
+      "eve's operation, FeltKit's audit and Personal OS's action are one chain",
+    );
+    assert.equal(audit.authority.delegation.delegationId, action.delegation.delegationId);
+  });
+
+  it("updates and completes with those grants; the briefing reflects it", async () => {
+    const moved = await work(
+      "ada",
+      "update-1",
+      invoke("tasks.update", { id: dentist.id, notes: "Ask about the bill" }),
+    );
+    assert.equal(moved.status, "completed", JSON.stringify(moved));
+    const rentWork = await work(
+      "ada",
+      "create-rent",
+      invoke("tasks.create", { due: TODAY, title: "Pay rent" }),
+    );
+    assert.equal(rentWork.status, "completed");
+    const briefing = await work("ada", "brief-1", invoke("briefing.today", { today: TODAY }));
+    assert.match(briefing.summary, /Pay rent/u, "the briefing eve read shows the task eve added");
+
+    let state = await snapshot();
+    [rent] = titled(state, "ada", "Pay rent");
+    assert.equal(titled(state, "ada", "Call the dentist")[0].notes, "Ask about the bill");
+    assert.ok(state.people.ada.briefing.dueToday.some((task) => task.id === rent.id));
+
+    const done = await work("ada", "complete-1", invoke("tasks.complete", { id: rent.id }));
+    assert.equal(done.status, "completed");
+    state = await snapshot();
+    assert.equal(titled(state, "ada", "Pay rent")[0].status, "done");
+    assert.ok(
+      !state.people.ada.briefing.dueToday.some((task) => task.id === rent.id),
+      "done is gone from today",
+    );
+  });
+
+  it("reopens only once reopen is delegated, and never deletes", async () => {
+    const denied = await work("ada", "reopen-denied", invoke("tasks.reopen", { id: rent.id }));
+    assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+    await restartHost(`ada=${WRITE}+tasks.reopen`);
+    const reopened = await work("ada", "reopen-1", invoke("tasks.reopen", { id: rent.id }));
+    assert.equal(reopened.status, "completed", JSON.stringify(reopened));
+    const deletion = await work("ada", "delete-1", invoke("tasks.delete", { id: rent.id }));
+    assert.equal(deletion.status, "blocked");
+    assert.deepEqual(deletion.operations, [], "no operation: tasks.delete is not a capability");
+    const state = await snapshot();
+    assert.equal(titled(state, "ada", "Pay rent")[0].status, "open");
+  });
+
+  it("never reaches Ada's tasks for Grace", async () => {
+    const listed = await work("grace", "grace-list", invoke("tasks.list", {}));
+    assert.equal(listed.operations[0].errorCode, "FORBIDDEN", "Grace delegated nothing");
+    await restartHost(`ada=${WRITE}+tasks.reopen;grace=tasks.complete`);
+    const reach = await work("grace", "grace-reach", invoke("tasks.complete", { id: dentist.id }));
+    assert.equal(reach.operations[0].errorCode, "NOT_FOUND", "Ada's task does not exist for Grace");
+    const state = await snapshot();
+    assert.equal(titled(state, "ada", "Call the dentist")[0].status, "open");
+  });
+
+  it("adds once when eve crashes after Personal OS committed, and Personal OS restarts too", async () => {
+    const response = await fetch(new URL("/work", agent.url), {
+      body: JSON.stringify({
+        objective: `[crash:invocation.record] ${invoke("tasks.create", { title: "Renew passport" })}`,
+      }),
+      headers: {
+        authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "ada")}`,
+        "content-type": "application/json",
+        "idempotency-key": "crash-1",
+      },
+      method: "POST",
+    });
+    const { workId } = await response.json();
+    await waitFor(async () => !(await reachable()));
+    await stop(agent.child);
+    await restartHost();
+    agent = await startAgent();
+    assert.equal((await outcome("ada", workId)).status, "completed");
+    const [operation] = await ledger(workId);
+    assert.deepEqual([operation.state, operation.attempts], ["succeeded", 2]);
+    const state = await snapshot();
+    assert.equal(titled(state, "ada", "Renew passport").length, 1);
+  });
+
+  it("leaves an operation indeterminate when Personal OS died before recording its answer, and never sends it again", async () => {
+    writeFileSync(crashFile, "next idempotency record");
+    const response = await fetch(new URL("/work", agent.url), {
+      body: JSON.stringify({
+        objective: `[crash:invocation.record] ${invoke("tasks.create", { title: "Book flights" })}`,
+      }),
+      headers: {
+        authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "ada")}`,
+        "content-type": "application/json",
+        "idempotency-key": "uncertain-1",
+      },
+      method: "POST",
+    });
+    const { workId } = await response.json();
+    await waitFor(async () => !(await reachable()));
+    await stop(agent.child);
+    await restartHost();
+    agent = await startAgent();
+    const blocked = await outcome("ada", workId);
+    assert.equal(blocked.status, "blocked");
+    assert.match(blocked.decisions.at(-1), /^indeterminate: /u);
+    const [operation] = await ledger(workId);
+    assert.equal(operation.state, "indeterminate");
+    assert.equal(operation.outcome.error.reason, "IDEMPOTENCY_OUTCOME_UNKNOWN");
+    const reconcile = await fetch(new URL("/work/reconcile", agent.url), {
+      headers: { authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "operator")}` },
+      method: "POST",
+    });
+    assert.equal(reconcile.status, 200);
+    const [after] = await ledger(workId);
+    assert.deepEqual(
+      [after.state, after.request_ids],
+      ["indeterminate", operation.request_ids],
+      "nothing sent again",
+    );
+    const state = await snapshot();
+    assert.equal(
+      titled(state, "ada", "Book flights").length,
+      1,
+      "the effect happened exactly once",
+    );
+  });
+
+  it("stops after Ada revokes", async () => {
+    await restartHost("ada=");
+    const denied = await work("ada", "after-revoke", invoke("tasks.list", {}));
+    assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+  });
+
+  it("fires Ada's reminder through Personal OS's own job, with eve stopped", async () => {
+    await stop(agent.child);
+    const state = await snapshot({ PERSONALOS_FIRE_REMINDERS: "1" });
+    agent = await startAgent();
+    assert.deepEqual(
+      state.people.ada.inbox.map((entry) => [entry.type, entry.title]),
+      [["reminder.due", "Call the dentist"]],
+    );
+    const fired = state.people.ada.actions.find((entry) => entry.kind === "reminder.fire");
+    assert.deepEqual([fired.via, fired.delegation], ["job", undefined]);
+    assert.ok(
+      state.people.ada.actions
+        .filter((entry) => entry.via === "agent")
+        .every((entry) => entry.delegation.agent === "appport-agent"),
+    );
+    assert.deepEqual(state.people.grace.tasks, []);
+  });
+});
