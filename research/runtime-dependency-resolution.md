@@ -6,10 +6,9 @@ last_updated: "2026-11-18"
 
 # Runtime dependency resolution
 
-> **AI status:** Written entirely by AI. Reviewed three times (2026-11-18): the direction and the
-> deployment-baseline ownership (option A) are approved; the public API is under refinement (this
-> revision answers the third review); the implementation is not approved. Nothing here is implemented
-> in `eve`.
+> **AI status:** Written entirely by AI. Reviewed four times (2026-11-18): the direction, baseline
+> ownership (option A) and deployment identity are approved; this revision answers the fourth review's
+> protocol findings; the implementation is not approved. Nothing here is implemented in `eve`.
 
 ## Summary
 
@@ -171,53 +170,78 @@ export default defineAppPortDependency({
 **The guarantees come from eve's records, not the caller's.** eve issues every resolution and keeps it
 in its own records. The caller holds an identifier and nothing it can alter.
 
-#### The resolution record
+#### The operation's resolution record
 
-`resolve` writes the resolution record into the session's **durable state**, not its view. Views have
-bounded retention; durable state survives crashes, redeploys and long sessions.
+Each AppPort operation has one resolution record in the session's **durable state**, not its view.
+Views have bounded retention; durable state survives crashes, redeploys and long sessions.
 
 **After a redeploy, an operation resumes in the same session.** When a deployment changes, eve moves a
-session to the new deployment with its ID, event stream and durable state, so `at` finds the operation's
+session to the new deployment with its ID, event stream and durable state, so the operation finds its
 record there.
 
 **There is no other recovery path for a resolution.** eve has no supported path for moving an operation
-into a different session, so a resolution record is never recovered from another session. The
-deployment baseline store is never consulted by `at`, and is not a recovery path for resolutions.
+into a different session, so a record is never recovered from another session. The deployment baseline
+store is never consulted to recover a resolution.
 
-The record is **create-only**, and nothing in the public API changes or deletes it. It holds:
+**The record is keyed by `operation` within the session.** It is created with an **atomic
+create-if-absent**. Nothing in the public API edits it; it only advances its `state`:
 
-| Field                               | Content                                                                       |
-| ----------------------------------- | ----------------------------------------------------------------------------- |
-| `resolutionId`                      | eve-issued, unique                                                            |
-| `operation`                         | The caller's operation identity (required; see below)                         |
-| `definition`                        | The dependency's file path                                                    |
-| `ref`, `revision`                   | The binding that was resolved                                                 |
-| `origin`, `application`, `endpoint` | The implementation selected                                                   |
-| `pins`                              | The binding's pinned `name@version → digest` at that revision                 |
-| `verified`                          | The capabilities this resolution verified, with the digests the origin served |
-| `receiptId`                         | The `dependency.resolved` receipt that recorded it                            |
+```
+pending ──(baselines settled)──▶ final
+   └─────(a baseline differs)──▶ refused (contract_changed)
+```
+
+**State transitions are atomic compare-and-set** on `state`. Everything else is fixed when the record is
+created, in `pending`:
+
+| Field                               | Content                                                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `resolutionId`, `receiptId`         | eve-issued, unique; generated before creation                                                                          |
+| `operation`, `capabilities`         | The caller's operation identity and the capability set it requested                                                    |
+| `definition`                        | The dependency's file path                                                                                             |
+| `ref`, `revision`                   | The binding that was resolved                                                                                          |
+| `origin`, `application`, `endpoint` | The implementation selected                                                                                            |
+| `pins`                              | The binding's pinned `name@version → digest` at that revision                                                          |
+| `verified`                          | The capabilities verified, with the digests the origin served                                                          |
+| `state`                             | `pending`, `final` or `refused`                                                                                        |
+| `baselines`                         | Per capability, set on leaving `pending`: `established`, `matched`, or (for `refused`) the conflicting baseline digest |
+
+**The `pending` state is not a second authority or a Resolver cache.** It is the durable evidence needed
+to finish an interrupted resolution without changing its implementation.
+
+**Session state must provide these primitives.** Atomic create-if-absent and compare-and-set on session
+state are required. eve's existing per-session state API (`defineState`: `get`, `update`) does not
+specify them. Whether its backends provide them is confirmed during implementation; without them,
+`defineAppPortDependency` fails closed (`baseline_unavailable`).
 
 #### `resolve(ctx, { operation, capabilities })`
 
-**The call.** It resolves a new operation against the current binding.
+**The call.**
 
 - `operation` is **required**: the caller's durable identity for the operation (for example, the ledger's
   operation id), at most 200 characters.
 - `capabilities` is the set the operation will use: a non-empty subset of the declared requirements.
 
-**What it verifies,** for exactly that set:
+**What it does, by the operation's record:**
 
-1. Every capability in the set is pinned by the binding.
-2. The origin serves each pinned digest exactly.
-3. The application matches.
-4. In experimental mode, no pin has moved from the deployment baseline.
+| The operation's record is… | `resolve`…                                                                                                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `final`                    | Returns it, with a new use receipt. It does not resolve the reference again                                                                                          |
+| `refused`                  | Returns the same refusal. The operation never resolves again                                                                                                         |
+| `pending`                  | **Resumes it**, settling baselines with the record's own resolution (see "Ordering and crash consistency"). It never resolves the current binding for this operation |
+| Absent                     | Resolves the current binding, verifies, and creates the record atomically                                                                                            |
 
-Capabilities outside the set are not verified, and the record says so (`verified` lists only the set).
+**The capability set must match.** In every case, a `capabilities` set that differs from the record's
+is refused (`operation_mismatch`).
 
-**Idempotent per operation.** A second `resolve` in the same session with the same `operation`
-returns the first record, with a new use receipt. It does not resolve the reference again. So a caller
-that mistakenly calls `resolve` on a retry or recovery still gets the implementation the operation
-started on. A different `capabilities` set for an existing operation is refused (`operation_mismatch`).
+**What it verifies,** for exactly the set:
+
+1. every capability in it is pinned by the binding;
+2. the origin serves each pinned digest exactly;
+3. the application matches;
+4. in experimental mode, each capability's baseline matches.
+
+Capabilities outside the set are not verified, and `verified` lists only the set.
 
 **It returns** `{ resolutionId, ...a read-only copy of the record }`. The copy is for display and the
 caller's own logs. eve never reads it back.
@@ -229,7 +253,9 @@ caller's own logs. eve never reads it back.
 **It accepts identifiers only, never resolution fields.** eve:
 
 1. loads the record by `resolutionId` from the **current session's** durable state, and refuses an
-   unknown identifier, or one from another session (`resolution_unknown`);
+   unknown identifier, or one from another session (`resolution_unknown`). A record not in `final` is
+   refused too: `resolution_incomplete` for `pending` (call `resolve` with the same `operation` to
+   finish it), or its `refused` code;
 2. requires `operation` to equal the record's (`operation_mismatch`);
 3. requires `capabilities` to be within the record's `verified` set (`capability_not_resolved`): an
    existing operation cannot widen what was resolved for it;
@@ -284,22 +310,23 @@ These records and receipts are the first of two harness responsibilities; see "H
 **Nothing falls back.** A model failure fails the turn; an AppPort failure fails `resolve` or `at`. The
 codes are separate per kind.
 
-| Kind    | Code                                        | When                                                                                                                      |
-| ------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Both    | `resolver_not_configured`                   | `RESOLVER_URL` or `RESOLVER_API_KEY` unset                                                                                |
-| Both    | `reference_missing` / `reference_forbidden` | Not found, revoked, or not readable by the deployment's key                                                               |
-| Both    | `resolver_unavailable`                      | Resolver cannot be reached (`resolve` and models only; `at` never asks Resolver)                                          |
-| Model   | `model_invalid`                             | Not a `model` reference, or a provider eve cannot construct                                                               |
-| Model   | `credential_unavailable`                    | The credential cannot be revealed                                                                                         |
-| AppPort | `reference_invalid`                         | Not an `agent` reference                                                                                                  |
-| AppPort | `contract_not_pinned`                       | A declared `name@version` has no pin in the binding                                                                       |
-| AppPort | `contract_mismatch`                         | The origin serves a different digest or application than pinned (or than recorded, for `at`)                              |
-| AppPort | `contract_changed`                          | Experimental: a pin moved from the deployment baseline, without Resolver's compatibility enforcement                      |
-| AppPort | `resolution_unknown`                        | `at` with an identifier eve did not issue in this session                                                                 |
-| AppPort | `operation_mismatch`                        | `at` with a different operation than the record's, or `resolve` with a different capability set for an existing operation |
-| AppPort | `capability_not_resolved`                   | `at` for a capability outside the record's verified set                                                                   |
-| AppPort | `baseline_unavailable`                      | Experimental: the durable backend cannot provide an atomic create-if-absent for baselines                                 |
-| AppPort | `implementation_unavailable`                | The resolved or recorded origin cannot be reached                                                                         |
+| Kind    | Code                                        | When                                                                                                                                    |
+| ------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Both    | `resolver_not_configured`                   | `RESOLVER_URL` or `RESOLVER_API_KEY` unset                                                                                              |
+| Both    | `reference_missing` / `reference_forbidden` | Not found, revoked, or not readable by the deployment's key                                                                             |
+| Both    | `resolver_unavailable`                      | Resolver cannot be reached (`resolve` and models only; `at` never asks Resolver)                                                        |
+| Model   | `model_invalid`                             | Not a `model` reference, or a provider eve cannot construct                                                                             |
+| Model   | `credential_unavailable`                    | The credential cannot be revealed                                                                                                       |
+| AppPort | `reference_invalid`                         | Not an `agent` reference                                                                                                                |
+| AppPort | `contract_not_pinned`                       | A declared `name@version` has no pin in the binding                                                                                     |
+| AppPort | `contract_mismatch`                         | The origin serves a different digest or application than pinned (or than recorded, for `at`)                                            |
+| AppPort | `contract_changed`                          | Experimental: a pin moved from the deployment baseline, without Resolver's compatibility enforcement                                    |
+| AppPort | `resolution_unknown`                        | `at` with an identifier eve did not issue in this session                                                                               |
+| AppPort | `operation_mismatch`                        | `at` with a different operation than the record's, or `resolve` with a different capability set for an existing operation               |
+| AppPort | `capability_not_resolved`                   | `at` for a capability outside the record's verified set                                                                                 |
+| AppPort | `baseline_unavailable`                      | Experimental: a durable backend cannot provide atomic create-if-absent (baselines, operation records) or compare-and-set (record state) |
+| AppPort | `resolution_incomplete`                     | `at` on a record still `pending`; `resolve` with the same `operation` finishes it                                                       |
+| AppPort | `implementation_unavailable`                | The resolved or recorded origin cannot be reached                                                                                       |
 
 ## Deployment baseline (experimental `contract_changed`)
 
@@ -370,32 +397,60 @@ durable backend cannot provide one, `defineAppPortDependency` fails closed (`bas
 It does not degrade to a check that races. Which of eve's existing durable backends (the Workflow
 World's local, Vercel and Postgres stores) provide it is confirmed during implementation, not assumed.
 
+### Baselines are independent per capability
+
+The baseline's identity is `(D, R, C)`. **A capability whose digest was verified can establish its
+baseline even when another capability in the same operation is then refused.** That partial
+establishment is intentional:
+
+- each baseline is a true, immutable fact about what D verified for C;
+- it is recoverable from the operation's record, which says which capabilities established their
+  baseline and which conflicted.
+
+There is no all-or-nothing transaction over a capability set, and none is needed.
+
+**What does hold:**
+
+- **A digest that was not verified never establishes a baseline.** Verification happens before the
+  record exists, and every baseline is created from a `pending` record's `verified` digests.
+- **A refused operation is refused as a whole,** even if some of its capabilities established
+  baselines.
+
 ### Ordering and crash consistency
 
-The baseline store and a session's durable state are separate stores. **eve does not provide one
-transaction across them, and this design does not assume one.** It uses an ordered, idempotent
-protocol instead.
+The baseline store and a session's durable state are separate stores. **eve provides no transaction
+across them, and this design assumes none.** It uses an ordered, resumable protocol, in which the
+operation's `pending` record is the single source of what the operation resolved.
 
-`resolve(ctx, { operation, capabilities })` for a new operation:
+`resolve(ctx, { operation, capabilities })` when the operation has no record:
 
 1. **Resolve and verify, with no writes.** Read the binding, contact the origin, and verify each
-   capability's served digest against the pin. Any failure ends here: **a failed resolution never
-   establishes a baseline.**
-2. **Settle the baseline**, for each capability in the set: create-if-absent with the verified digest.
-   - `resolutionId` and `receiptId` are generated before this step, so the record can cite them.
-   - If the record that exists (won by this call or another) has a different digest, the result is
-     `contract_changed`, and no resolution record is written.
-3. **Write the resolution record** (create-only, keyed by `operation` in the session). It carries the
-   baseline outcome for each capability: `established` or `matched`.
-4. **Append the receipt** (idempotent by `receiptId`).
+   capability's served digest against the pin. Any failure ends here: nothing is written.
+2. **Create the `pending` record** with an atomic create-if-absent. It carries the complete resolution
+   (above), so the implementation is fixed from this point.
+   - **If another call created the record first** (a concurrent `resolve` of the same operation in the
+     same session), this call **discards its own candidate**. It reads the winner, checks the capability
+     set (`operation_mismatch` if different), and continues with the winner's record, from its state.
+3. **Settle baselines** from the record's `verified` digests, one create-if-absent per capability.
+   - An existing baseline is never overwritten.
+   - A baseline with a different digest marks that capability as conflicting.
+4. **Leave `pending`** by compare-and-set: to `final` if every capability matched or established, or to
+   `refused` (`contract_changed`) if any conflicted. If the compare-and-set loses to a concurrent call,
+   read the record and use its state.
+5. **Append the receipt.** The event store rejects a second fact with the same `receiptId` at its
+   boundary, so recovery cannot duplicate it, whatever the caller does.
 
 **Recovery,** by where a crash happens:
 
-| Crash after… | State left behind                                         | What happens next                                                                                                                                                                                                                                                                                                                                   |
-| ------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1            | Nothing written                                           | A retry starts again                                                                                                                                                                                                                                                                                                                                |
-| 2, before 3  | A baseline citing a `resolutionId` that has no record yet | An **orphaned baseline**: still a valid fact, because it was created only after step 1 verified its digest. It is never replaced. A retry of the same operation finds it, compares (`matched` when unchanged), and writes the record. The baseline's `establishedBy` stays as written, and is read as "first verified by", not as a guaranteed link |
-| 3, before 4  | A record without its receipt                              | `resolve` is idempotent per operation: a retry returns the record, and appends the receipt by its `receiptId`                                                                                                                                                                                                                                       |
+| Crash after…         | State left behind                                 | Next `resolve` of the operation                                                                                                                                                               |
+| -------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1                    | Nothing                                           | Starts again: resolves the current binding                                                                                                                                                    |
+| 2, during or after 3 | A `pending` record; some or all baselines created | **Resumes from the record**: settles any baselines not yet created, from the record's digests. It never resolves the current binding again, so a binding replaced in the meantime is not used |
+| 4                    | A `final` or `refused` record without its receipt | Returns the record's outcome and appends the receipt (deduplicated by `receiptId`)                                                                                                            |
+
+**The implementation can vanish.** A resumed or reused resolution can find its implementation gone. The
+record still names it, so `at` fails explicitly (`implementation_unavailable`). It never switches to
+the current binding.
 
 ### When `contract_changed` is removed
 
@@ -413,10 +468,10 @@ from `contract_mismatch` ("the origin serves a digest other than the pinned one"
 
 There are two, kept separate because their lifetimes and lookup boundaries differ:
 
-| Responsibility                                        | Scope                                    | Lifetime                        | Looked up by                                       | Written                                                |
-| ----------------------------------------------------- | ---------------------------------------- | ------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
-| Resolution records and `dependency.resolved` receipts | Session (durable state and event stream) | The session's, across redeploys | `resolutionId` and `operation`, within the session | By `resolve` and `at`                                  |
-| Baseline records                                      | Deployment `D`                           | Immutable history of D          | `(D, R, C)`                                        | Create-if-absent by `resolve` only, while experimental |
+| Responsibility                                                                                    | Scope                                    | Lifetime                        | Looked up by                                       | Written                                                                                                                      |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Operation resolution records (`pending` → `final` / `refused`) and `dependency.resolved` receipts | Session (durable state and event stream) | The session's, across redeploys | `resolutionId` and `operation`, within the session | Records: by `resolve` (create-if-absent, then compare-and-set). Receipts: by `resolve` and `at`, deduplicated by `receiptId` |
+| Baseline records                                                                                  | Deployment `D`                           | Immutable history of D          | `(D, R, C)`                                        | Create-if-absent by `resolve` only, while experimental                                                                       |
 
 Neither can change Resolver state, and no public API edits either.
 
@@ -440,6 +495,8 @@ Neither can change Resolver state, and no public API edits either.
   - `at` never calling Resolver;
   - the receipt schema, and no secret in any receipt;
   - the vendored digest against both vector files.
+- **Backends.** Atomic create-if-absent and compare-and-set are tested on each durable backend
+  separately (local, Vercel, Postgres). They are not assumed interchangeable.
 - **Integrity of resolutions.** `at` must refuse each of these before any request is sent:
   - an identifier eve never issued;
   - one issued in another session;
@@ -457,8 +514,16 @@ Neither can change Resolver state, and no public API edits either.
   - recovered after restart;
   - **concurrency:** many sessions racing the first resolution of one `(D, R, C)`, across a binding
     change. Exactly one digest wins; every loser compares against it; none overwrites it;
-  - **crash points:** a crash after each step of the protocol, then recovery. The results match the
-    table: no baseline from a failed resolution, an orphan never replaced, a receipt appended once;
+  - **the acceptance test for this design:** crash after the first baseline is written, change the
+    Resolver binding, restart, and recover the same operation. It must use the original verified
+    implementation from its `pending` record, or fail explicitly (`implementation_unavailable`). It
+    must never use the new binding;
+  - **crash points:** a crash after each protocol step, then recovery, as in the table. This includes
+    a multi-capability operation refused after its first baseline was created: that baseline stays,
+    the record is `refused`, and nothing else is created;
+  - **same-operation concurrency:** many concurrent `resolve` calls for one operation in one session.
+    Exactly one record is created; every other call uses the winner's resolution, never its own;
+  - **receipts:** a duplicate `receiptId` is rejected at the event store;
   - **identity:** an environment change to the deployment id after boot is ignored, and no API accepts
     one;
   - **after a redeploy:** an operation resumes in the same session, and `at` uses its record.
