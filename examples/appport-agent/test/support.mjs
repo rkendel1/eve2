@@ -41,7 +41,7 @@ export function startProcess(command, args, env, readyPattern, cwd = root) {
   });
 }
 
-function groupAlive(pid) {
+export function groupAlive(pid) {
   try {
     process.kill(-pid, 0);
     return true;

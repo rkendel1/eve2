@@ -4,7 +4,8 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 
 import { invokeCapability } from "../lib/appport";
-import { AGENT_ID, currentWork, recordInvocation } from "../lib/work";
+import { fault } from "../lib/faults";
+import { AGENT_ID, readSubmission, recordInvocation, workForSession } from "../lib/work";
 
 export default defineTool({
   description:
@@ -16,11 +17,14 @@ export default defineTool({
   async execute({ input, name }, ctx) {
     const principalId = ctx.session.auth?.current?.principalId;
     if (principalId === undefined) return { error: "No authenticated caller." };
-    const workId = currentWork.get();
+    const workId = await workForSession(ctx.session.id);
     const result = await invokeCapability({ principalId }, name, input, workId ?? ctx.session.id);
     if (workId !== null) {
+      const submission = await readSubmission(workId);
+      await fault("invocation.record", { objective: submission?.objective ?? "", workId });
       await recordInvocation({
         agent: AGENT_ID,
+        callId: ctx.callId,
         capability: name,
         caller: principalId,
         errorCode: result.ok ? null : result.error.code,

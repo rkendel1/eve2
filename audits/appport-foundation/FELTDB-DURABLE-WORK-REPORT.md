@@ -118,7 +118,7 @@ Everything below runs in `examples/appport-agent/test/work.test.mjs` against rea
 
 ## Remaining recovery and operational gaps
 
-- **No reconciliation of interrupted work.** If eve crashes mid-turn, eve's Workflow world resumes the turn, and the channel handlers record the rest. If a handler's FeltDB write itself fails, the work stays `running`; nothing sweeps for stale `running` work. If eve crashes between creating the record and sending to the session, the work stays `ready` until the client resubmits the same key, which completes the send.
+- **No reconciliation of interrupted work.** Addressed in the next slice: see `DURABLE-WORK-RECOVERY-REPORT.md`.
 - **No cancel, list or follow-up routes.** A completed task is terminal, so follow-ups to it are not modelled.
 - **No indexed lookup by requester.** `listTasks` indexes status and project only.
 - **Single eve process** per work store (the lock), the same as the local Workflow world.

@@ -40,36 +40,59 @@ curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
 **What `POST /work` does:**
 
 1. **Authenticate** with eve's `routeAuth` and `jwtHmac`.
-2. **Create the record.** Derive the work id from (requester, key), then create a FeltDB `AgentTask` with:
+2. **Record the submission.** Derive the work id from (requester, key) and commit a `work_submissions` record first: the objective and the caller's verified `AuthResult`. JWT claims only, never the token.
+3. **Create the record.** Create a FeltDB `AgentTask` with:
    - `objective`;
    - `owner` = `agent:appport-agent`;
    - `scope.workspace` = the requester;
    - `scope.project` = `inventory`.
-3. **Start the session.** Send the objective to the eve session at address = work id, with eve's delivery `idempotencyKey`.
+4. **Start the session.** Send the objective to the eve session at address = work id, with eve's delivery `idempotencyKey`.
 
 **Repeated submissions.** The same key and objective return the same work and session and run nothing again. The same key with a different objective returns `409 IDEMPOTENCY_KEY_REUSED`.
 
 **Progress** is recorded by the `work` channel's event handlers as immutable FeltDB checkpoints, never overwritten:
 
-| eve event                           | Checkpoint                                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------------------------- |
-| `turn.started`                      | `running`, with the eve session id as `execution.conversation_id`                            |
-| `call.settled` for `appport_invoke` | `running`, citing the invocation record as evidence (verified by FeltDB inside the commit)   |
-| `turn.settled`                      | One of the three outcomes below, decided from recorded evidence, never from the model's text |
+| eve event                           | Checkpoint                                                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turn.started`                      | `running`, with the eve session id as `execution.conversation_id`; the session is bound to the work in `work_sessions` before any tool runs |
+| `call.settled` for `appport_invoke` | `running`, citing the invocation record as evidence (verified by FeltDB inside the commit)                                                  |
+| `turn.settled`                      | One of the three outcomes below, decided from recorded evidence, never from the model's text                                                |
 
-| Outcome                                                         | When                                   |
-| --------------------------------------------------------------- | -------------------------------------- |
-| `completed`                                                     | At least one invocation was authorized |
-| `blocked` with `waiting: every AppPort invocation was rejected` | Every invocation was rejected          |
-| `blocked` with `failed: the eve turn ended failed`              | The turn failed                        |
+| Outcome                                                                            | When                                                                                                                            |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `completed`                                                                        | At least one invocation was authorized                                                                                          |
+| `blocked` with `waiting: every AppPort invocation was rejected`                    | Every invocation was rejected                                                                                                   |
+| `blocked` with `failed: the eve turn ended failed`                                 | The turn failed                                                                                                                 |
+| `blocked` with `indeterminate: N AppPort invocation(s) without committed evidence` | eve recorded an `appport_invoke` call that settled without committed evidence (for example, interrupted after AppPort answered) |
 
 The agent's reply is kept in the summary as the agent's claim.
 
-**Invocation evidence.** The `appport_invoke` tool commits an `appport_invocations` record from AppPort's response. It holds the work id, caller, agent, capability, outcome, output digest and `requestId`. AppPort's `traceId` is the work id, so the host's provenance carries the work id beside the AuthBoundry `delegationId`, `decisionId` and authority.
+**Invocation evidence.** The `appport_invoke` tool commits an `appport_invocations` record from AppPort's response, keyed by work id and eve call id. It holds the work id, caller, agent, capability, outcome, output digest and `requestId`. AppPort's `traceId` is the work id, so the host's provenance carries the work id beside the AuthBoundry `delegationId`, `decisionId` and authority.
 
 **Reading work.** `GET /work/:id` returns a requester's own work only; anyone else gets 404. The response includes status, history, decisions, evidence, invocation outcomes, the recorded session, and the session eve currently holds for that address.
 
 Only one eve process may open the work store: FeltDB holds an exclusive lock.
+
+## Recovery
+
+eve has no startup hook. The `work` channel therefore reconciles every unfinished work record (`ready`, `running`, `blocked`) once per process, before it answers its first `/work` request. `POST /work/reconcile` forces another pass; only the principal named by `APPPORT_AGENT_OPERATOR` may call it.
+
+Run it right after start: from the supervisor (for example a systemd `ExecStartPost`), or by sending any `/work` request.
+
+For each record, the reconciler reads eve's recorded events in process (`sessions.attach(id).stream({ follow: false })` from `eve/server`), folds them with `eve/events` selectors, and decides:
+
+| eve shows                                                    | Work becomes                                                                                 | Runs anything?               |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------- |
+| No session for the work, record `ready`, submission recorded | Submitted at its address with the original delivery key; decision `recovered: submitted…`    | Yes: the accepted turn, once |
+| No session, record not `ready`, or no submission record      | `blocked`, `indeterminate: …`                                                                | No                           |
+| A turn still running                                         | `running`; eve's own world resumes it                                                        | No                           |
+| A turn waiting on an interaction (approval)                  | `blocked`, `waiting: …`                                                                      | No                           |
+| A settled turn                                               | The live outcome rule, prefixed by `recovered: final state reconstructed from eve session …` | No                           |
+| A session that cannot be read                                | `blocked`, `indeterminate: eve session … could not be read`                                  | No                           |
+
+**Idempotent.** A pass writes only when the derived status or decision differs from the record, so repeated passes change nothing.
+
+**No invented evidence.** Evidence comes only from committed invocation records belonging to that work. A settled `appport_invoke` call without one makes the work indeterminate.
 
 ## Who owns what
 
@@ -132,7 +155,19 @@ Every rejected call is checked to have no `execution` record.
 - revocation blocks invocation;
 - a failed turn is recorded as failed;
 - the record and session association survive an eve restart (whole process group killed);
-- the records read directly from FeltDB without eve.
+- the records read directly from FeltDB without eve;
+- recovery after process-group crashes:
+  - between record creation and send;
+  - after AppPort answered but before the evidence was written;
+  - before the final checkpoint;
+- a failed checkpoint write stays visible until reconciliation;
+- a call without committed evidence is never cited;
+- waiting work stays waiting;
+- reconciliation run twice changes nothing;
+- a replayed key after restarts runs nothing;
+- a missing eve session is never reported as completed.
+
+The scripted agent replaces `agent/lib/faults.ts` (a no-op in the real agent) to crash or fail at named points, and adds an approval-gated tool.
 
 **With `APPPORT_AGENT_E2E_ANTHROPIC_API_KEY`**, the built agent on `eve start` with a real model:
 
