@@ -6,9 +6,10 @@ last_updated: "2026-11-18"
 
 # Runtime dependency resolution
 
-> **AI status:** Written entirely by AI. Reviewed twice (2026-11-18): the direction is approved; the
-> public API is under refinement (this revision answers the second review); the implementation is not
-> approved. Nothing here is implemented in `eve`.
+> **AI status:** Written entirely by AI. Reviewed three times (2026-11-18): the direction and the
+> deployment-baseline ownership (option A) are approved; the public API is under refinement (this
+> revision answers the third review); the implementation is not approved. Nothing here is implemented
+> in `eve`.
 
 ## Summary
 
@@ -175,6 +176,14 @@ in its own records. The caller holds an identifier and nothing it can alter.
 `resolve` writes the resolution record into the session's **durable state**, not its view. Views have
 bounded retention; durable state survives crashes, redeploys and long sessions.
 
+**After a redeploy, an operation resumes in the same session.** When a deployment changes, eve moves a
+session to the new deployment with its ID, event stream and durable state, so `at` finds the operation's
+record there.
+
+**There is no other recovery path for a resolution.** eve has no supported path for moving an operation
+into a different session, so a resolution record is never recovered from another session. The
+deployment baseline store is never consulted by `at`, and is not a recovery path for resolutions.
+
 The record is **create-only**, and nothing in the public API changes or deletes it. It holds:
 
 | Field                               | Content                                                                       |
@@ -268,7 +277,7 @@ and each model resolution at a turn boundary.
   exact implementation and contract used.
 - **Secret-free:** no credential material, Resolver key, or authorization header.
 
-This is the one change inside the harness.
+These records and receipts are the first of two harness responsibilities; see "Harness changes".
 
 ## Failures
 
@@ -289,14 +298,21 @@ codes are separate per kind.
 | AppPort | `resolution_unknown`                        | `at` with an identifier eve did not issue in this session                                                                 |
 | AppPort | `operation_mismatch`                        | `at` with a different operation than the record's, or `resolve` with a different capability set for an existing operation |
 | AppPort | `capability_not_resolved`                   | `at` for a capability outside the record's verified set                                                                   |
+| AppPort | `baseline_unavailable`                      | Experimental: the durable backend cannot provide an atomic create-if-absent for baselines                                 |
 | AppPort | `implementation_unavailable`                | The resolved or recorded origin cannot be reached                                                                         |
 
 ## Deployment baseline (experimental `contract_changed`)
 
-**Definition.** For a deployment D, a reference R and a declared `name@version` C, the **baseline** is the
-digest from the first successful `resolve` in D that verified C on R. A deployment is the running eve
-application at one deployment identity, so a new deployment starts new baselines. From then on, while
-experimental:
+**What it is.** The baseline is evidence of what a deployment first successfully relied on: an
+immutable fact about deployment history.
+
+**What it is not.** It is not Resolver configuration, and not a binding revision.
+
+**Who owns what.** Resolver stays authoritative for bindings and compatibility. eve records and enforces
+its own deployment-scoped observation, as a temporary safety check, not a competing control plane.
+
+**Definition.** For a deployment D, a reference R and a declared `name@version` C, the baseline is the
+digest from the first successful `resolve` in D that verified C on R. From then on, while experimental:
 
 | The binding's pin for C is…                                                      | Result                                                                                                                           |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -306,28 +322,103 @@ experimental:
 **Moving a baseline.** An operator can:
 
 - roll the binding back to the baseline digest; or
-- start a new deployment, which establishes new baselines and records the previous anchor.
+- start a new deployment, which establishes new baselines.
 
-eve offers no route to change a baseline in place. That would make eve a control plane.
+Nothing changes a baseline in place: no eve route, no operator action, no agent code. A store that could
+be edited would become another place to decide what is compatible.
 
-**Anchoring, the decision needed.** Resolver's history alone cannot identify D's boundary. It records
-binding revisions, not which deployment first relied on which. eve has durable state per _session_, not
-per deployment. Two options; neither creates an operator-maintained registry:
+### Deployment identity
 
-| Option              | Anchor                                                                                                                                                                                       | Recovery                                                                                   | Cost                                                                                                                                                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A (recommended)** | A create-only _baseline receipt_ in a new, deployment-scoped durable store in eve: one record per (D, R, C), holding the digest, Resolver revision, establishing session and its `receiptId` | Read the anchor; it cites the session receipt and Resolver's revision for the full context | A small deployment-scoped store in eve, the second harness change                                                                                                                                             |
-| B                   | The deployment's Resolver **consumer registration** (`register`), with the baseline in its declared dependency `contract` field (today informational, at most 200 characters, per reference) | Read the registration back from Resolver                                                   | No eve store, but the anchor lives in Resolver, written by the deployment: the agent's key would write Resolver state, and one field per reference cannot hold per-capability digests without a second lookup |
+D comes from eve's **trusted runtime identity**:
 
-**When `contract_changed` is removed.** Once a Resolver release enforces compatibility on binding
-changes, and eve can confirm that from Resolver's served capabilities:
+- **The build deployment id.** This is the SHA-256 over the build output that `eve build` stamps into the
+  build (`internal/nitro/host/build-deployment-id.ts`).
+- **On Vercel,** the platform's deployment id (`VERCEL_DEPLOYMENT_ID`). This is the identity eve already
+  uses to decide that a deployment changed.
 
-- eve drops baselines;
+**How it is protected:**
+
+- The runtime captures D once at boot, before authored modules load, and holds it internally.
+- No public API accepts it, and no operation argument, tool input or agent configuration can supply it.
+- A value authored code writes to the environment afterwards is never read for it.
+
+So an agent cannot escape a baseline by naming another deployment.
+
+**What a change of D means.** A new build, or a new platform deployment, is a new D, with new
+baselines. The same build redeployed with the same build id keeps them.
+
+### The store
+
+**Shape.** One record per key `(D, R, C)`, holding:
+
+- the digest and the Resolver revision it was verified at;
+- `establishedAt`;
+- `establishedBy: { sessionId, resolutionId, receiptId }`.
+
+**Operations.** The store has exactly two: **create-if-absent** and **read**. It has no update and no
+delete, and it cannot change Resolver state.
+
+**Atomicity is required, not optional.** Two sessions may make the first resolution of the same
+`(D, R, C)` at once, with different digests (one before a binding change, one after):
+
+- Exactly one create wins.
+- The loser reads the record that won and compares its own verified digest against it. It never
+  overwrites the record, and never proceeds as if it had established the baseline.
+
+**Backends without it.** The store needs a backend with an atomic create-if-absent. Where a configured
+durable backend cannot provide one, `defineAppPortDependency` fails closed (`baseline_unavailable`).
+It does not degrade to a check that races. Which of eve's existing durable backends (the Workflow
+World's local, Vercel and Postgres stores) provide it is confirmed during implementation, not assumed.
+
+### Ordering and crash consistency
+
+The baseline store and a session's durable state are separate stores. **eve does not provide one
+transaction across them, and this design does not assume one.** It uses an ordered, idempotent
+protocol instead.
+
+`resolve(ctx, { operation, capabilities })` for a new operation:
+
+1. **Resolve and verify, with no writes.** Read the binding, contact the origin, and verify each
+   capability's served digest against the pin. Any failure ends here: **a failed resolution never
+   establishes a baseline.**
+2. **Settle the baseline**, for each capability in the set: create-if-absent with the verified digest.
+   - `resolutionId` and `receiptId` are generated before this step, so the record can cite them.
+   - If the record that exists (won by this call or another) has a different digest, the result is
+     `contract_changed`, and no resolution record is written.
+3. **Write the resolution record** (create-only, keyed by `operation` in the session). It carries the
+   baseline outcome for each capability: `established` or `matched`.
+4. **Append the receipt** (idempotent by `receiptId`).
+
+**Recovery,** by where a crash happens:
+
+| Crash after… | State left behind                                         | What happens next                                                                                                                                                                                                                                                                                                                                   |
+| ------------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1            | Nothing written                                           | A retry starts again                                                                                                                                                                                                                                                                                                                                |
+| 2, before 3  | A baseline citing a `resolutionId` that has no record yet | An **orphaned baseline**: still a valid fact, because it was created only after step 1 verified its digest. It is never replaced. A retry of the same operation finds it, compares (`matched` when unchanged), and writes the record. The baseline's `establishedBy` stays as written, and is read as "first verified by", not as a guaranteed link |
+| 3, before 4  | A record without its receipt                              | `resolve` is idempotent per operation: a retry returns the record, and appends the receipt by its `receiptId`                                                                                                                                                                                                                                       |
+
+### When `contract_changed` is removed
+
+Once a Resolver release enforces compatibility on binding changes, and eve can confirm that from
+Resolver's served capabilities:
+
+- eve stops consulting and creating baselines, and the store becomes read-only history;
 - it trusts a compatible binding change;
 - it still verifies that the origin serves exactly the digest Resolver pins now.
 
 Until then, `contract_changed` distinguishes "the binding moved without the compatibility guarantee"
 from `contract_mismatch` ("the origin serves a digest other than the pinned one").
+
+## Harness changes
+
+There are two, kept separate because their lifetimes and lookup boundaries differ:
+
+| Responsibility                                        | Scope                                    | Lifetime                        | Looked up by                                       | Written                                                |
+| ----------------------------------------------------- | ---------------------------------------- | ------------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| Resolution records and `dependency.resolved` receipts | Session (durable state and event stream) | The session's, across redeploys | `resolutionId` and `operation`, within the session | By `resolve` and `at`                                  |
+| Baseline records                                      | Deployment `D`                           | Immutable history of D          | `(D, R, C)`                                        | Create-if-absent by `resolve` only, while experimental |
+
+Neither can change Resolver state, and no public API edits either.
 
 ## Not in scope
 
@@ -363,7 +454,14 @@ from `contract_mismatch` ("the origin serves a digest other than the pinned one"
   - established on first use;
   - matched after a rollback to it;
   - `contract_changed` after a re-pin, with existing operations unaffected;
-  - recovered after restart.
+  - recovered after restart;
+  - **concurrency:** many sessions racing the first resolution of one `(D, R, C)`, across a binding
+    change. Exactly one digest wins; every loser compares against it; none overwrites it;
+  - **crash points:** a crash after each step of the protocol, then recovery. The results match the
+    table: no baseline from a failed resolution, an orphan never replaced, a receipt appended once;
+  - **identity:** an environment change to the deployment id after boot is ignored, and no API accepts
+    one;
+  - **after a redeploy:** an operation resumes in the same session, and `at` uses its record.
 - **Integration with a real local Resolver process:**
   - replacement without restart;
   - breaking-contract rejection, both by Resolver and by `contract_changed`;
