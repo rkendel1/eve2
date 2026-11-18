@@ -1,15 +1,22 @@
-import { spawn, execFileSync } from "node:child_process";
-import { createHmac } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { fileURLToPath } from "node:url";
 
 import { AGENT_ID, startInventoryHost } from "../appport-host/host.mjs";
+import {
+  cleanEnv,
+  readJsonl,
+  root,
+  signJwt,
+  startProcess,
+  stop,
+  stopAll,
+  waitFor,
+} from "./support.mjs";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
 const scratch = mkdtempSync(join(tmpdir(), "appport-agent-acceptance-"));
 const provenanceFile = join(scratch, "provenance.jsonl");
 const agentCredentialFile = join(scratch, "agent-credential");
@@ -25,7 +32,6 @@ const CAROL = "appport-agent-operator:carol";
 const catalog = JSON.parse(readFileSync(join(root, "appport-host/catalog.json"), "utf8"));
 const ALPHA = catalog.items.find((item) => item.sku === "ALPHA-1");
 
-const children = [];
 let host;
 let lib;
 let aliceGrant;
@@ -39,50 +45,7 @@ const startHost = () =>
     provenanceFile,
   });
 
-function cleanEnv(extra) {
-  const env = {};
-  for (const [name, value] of Object.entries(process.env)) {
-    if (name.startsWith("VERCEL") || name.endsWith("_API_KEY") || name.startsWith("APPPORT_"))
-      continue;
-    env[name] = value;
-  }
-  return { ...env, EVE_TELEMETRY_DISABLED: "1", NODE_ENV: "production", ...extra };
-}
-
-function startProcess(command, args, env, readyPattern) {
-  const child = spawn(command, args, { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
-  children.push(child);
-  let output = "";
-  return new Promise((resolve, reject) => {
-    const onData = (chunk) => {
-      output += chunk;
-      const match = readyPattern.exec(output);
-      if (match) resolve({ child, output: () => output, url: match[1] });
-    };
-    child.stdout.on("data", onData);
-    child.stderr.on("data", (chunk) => (output += chunk));
-    child.once("exit", (code) =>
-      reject(new Error(`${command} exited (${code}) before ready:\n${output}`)),
-    );
-    setTimeout(() => reject(new Error(`${command} not ready in time:\n${output}`)), 90_000).unref();
-  });
-}
-
-function stop(child) {
-  return new Promise((resolve) => {
-    if (child.exitCode !== null || child.signalCode !== null) return resolve();
-    child.once("exit", () => resolve());
-    child.kill("SIGKILL");
-  });
-}
-
-function provenance() {
-  if (!existsSync(provenanceFile)) return [];
-  return readFileSync(provenanceFile, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
+const provenance = () => readJsonl(provenanceFile);
 
 const recordsFor = (requestId, kind) =>
   provenance().filter((entry) => entry.requestId === requestId && entry.kind === kind);
@@ -98,14 +61,6 @@ function assertRejectedBeforeExecution(result, code, reason) {
     assert.equal(recordsFor(result.requestId, "authorization")[0].reason, reason);
 }
 
-async function waitFor(condition) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (await condition()) return;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  assert.fail("condition not met in time");
-}
-
 before(async () => {
   host = await startHost();
   process.env.APPPORT_URL = APPPORT_URL;
@@ -115,7 +70,7 @@ before(async () => {
 });
 
 after(async () => {
-  await Promise.all(children.map(stop));
+  await stopAll();
   await host?.close();
   rmSync(scratch, { force: true, recursive: true });
 });
@@ -270,19 +225,7 @@ describe("AppPort with AuthBoundry delegation (real servers, no model)", () => {
   });
 });
 
-function signAgentJwt(sub) {
-  const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const now = Math.floor(Date.now() / 1000);
-  const header = encode({ alg: "HS256", typ: "JWT" });
-  const payload = encode({
-    aud: "appport-agent",
-    exp: now + 600,
-    iat: now,
-    iss: "appport-agent-operator",
-    sub,
-  });
-  return `${header}.${payload}.${createHmac("sha256", AGENT_JWT_SECRET).update(`${header}.${payload}`).digest("base64url")}`;
-}
+const signAgentJwt = (sub) => signJwt(AGENT_JWT_SECRET, sub);
 
 async function turn(agentUrl, user, message, sessionId) {
   const headers = {
@@ -332,6 +275,7 @@ describe("eve agent end to end (real Anthropic model)", { skip: ANTHROPIC_API_KE
       ANTHROPIC_API_KEY,
       APPPORT_AGENT_CREDENTIAL_FILE: agentCredentialFile,
       APPPORT_AGENT_CAPABILITIES: "catalog.lookup",
+      APPPORT_AGENT_WORK_DIR: join(scratch, "work"),
       APPPORT_URL,
       PORT: "0",
     });

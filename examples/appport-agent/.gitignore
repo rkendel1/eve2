@@ -1,2 +1,4 @@
 .appport-host/
 appport-provenance.jsonl
+.appport-agent-work/
+.acceptance-agent/

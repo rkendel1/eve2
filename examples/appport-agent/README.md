@@ -5,7 +5,8 @@ A minimal, self-hosted eve agent that acts for an authenticated person through o
 - **Model.** `anthropic("claude-sonnet-5")` direct (`ANTHROPIC_API_KEY`), overridable with `APPPORT_AGENT_MODEL`.
 - **Tools.** `defaultTools: false`. The agent has only `appport_capabilities`, `appport_contract`, and `appport_invoke`.
 - **Route auth.** `jwtHmac` (HS256; `AGENT_JWT_SECRET`, `AGENT_JWT_ISSUER`, `AGENT_JWT_AUDIENCE`), then `placeholderAuth()`.
-- **Persistence.** eve's local Workflow world in `.eve/.workflow-data` (SQLite). Sessions continue after a restart.
+- **Execution state.** eve's local Workflow world in `.eve/.workflow-data` (SQLite): sessions, turns, checkpoints. Sessions continue after a restart.
+- **Work state.** FeltDB (`@feltdb/core` agent state, local file runtime) in `APPPORT_AGENT_WORK_DIR`. This is the authoritative record of each piece of work, independent of eve's sessions.
 
 ## How a capability call is authorized
 
@@ -25,14 +26,61 @@ Authentication, delegation and capability authorization are separate steps, each
    - `execution`: written by the handler, only when it ran;
    - `request`: AppPort's own telemetry.
 
+## Durable work
+
+Submit work to `POST /work`, authenticated with the same JWT as the eve channel and an `Idempotency-Key` header:
+
+```bash
+curl -X POST "$AGENT_URL/work" -H "authorization: Bearer $JWT" -H "idempotency-key: order-123" \
+  -H "content-type: application/json" -d '{"objective":"How many units of SKU ALPHA-1 are in stock?"}'
+# 201 {"workId":"work_…","sessionId":"wrun_…","replayed":false}
+curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
+```
+
+**What `POST /work` does:**
+
+1. **Authenticate** with eve's `routeAuth` and `jwtHmac`.
+2. **Create the record.** Derive the work id from (requester, key), then create a FeltDB `AgentTask` with:
+   - `objective`;
+   - `owner` = `agent:appport-agent`;
+   - `scope.workspace` = the requester;
+   - `scope.project` = `inventory`.
+3. **Start the session.** Send the objective to the eve session at address = work id, with eve's delivery `idempotencyKey`.
+
+**Repeated submissions.** The same key and objective return the same work and session and run nothing again. The same key with a different objective returns `409 IDEMPOTENCY_KEY_REUSED`.
+
+**Progress** is recorded by the `work` channel's event handlers as immutable FeltDB checkpoints, never overwritten:
+
+| eve event                           | Checkpoint                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| `turn.started`                      | `running`, with the eve session id as `execution.conversation_id`                            |
+| `call.settled` for `appport_invoke` | `running`, citing the invocation record as evidence (verified by FeltDB inside the commit)   |
+| `turn.settled`                      | One of the three outcomes below, decided from recorded evidence, never from the model's text |
+
+| Outcome                                                         | When                                   |
+| --------------------------------------------------------------- | -------------------------------------- |
+| `completed`                                                     | At least one invocation was authorized |
+| `blocked` with `waiting: every AppPort invocation was rejected` | Every invocation was rejected          |
+| `blocked` with `failed: the eve turn ended failed`              | The turn failed                        |
+
+The agent's reply is kept in the summary as the agent's claim.
+
+**Invocation evidence.** The `appport_invoke` tool commits an `appport_invocations` record from AppPort's response. It holds the work id, caller, agent, capability, outcome, output digest and `requestId`. AppPort's `traceId` is the work id, so the host's provenance carries the work id beside the AuthBoundry `delegationId`, `decisionId` and authority.
+
+**Reading work.** `GET /work/:id` returns a requester's own work only; anyone else gets 404. The response includes status, history, decisions, evidence, invocation outcomes, the recorded session, and the session eve currently holds for that address.
+
+Only one eve process may open the work store: FeltDB holds an exclusive lock.
+
 ## Who owns what
 
-| Concern                                      | Owner                                                                         |
-| -------------------------------------------- | ----------------------------------------------------------------------------- |
-| AuthBoundry server process and its state     | The AppPort application (`appport-host/host.mjs`), via `@authboundry/local`   |
-| Grants and revocations                       | AuthBoundry, through the application (`authority.grant` / `authority.revoke`) |
-| The agent's credential (issue, renew, store) | The application, written to `APPPORT_AGENT_CREDENTIAL_FILE` (mode 0600)       |
-| Reading the current credential               | eve, from the same file, on every call                                        |
+| Concern                                      | Owner                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| AuthBoundry server process and its state     | The AppPort application (`appport-host/host.mjs`), via `@authboundry/local`      |
+| Grants and revocations                       | AuthBoundry, through the application (`authority.grant` / `authority.revoke`)    |
+| The agent's credential (issue, renew, store) | The application, written to `APPPORT_AGENT_CREDENTIAL_FILE` (mode 0600)          |
+| Reading the current credential               | eve, from the same file, on every call                                           |
+| Work records, progress, outcomes, evidence   | FeltDB, written by the eve agent (`agent/lib/work.ts`, `agent/channels/work.ts`) |
+| Sessions, turns, execution checkpoints       | eve's Workflow world; never the work record                                      |
 
 The agent never sends AuthBoundry a credential of its own. A renewed credential supersedes the old one, and replaying a superseded credential revokes the whole family (verified). So the application keeps custody and compares what the agent presents with its current copy.
 
@@ -45,7 +93,7 @@ AUTHBOUNDRY_ADMIN_SECRET=<32+ chars> APPPORT_AGENT_CREDENTIAL_FILE=$PWD/.appport
 EVE_MODEL_CATALOG=bundled pnpm build
 ANTHROPIC_API_KEY=… AGENT_JWT_SECRET=<32+ chars> APPPORT_URL=http://127.0.0.1:4317/appport \
   APPPORT_AGENT_CREDENTIAL_FILE=$PWD/.appport-host/agent-credential \
-  APPPORT_AGENT_CAPABILITIES=catalog.lookup pnpm start
+  APPPORT_AGENT_CAPABILITIES=catalog.lookup APPPORT_AGENT_WORK_DIR=$PWD/.appport-agent-work pnpm start
 ```
 
 The host keeps AuthBoundry's state and its check credential in `APPPORT_HOST_DATA_DIR` (default `.appport-host`).
@@ -74,6 +122,17 @@ People grant through the application. This example has no person-facing grant sc
 - grants and credentials survive a restart of the application.
 
 Every rejected call is checked to have no `execution` record.
+
+**Always, `test/work.test.mjs`.** Real eve (`eve start`), FeltDB on disk, AppPort and AuthBoundry, with a scripted `mockModel` agent generated from `agent/` with only `agent.ts` replaced:
+
+- one record per submission, and the actual outcome;
+- AppPort provenance linked to the work and the delegation;
+- idempotent replay, and a key-reuse conflict;
+- Bob can't read Alice's work;
+- revocation blocks invocation;
+- a failed turn is recorded as failed;
+- the record and session association survive an eve restart (whole process group killed);
+- the records read directly from FeltDB without eve.
 
 **With `APPPORT_AGENT_E2E_ANTHROPIC_API_KEY`**, the built agent on `eve start` with a real model:
 
