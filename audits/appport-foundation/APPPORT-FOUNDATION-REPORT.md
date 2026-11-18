@@ -48,19 +48,19 @@ Model exposure: three tools. Invocation is limited to operator-allowlisted capab
 
 **Implemented and verified by execution**, all automated in `examples/appport-agent/test/acceptance.test.mjs` and run in CI.
 
-| Claim                                               | How proven                                                                                                 | Inference          |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------ |
-| The agent can discover the capability               | `listCapabilities` against real AppPort                                                                    | none               |
-| The agent can understand its contract               | `readContract`: `inputSchema.required = ["sku"]`                                                           | none               |
-| An authorized invocation succeeds                   | Output equals `catalog.json`'s entry, read independently                                                   | none               |
-| An unauthorized invocation is rejected              | Bob → `FORBIDDEN`; forged assertion → `UNAUTHORIZED`                                                       | none               |
-| Invalid input is rejected by the contract           | `{}` and `{sku: 5}` → `INVALID_INPUT`                                                                      | none               |
-| Privileged or unlisted capabilities are not exposed | `NOT_EXPOSED`; no AppPort request sent                                                                     | none               |
-| Provenance is retained                              | JSONL record per `requestId` with principal, session, outcome                                              | none               |
-| End to end through the agent                        | Built `eve start` agent: Alice's answer `42` comes through AppPort; Bob's attempt is rejected and recorded | **real Anthropic** |
-| Works after restart                                 | `SIGKILL` + `eve start`; the same session answers `7`                                                      | **real Anthropic** |
-| Unauthenticated access rejected                     | `POST /eve/v1/session` → 401                                                                               | none               |
-| Existing eve behavior intact                        | eve unit 9,352 / integration 2,675 / scenario 372 pass (known pre-existing pnpm failure only)              | n/a                |
+| Claim                                               | How proven                                                                                                                                                                                                         | Inference          |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| The agent can discover the capability               | `listCapabilities` against real AppPort                                                                                                                                                                            | none               |
+| The agent can understand its contract               | `readContract`: `inputSchema.required = ["sku"]`                                                                                                                                                                   | none               |
+| An authorized invocation succeeds                   | Output equals `catalog.json`'s entry, read independently                                                                                                                                                           | none               |
+| An unauthorized invocation is rejected              | Bob → `FORBIDDEN`; forged assertion → `UNAUTHORIZED`                                                                                                                                                               | none               |
+| Invalid input is rejected by the contract           | `{}` and `{sku: 5}` → `INVALID_INPUT`                                                                                                                                                                              | none               |
+| Privileged or unlisted capabilities are not exposed | `NOT_EXPOSED`; no AppPort request sent                                                                                                                                                                             | none               |
+| Provenance is retained                              | JSONL record per `requestId` with principal, session, outcome                                                                                                                                                      | none               |
+| End to end through the agent                        | Built `eve start` agent: Alice's answer `42` comes through AppPort; Bob's attempt is rejected and recorded                                                                                                         | **real Anthropic** |
+| Works after restart                                 | `SIGKILL` + `eve start`; the same session answers `7`. Corrected later: this first killed only the CLI. It is now re-verified with the whole process group killed (see `FELTDB-DURABLE-WORK-REPORT.md`, finding 1) | **real Anthropic** |
+| Unauthenticated access rejected                     | `POST /eve/v1/session` → 401                                                                                                                                                                                       | none               |
+| Existing eve behavior intact                        | eve unit 9,352 / integration 2,675 / scenario 372 pass (known pre-existing pnpm failure only)                                                                                                                      | n/a                |
 
 Result: 10/10 with the key; 7/7 plus the e2e suite skipped without it. The key never appeared in logs.
 

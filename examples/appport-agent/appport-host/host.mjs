@@ -88,6 +88,7 @@ export async function startInventoryHost({
         const body = answer.body ?? {};
         record({
           agent: body.executor?.principal_id ?? agent,
+          authority: { application: APPLICATION_ID, kind: "authboundry", tenant: authority.tenant },
           capability: capability.name,
           decision: body.decision ?? `http_${answer.status}`,
           decisionId: body.decision_id ?? null,

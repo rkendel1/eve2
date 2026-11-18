@@ -1863,6 +1863,9 @@ importers:
       '@appport/transport-http':
         specifier: 1.1.8
         version: 1.1.8
+      '@feltdb/core':
+        specifier: 0.22.0
+        version: 0.22.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       ai:
         specifier: ^7.0.172
         version: 7.0.172(zod@4.6.7)
