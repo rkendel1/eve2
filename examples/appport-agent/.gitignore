@@ -2,3 +2,4 @@
 appport-provenance.jsonl
 .appport-agent-work/
 .acceptance-agent/
+.idempotency-agent/

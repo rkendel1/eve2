@@ -6,6 +6,8 @@ import { startLocalAuthority } from "@authboundry/local";
 import { AppPortError, createApplication, createServer, defineCapability, s } from "@appport/sdk";
 import { serve } from "@appport/sdk/node";
 
+import { createDurableIdempotencyStore } from "./idempotency-store.mjs";
+
 export const APPLICATION_ID = "inventory";
 export const AGENT_ID = "agent:appport-agent";
 const here = (file) => new URL(file, import.meta.url);
@@ -28,6 +30,7 @@ function sameSecret(presented, held) {
 export async function startInventoryHost({
   extraCapabilities = [],
   extraPermissions = [],
+  idempotencyFault,
   adminSecret,
   agentCredentialFile,
   authorityLogger,
@@ -44,6 +47,11 @@ export async function startInventoryHost({
       provenanceFile,
       `${JSON.stringify({ ...entry, recordedAt: new Date().toISOString() })}\n`,
     );
+
+  const idempotency = createDurableIdempotencyStore({
+    fault: idempotencyFault,
+    path: join(dataDir, "idempotency"),
+  });
 
   const authority = await startLocalAuthority({
     adminSecret,
@@ -150,6 +158,7 @@ export async function startInventoryHost({
     application: { id: APPLICATION_ID, name: "Inventory", version: "1.0.0" },
     authorizer: delegatedAuthority,
     capabilities: [catalogLookup, ...extraCapabilities],
+    idempotency,
     mode: "production",
     telemetry: { record: (entry) => record({ ...entry, kind: "request" }) },
   });
@@ -175,9 +184,11 @@ export async function startInventoryHost({
   const running = await serve({ host, port, server, websocket: false });
   return {
     authority,
+    idempotency,
     async close() {
       await running.close();
       await authority.close();
+      await idempotency.close();
     },
     url: running.url,
   };
