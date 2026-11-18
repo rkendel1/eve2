@@ -1,0 +1,379 @@
+# PersonalOS (incl. AnywhereAide) capability inventory
+
+- **Repo:** `/home/user/rkendel1/personalOS` @ `c684688` (package `personalos` 0.1.0, `@feltdb/feltkit` 0.3.30, `@authboundry/local` 0.1.0, `@appport/resolver-client` 0.3.0)
+- **Framework consulted (semantics only):** `/home/user/feltkit` @ `04d307f` — `README.md` "Capabilities", `packages/sdk/src/runtime/capabilities.ts:27-46`, `docs/AGENT-CAPABILITY-INFRASTRUCTURE.md`.
+- **Inspected:** every `feltkit/*.ts` operation and integration (source), `feltkit/app.ts` (roles, authority, services, integrations, collections), `feltkit/_authority.ts`, `_ops.ts`, `turn.ts` tool list, `assistant.ts`, `_pages.ts`, UI call sites in `src/*.tsx`, extension `extension/src/*`, iOS client `ios/Shared/PersonalOSClient.swift`, test names in `tests/*.test.ts`, `docs/LIMITATIONS.md`.
+- **NOT inspected in depth:** `src/*.tsx` UI rendering beyond call sites; `e2e/*.mjs` scripts (names only); `docs/evidence/*` JSON; iOS Swift beyond the client; `feltkit/_generated/`; `scripts/`; FeltKit internals beyond the capability-publishing rule.
+- **Tests:** NOT run. `node_modules` is absent in the repo and installing was out of scope. All "tested" labels below mean _test exists and targets this behavior (by source reading)_, not _observed passing_. Tests marked `{ skip: SKIP }` need a real AuthBoundry/model and are skipped by default.
+
+## Key structural findings
+
+1. **PersonalOS already exposes AppPort capabilities.** FeltKit publishes any function declaring `capability: {...}` at `POST /appport` and as an MCP tool at `/mcp` (FeltKit `README.md` §Capabilities). Queries → `effect: observation`; mutations → `consequential` with `idempotency: "supported"` (FeltKit `runtime/capabilities.ts:37-40`); version defaults to 1. **14 functions are published:** `actions.list`, `assistant.send`, `briefing.today`, `conversations.list`, `conversations.messages`, `documents.list`, `memory.list`, `memory.add`, `projects.list`, `tasks.list`, `tasks.create`, `tasks.update`, `tasks.complete` (13 functions) + integration ops that are not `expose:false`: `websearch.search`, `openaisearch.search`, `identity.lookup`, `identity.resolve`, `identitylinks.put`, `identitylinks.revoke` (the last four are refused to every person/bridge role). `x.*` is `expose: false` (`app.ts:266`).
+2. **Two authorization planes.** (a) FeltKit roles/permissions (`app.ts:15-87`: `owner`, `viewer`, `bridge`, `identitylinker`, `xadapter`, `admin`) gate every function, including the published `/appport` capabilities (`Authority.required(fn.access)`), i.e. a caller needs the person's own session. (b) AuthBoundry (`app.ts:99-106`, executor `agent:personalos`) decides **only** work arriving from connected surfaces (Multiplayer, X, Chrome, iOS) via `ctx.authority.decide` with the 14 `personalos.*` capabilities in `_authority.ts:35-45`, mapped from intents by `capabilityFor` (`_authority.ts:16-32`). **The published `/appport` capabilities are NOT AuthBoundry-delegated** — they run as the session holder. That is the main contract gap for an agent acting on someone's behalf.
+3. **Model-facing tool list** (`feltkit/turn.ts:27`): `tasks.create, tasks.update, tasks.complete, tasks.list, memory.add, memory.list, briefing.today, projects.list, documents.list`, plus the synthetic `research.start` (`turn.ts:33-37`). Tools are resolved via `ctx.agent.tools()` and called via `ctx.agent.propose` (`turn.ts:144,202`): observations run immediately; consequential calls wait for owner approval (FeltKit agent approvals, `feltkit.agent.*`, UI `src/chat.tsx:41`).
+4. **No email, calendar, messaging or file-sync integrations** exist (`docs/LIMITATIONS.md:11`; integrations in `app.ts` are only Resolver ×2, web search ×2, X).
+5. **Scheduled/for-a-person work** is FeltKit jobs (`app.ts:114` handlers): `reminder.fire`, `checkin.fire`, `review.fire`, `research.step`, `invocation.process`, `x.poll`, `x.reply`. Per-person recurrence is a job chain queued as the person (no cron).
+
+## Classification counts
+
+| Classification       | All    | AnywhereAide subset |
+| -------------------- | ------ | ------------------- |
+| Already available    | 2      | 0                   |
+| Direct port          | 0      | 0                   |
+| Contract adaptation  | 16     | 0                   |
+| Integration required | 5      | 5                   |
+| Internal only        | 17     | 3                   |
+| Duplicate            | 6      | 3                   |
+| Retire               | 1      | 0                   |
+| Unresolved           | 0      | 0                   |
+| **Total**            | **47** | **11**              |
+
+## Capability table (summary)
+
+Paths relative to `personalOS/`. "Pub" = published on `/appport`+`/mcp`; "Tool" = model tool in `turn.ts:27`. AA = AnywhereAide.
+
+| ID    | Name                                                                                    | AA                   | Source                                                                                          | Pub                                 | Tool          | Effect                                          | AuthBoundry cap (surfaces) / FeltKit permission                          | Tests                        | Status                         | Destination          |
+| ----- | --------------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------- | ------------- | ----------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------- | ------------------------------ | -------------------- |
+| PO-01 | Deterministic assistant chat (send/edit/retry)                                          | –                    | feltkit/assistant.ts:358,414,431                                                                | ✓ (`assistant.send`)                | –             | read, write                                     | `assistant.send`; surfaces: `personalos.assistant.converse` + per-intent | tested                       | complete (retry unused by UI)  | Duplicate            |
+| PO-02 | Model turn (streamed, tools as proposals) + modelStatus                                 | –                    | feltkit/turn.ts:89,233                                                                          | –                                   | defines tools | read, execute                                   | `assistant.send`                                                         | tested                       | complete                       | Duplicate            |
+| PO-03 | Conversations list / messages                                                           | –                    | feltkit/conversations.ts:5,12                                                                   | ✓                                   | –             | read                                            | `conversations.read`                                                     | tested (indirect)            | complete                       | Duplicate            |
+| PO-04 | Conversation rename / remove                                                            | –                    | feltkit/conversations.ts:23,33                                                                  | –                                   | –             | write                                           | `conversations.write`                                                    | untested                     | unused                         | Retire               |
+| PO-05 | Cross-surface continuity view                                                           | partly               | feltkit/continuity.ts:96                                                                        | –                                   | –             | read                                            | `conversations.read`                                                     | tested                       | complete                       | Internal only        |
+| PO-06 | List tasks                                                                              | –                    | feltkit/tasks.ts:8                                                                              | ✓                                   | ✓             | read                                            | `tasks.read`; `personalos.tasks.read`                                    | tested                       | complete                       | Contract adaptation  |
+| PO-07 | Create task / reminder                                                                  | –                    | feltkit/tasks.ts:16 → _ops.ts:107                                                               | ✓                                   | ✓             | write, execute (job)                            | `tasks.write`; `personalos.tasks.create` / `personalos.reminders.create` | tested                       | complete                       | Contract adaptation  |
+| PO-08 | Update / reschedule task                                                                | –                    | feltkit/tasks.ts:25 → _ops.ts:164                                                               | ✓                                   | ✓             | write                                           | `tasks.write`; `personalos.tasks.update`                                 | tested                       | complete                       | Contract adaptation  |
+| PO-09 | Complete task (recurrence)                                                              | –                    | feltkit/tasks.ts:34 → _ops.ts:134                                                               | ✓                                   | ✓             | write                                           | `tasks.write`; `personalos.tasks.update`                                 | tested                       | complete                       | Contract adaptation  |
+| PO-10 | Reopen task                                                                             | –                    | feltkit/tasks.ts:43 → _ops.ts:156                                                               | –                                   | –             | write                                           | `tasks.write`; (no surface intent)                                       | untested                     | complete (UI only)             | Contract adaptation  |
+| PO-11 | Delete task (direct; proposal from chat/surface)                                        | –                    | feltkit/tasks.ts:52 → _ops.ts:192; proposal _ops.ts:286-303                                     | –                                   | –             | write (destructive)                             | `tasks.write`; `personalos.tasks.delete`                                 | tested                       | complete                       | Contract adaptation  |
+| PO-12 | Reminder firing job                                                                     | –                    | feltkit/reminders.ts:11                                                                         | –                                   | –             | execute, external-state (notification, webhook) | `reminders.fire` (job as owner/bridge)                                   | tested                       | complete                       | Internal only        |
+| PO-13 | List memories                                                                           | –                    | feltkit/memory.ts:7                                                                             | ✓                                   | ✓             | read                                            | `memory.read`; `personalos.memory.read`                                  | tested                       | complete                       | Contract adaptation  |
+| PO-14 | Add memory                                                                              | –                    | feltkit/memory.ts:14 → _ops.ts:212                                                              | ✓                                   | ✓             | write                                           | `memory.write`; `personalos.memory.write`                                | tested                       | complete                       | Contract adaptation  |
+| PO-15 | Confirm / edit memory                                                                   | –                    | feltkit/memory.ts:23,32                                                                         | –                                   | –             | write                                           | `memory.write`                                                           | tested (confirm)             | complete                       | Internal only        |
+| PO-16 | Forget memory                                                                           | –                    | feltkit/memory.ts:41 → _ops.ts:265                                                              | –                                   | –             | write (destructive)                             | `memory.write`; `personalos.memory.delete`                               | tested                       | complete                       | Contract adaptation  |
+| PO-17 | List projects                                                                           | –                    | feltkit/projects.ts:5                                                                           | ✓                                   | ✓             | read                                            | `projects.read`; `personalos.tasks.read` (project.status)                | tested (indirect)            | complete                       | Contract adaptation  |
+| PO-18 | Create project                                                                          | –                    | feltkit/projects.ts:16 → _ops.ts:273                                                            | –                                   | –             | write                                           | `projects.write`; `personalos.projects.create`                           | untested direct              | complete                       | Contract adaptation  |
+| PO-19 | Update project                                                                          | –                    | feltkit/projects.ts:24                                                                          | –                                   | –             | write                                           | `projects.write`                                                         | untested                     | complete (UI)                  | Internal only        |
+| PO-20 | List documents                                                                          | –                    | feltkit/documents.ts:16                                                                         | ✓                                   | ✓             | read                                            | `documents.read`                                                         | tested                       | complete                       | Contract adaptation  |
+| PO-21 | Upload document (prepareUpload + attach)                                                | –                    | feltkit/documents.ts:25,33                                                                      | –                                   | –             | write, external-state (Files)                   | `documents.write`, `files.write`                                         | tested                       | complete                       | Internal only        |
+| PO-22 | Document download link / update / remove                                                | –                    | feltkit/documents.ts:71,55,82                                                                   | –                                   | –             | read, write                                     | `documents.read/write`                                                   | tested                       | complete                       | Internal only        |
+| PO-23 | Action log                                                                              | –                    | feltkit/actions.ts:7                                                                            | ✓                                   | –             | read                                            | `actions.read`                                                           | tested                       | complete                       | Internal only        |
+| PO-24 | Approve / reject proposals                                                              | –                    | feltkit/actions.ts:16,43 (+ FeltKit agent approvals, src/chat.tsx:41)                           | – (approve is `approval: required`) | –             | write, execute                                  | `actions.decide`, `feltkit.agent.*`                                      | tested                       | complete                       | Internal only        |
+| PO-25 | Daily briefing                                                                          | –                    | feltkit/briefing.ts:24 (+ _briefing.ts)                                                         | ✓                                   | ✓             | read                                            | `briefing.read`; `personalos.tasks.read`                                 | tested                       | complete                       | Contract adaptation  |
+| PO-26 | Daily check-in (configure + job)                                                        | –                    | feltkit/checkins.ts:29,46                                                                       | –                                   | –             | write, execute, external-state (notification)   | `settings.write`; job `briefing.read`                                    | tested                       | complete                       | Internal only        |
+| PO-27 | Weekly review (configure + job)                                                         | –                    | feltkit/weekly.ts:67,85                                                                         | –                                   | –             | write, execute, external-state                  | `settings.write`; job `briefing.read`                                    | tested                       | complete                       | Internal only        |
+| PO-28 | Notifications inbox                                                                     | –                    | feltkit/inbox.ts:5,12                                                                           | –                                   | –             | read, write                                     | `notifications.read/update`                                              | untested                     | complete                       | Internal only        |
+| PO-29 | Settings (name, modelAssist)                                                            | –                    | feltkit/settings.ts:5,13                                                                        | –                                   | –             | read, write                                     | `settings.*`                                                             | tested (indirect)            | complete                       | Internal only        |
+| PO-30 | Start research                                                                          | partly (invocations) | feltkit/research.ts:64; tool `research.start` turn.ts:33,187; researchstate.ts:64               | –                                   | ✓ (synthetic) | execute, write, external-state (web)            | `research.run`; `personalos.research.run`                                | tested                       | complete (needs search config) | Contract adaptation  |
+| PO-31 | Research runs / sources / prospects read                                                | –                    | feltkit/research.ts:126,135                                                                     | –                                   | –             | read                                            | `research.read`                                                          | tested                       | complete                       | Contract adaptation  |
+| PO-32 | Cancel / retry research                                                                 | –                    | feltkit/research.ts:113,105                                                                     | –                                   | –             | write, execute                                  | `research.run`; `personalos.research.run` (checked per step)             | tested                       | complete                       | Contract adaptation  |
+| PO-33 | Web search integrations (Brave, OpenAI)                                                 | –                    | feltkit/app.ts:185,213; _search.ts                                                              | ✓                                   | –             | read, external-state (quota)                    | `research.search`                                                        | tested                       | complete                       | Already available    |
+| PO-34 | Delegation grants (list/set)                                                            | ✓ (governs AA)       | feltkit/delegation.ts:28,53; _delegation.ts:23                                                  | –                                   | –             | read, write (AuthBoundry)                       | `delegation.read/write`                                                  | tested                       | complete                       | Already available    |
+| PO-35 | Identity linking (start/confirm/revoke/list) via Resolver                               | ✓                    | feltkit/links.ts:55,102,79,72; agent links.ts:121; _resolver.ts:133-184                         | –                                   | –             | write, external-state (Resolver)                | `links.*`; Resolver writes only by `identitylinker` role                 | tested                       | complete                       | Integration required |
+| PO-36 | Surface interactions in (receive/status/cancel), `personalos.interaction/1`             | ✓                    | feltkit/interactions.ts:83,368,382                                                              | –                                   | –             | read, write, execute                            | `interactions.receive` (bridge); AuthBoundry per intent                  | tested (37 tests)            | complete                       | Duplicate            |
+| PO-37 | Owner's interaction list                                                                | ✓                    | feltkit/interactions.ts:450                                                                     | –                                   | –             | read                                            | `interactions.read`                                                      | tested                       | complete                       | Internal only        |
+| PO-38 | Invocation submit, `personalos.invocation/1` (iOS share, Chrome)                        | ✓                    | feltkit/invocations.ts:47 (+ job :118)                                                          | –                                   | –             | write, execute (job)                            | `invocations.submit`; AuthBoundry at process time                        | tested                       | complete                       | Duplicate            |
+| PO-39 | Run a waiting invocation (owner approves answer)                                        | ✓                    | feltkit/invocations.ts:85                                                                       | –                                   | –             | execute                                         | `invocations.submit` (owner session)                                     | tested                       | complete                       | Internal only        |
+| PO-40 | Invocation receipts (get/list)                                                          | ✓                    | feltkit/invocationstate.ts:97,108                                                               | –                                   | –             | read                                            | `invocations.read`                                                       | tested                       | complete                       | Duplicate            |
+| PO-41 | X mention intake (@anywhereaide polling + receive)                                      | ✓                    | feltkit/xsurface.ts:86,100,170,249; _x.ts                                                       | –                                   | –             | read, write, execute, external-state            | `x.poll`, `x.receive`, `x.read` (xadapter); AuthBoundry per intent       | tested                       | complete                       | Integration required |
+| PO-42 | X reply delivery                                                                        | ✓                    | feltkit/xsurface.ts:493 (job `x.reply`), 442-490                                                | –                                   | –             | external-state (posts on X)                     | `x.post`                                                                 | tested                       | complete                       | Integration required |
+| PO-43 | Publish on X (owner's explicit act)                                                     | ✓                    | feltkit/xsurface.ts:545                                                                         | –                                   | –             | write, external-state (queued X post)           | `x.publish`; `personalos.x.publish`                                      | tested                       | complete                       | Integration required |
+| PO-44 | Owner's X views (mine/post/bot)                                                         | ✓                    | feltkit/xsurface.ts:511,519,531                                                                 | –                                   | –             | read                                            | `invocations.read`, `links.read`                                         | tested (post)                | complete                       | Internal only        |
+| PO-45 | Surface clients: Chrome extension + iOS share                                           | ✓                    | extension/src/summonform.tsx:26, summon.ts, background.ts; ios/Shared/PersonalOSClient.swift:76 | –                                   | –             | execute (submit)                                | owner session (bearer)                                                   | tested (browser-summon)      | complete (Chrome only)         | Integration required |
+| PO-46 | Resolver integrations exposed on /appport                                               | partly               | feltkit/app.ts:152,163                                                                          | ✓ (role-refused)                    | –             | read / write (Resolver)                         | `identity.resolve`, `identity.link`                                      | tested                       | complete                       | Internal only        |
+| PO-47 | Outbound webhooks (task.completed, reminder.fired, document.added, interaction.updated) | partly               | feltkit/app.ts:124 (FeltKit service); emitted in _ops/actions/reminders                         | –                                   | –             | external-state                                  | `webhooks.emit/deliver`                                                  | tested (interaction.updated) | complete                       | Internal only        |
+
+## Per-capability detail
+
+### PO-01 Deterministic assistant chat — Duplicate
+
+- **Source:** `feltkit/assistant.ts:358` (`send`), `:414` (`edit`), `:431` (`retry`); core `respond` `:396`, intent dispatcher `handle` `:131`; interpretation `feltkit/_interpret.ts:111`. Published as AppPort `assistant.send@1` (`assistant.ts:368`). UI: `src/chat.tsx` (via turn fallback). `retry` has no caller in `src`/`extension`/tests; `edit` only in tests.
+- **Contract:** in `{ text ≤4000, conversationId?, today?, tzOffset? }` → `SendResult` (conversationId, messageId, replyId, intent, reply text, actionIds, suggestions).
+- **Deps:** FeltDB collections conversations/messages/tasks/memories/projects/actions; jobs (reminders).
+- **Auth:** `assistant.send` (owner). Surfaces call the same `respond` under `actingFor` after AuthBoundry `capabilityFor(intent)`.
+- **Effect:** read, write (tasks/memory/projects, action log). Destructive intents (task.delete, memory.forget) become proposals (`_ops.ts:286`). Reversible via UI except deletes.
+- **Tests:** `tests/assistant.test.ts` (15, e.g. "DoD 1-2…", "DoD 9: destructive requests are proposed…", "editing a message supersedes…"), `tests/interpret.test.ts` (5). Label: tested (not run).
+- **Status:** complete; rules-only NLU (keyword recall, `docs/LIMITATIONS.md:7`).
+- **Rationale:** a regex-intent chat front end over the same ops; eve's agent loop replaces conversational handling, and the underlying ops are inventoried separately (PO-06…PO-25). Exposing "chat to another assistant" as an agent capability adds nothing.
+
+### PO-02 Model turn engine — Duplicate
+
+- **Source:** `feltkit/turn.ts:89` (`turn`), `:233` (`modelStatus`); tools `:27`, app-filled inputs `:29,62-73`, max 3 rounds `:30`; helpers `feltkit/turnstate.ts:9,33,49`. UI `api.turn.turn`.
+- **Contract:** `{ conversationId?, clientId (8-100, idempotent), text }` → `{ mode: model|rules, conversationId, messageId, replyId, replayed, reason? }`; streams `delta`/`proposal`.
+- **Deps:** FeltKit `intelligence` / `ctx.model.generate`, `ctx.agent.openTask/propose/tools/catalog`; Resolver model ref `ref://prod/personalos/model` (`app.ts:110`).
+- **Auth:** `assistant.send`; proposals approved by the owner (`feltkit.agent.*`).
+- **Effect:** read, execute (observations), consequential proposals pending approval. No direct writes by the model.
+- **Tests:** `tests/turn.test.ts` (6), `tests/real-provider.test.ts` (skipped w/o key), research routing in `tests/research.test.ts` "with a model: the outcome still goes to research…".
+- **Rationale:** eve already provides durable model turns, tool calling, streaming and approvals; this is PersonalOS's own agent loop.
+
+### PO-03 Conversations list / messages — Duplicate
+
+- `feltkit/conversations.ts:5,12`; published `conversations.list@1`, `conversations.messages@1`. In `{}` / `{conversationId}` → conversation docs / ordered messages. `conversations.read`. Read-only. Tests: indirect in `assistant.test.ts` "DoD 1-2". Complete.
+- **Rationale:** transcripts of PersonalOS's own chat; eve durable sessions own the agent's conversation history. Cross-surface provenance is PO-05.
+
+### PO-04 Conversation rename / remove — Retire
+
+- `feltkit/conversations.ts:23,33`; `conversations.write`. No caller in `src/`, `extension/`, `ios/` or tests (grep). Status: unused. Retire (product UI never wired).
+
+### PO-05 Continuity view — Internal only
+
+- `feltkit/continuity.ts:96` (`of`): per-conversation provenance of each part (surface, asked, shared, inferred, authority, did). `conversations.read`. Tests: `tests/continuity.test.ts` (8, Scenarios A–E), `tests/continuity-authboundry-real.test.ts` (skipped). Complete. PersonalOS product view; the provenance model is worth keeping as the evidence shape (see port notes) but not an agent capability.
+
+### PO-06 List tasks — Contract adaptation
+
+- `feltkit/tasks.ts:8`; published `tasks.list@1` (observation); model tool. In `{status?: open|done}` → task docs. FeltDB. `tasks.read`; surfaces `personalos.tasks.read`. Read. Tests: assistant.test.ts "DoD 7-8", interactions.test.ts "a mention in a shared conversation never exposes…". Complete.
+
+### PO-07 Create task / reminder — Contract adaptation
+
+- `feltkit/tasks.ts:16` → `_ops.ts:107` (`createTask`: verify read-back, action record with evidence, reminder job via `scheduleReminder` `_ops.ts:~101`). Published `tasks.create@1` (consequential, idempotency supported). Model tool (proposal, approval required).
+- In `{title, notes?, priority?, recurrence?, projectId?, due?, time?, tzOffset?, reminder?}` → task doc.
+- Deps: FeltDB, FeltKit jobs (`reminder.fire`), notifications, webhooks.
+- Auth: `tasks.write`; surfaces `personalos.tasks.create` or `personalos.reminders.create` (`_authority.ts:18`).
+- Effect: write + scheduled execute; reversible (complete/delete).
+- Tests: assistant.test.ts "DoD 5-6: a reminder from chat becomes a task with evidence, and fires through a real job", "a reminder with no time asks…"; interactions.test.ts "a reminder from a channel…"; authboundry-real.test.ts (skipped). Complete.
+
+### PO-08 Update task — Contract adaptation
+
+- `feltkit/tasks.ts:25` → `_ops.ts:164`. Published `tasks.update@1`. In `{id, title?, notes?, priority?, recurrence?, due?, time?, reminder?, projectId?, …}` → task doc. Re-queues reminder job. `tasks.write`; `personalos.tasks.update`. Tests: assistant.test.ts "\"move that task to Friday\"…". Complete.
+
+### PO-09 Complete task — Contract adaptation
+
+- `feltkit/tasks.ts:34` → `_ops.ts:134` (recurring task → next occurrence). Published `tasks.complete@1`. In `{id}` → task. Emits `task.completed` webhook. `personalos.tasks.update`. Tests: assistant.test.ts (same as PO-08). Complete. Reversible by PO-10.
+
+### PO-10 Reopen task — Contract adaptation
+
+- `feltkit/tasks.ts:43` → `_ops.ts:156`. Not published; UI only. `tasks.write`; no surface intent (would map to `personalos.tasks.update`). Untested directly. Fold into the `tasks.update` contract (status field) rather than a separate capability.
+
+### PO-11 Delete task — Contract adaptation
+
+- Direct: `feltkit/tasks.ts:52` → `_ops.ts:192` (UI, owner's act). Chat/surface: proposal `_ops.ts:289`, executed only on `actions.approve` (`_ops.ts:294-298`). `tasks.write`; `personalos.tasks.delete`. Destructive, not reversible. Tests: assistant.test.ts "DoD 9…", interactions.test.ts "approval: a destructive request waits for the owner…". Complete.
+
+### PO-12 Reminder firing job — Internal only
+
+- `feltkit/reminders.ts:11` (job `reminder.fire`, `app.ts:114`). Fires notification `reminder.due` + webhook `reminder.fired` if task still open and remindAt matches. Runs as owner or bridge (`reminders.fire`). Tests: assistant.test.ts "DoD 5-6"; interactions.test.ts "a bridge-queued reminder fires as the owner…", "revoked link: … reminders stop firing". Complete. Stays a FeltKit jobs/notifications service behavior behind `tasks.create`.
+
+### PO-13 List memories — Contract adaptation
+
+- `feltkit/memory.ts:7`; published `memory.list@1`; model tool. Returns memories with kind (`MEMORY_KINDS` `app.ts:360`), status confirmed|inferred, provenance. `memory.read`; `personalos.memory.read`. Tests: assistant.test.ts "DoD 3-4…", "volunteered facts are stored as inferred…". Complete.
+- Note: eve memory (`docs/memory`) is the agent's own store; this is the person's PersonalOS store. A custom eve memory provider backed by this contract is an alternative.
+
+### PO-14 Add memory — Contract adaptation
+
+- `feltkit/memory.ts:14` → `_ops.ts:212` (`remember`, dedupe). Published `memory.add@1`; tool. In `{kind, subject, content, date?}` → memory (confirmed). `memory.write`; `personalos.memory.write`. Tests: as PO-13. Complete.
+
+### PO-15 Confirm / edit memory — Internal only
+
+- `feltkit/memory.ts:23,32` → `_ops.ts:240,248`. Owner curation in UI (confirming an inferred memory is the person's own act). Tests: assistant.test.ts "…only confirmed by the user".
+
+### PO-16 Forget memory — Contract adaptation
+
+- `feltkit/memory.ts:41` → `_ops.ts:265`; chat/surface path is a proposal (`memory.forget` in `NEEDS_APPROVAL`). `personalos.memory.delete`. Destructive. Tests: assistant.test.ts "rejecting a proposal changes nothing; forgetting needs approval too". Complete.
+
+### PO-17 List projects — Contract adaptation
+
+- `feltkit/projects.ts:5`; published `projects.list@1`; tool. Returns projects + open/done counts. `projects.read`. Tested indirectly (assistant "DoD 7-8", Files test). Complete.
+
+### PO-18 Create project — Contract adaptation
+
+- `feltkit/projects.ts:16` → `_ops.ts:273`. `{name, description?}`. `projects.write`; `personalos.projects.create`. Not published, not a model tool, but a surface intent (`project.create`). No dedicated test. Complete.
+
+### PO-19 Update project — Internal only
+
+- `feltkit/projects.ts:24`; status active|paused|done. UI only; no AuthBoundry capability. Untested.
+
+### PO-20 List documents — Contract adaptation
+
+- `feltkit/documents.ts:16`; published `documents.list@1`; tool (metadata only; model cannot read contents, `turn.ts:51`). `documents.read`. Tests: assistant.test.ts "Files: upload through a link…". No `personalos.documents.*` AuthBoundry capability exists → gap.
+
+### PO-21 Upload document — Internal only
+
+- `feltkit/documents.ts:25` (single-use upload URL), `:33` (attach after ownership check). FeltKit `files` service (10 MB, `app.ts:120`), emits `document.added`. Browser PUT flow; Files bytes stay in FeltKit. Tests: assistant.test.ts "Files…".
+
+### PO-22 Document link / update / remove — Internal only
+
+- `feltkit/documents.ts:71` (short-lived download link), `:55`, `:82`. FeltKit files. UI-only; no delegated capability. Tests: "Files…".
+
+### PO-23 Action log — Internal only
+
+- `feltkit/actions.ts:7`; published `actions.list@1`. Owner audit of every op (kind, status, evidence `{collection,id,version,verified}`, via chat|ui|model|job). Tests: assistant.test.ts "DoD 9". The destination agent keeps its own operation ledger; this stays the PersonalOS-side evidence of record and should be referenced, not re-exposed.
+
+### PO-24 Approve / reject proposals — Internal only
+
+- `feltkit/actions.ts:16` (`approval: "required"` → FeltKit only lets a person run it; agents can only propose, FeltKit `capabilities.ts:33`), `:43`; model proposals approved via FeltKit agent approvals (`src/chat.tsx:41`). Settles surface interactions (`interaction.updated`). Tests: assistant.test.ts "DoD 9", interactions.test.ts "approval: seeing the conversation is not authority…", turn.test.ts "two people: Grace cannot … approve Ada's proposal". Must stay human-only.
+
+### PO-25 Daily briefing — Contract adaptation
+
+- `feltkit/briefing.ts:24`, logic `_briefing.ts`. Published `briefing.today@1`; tool (`today` app-filled). Returns focus, overdue, due today, coming up, dates, projects, attention. `briefing.read`; surfaces `personalos.tasks.read` (`_authority.ts:22`). Tests: assistant.test.ts "DoD 7-8". Complete.
+
+### PO-26 Daily check-in — Internal only
+
+- `feltkit/checkins.ts:29` (configure, `settings.write`), `:46` (job `checkin.fire`). Posts briefing into "Daily check-in" conversation + `checkin.daily` notification; self-re-arming job chain. Tests: assistant.test.ts "scheduled check-in: a real job posts the briefing…". The agent-side equivalent is an eve schedule calling `briefing.today`; the in-app version stays FeltKit jobs/notifications.
+
+### PO-27 Weekly review — Internal only
+
+- `feltkit/weekly.ts:67,85` (job `review.fire`). Same pattern as PO-26. Test: assistant.test.ts "weekly review: a real job posts…".
+
+### PO-28 Notifications inbox — Internal only
+
+- `feltkit/inbox.ts:5,12`; FeltKit notifications service. Untested here.
+
+### PO-29 Settings — Internal only
+
+- `feltkit/settings.ts:5,13` (display name, `modelAssist` toggle). UI.
+
+### PO-30 Start research — Contract adaptation
+
+- **Source:** `feltkit/research.ts:64` (`begin`: discovery via `ctx.agent.catalog` `_capabilities.ts:81`, then `researchstate.create` `researchstate.ts:64`); model tool `research.start` (`turn.ts:33`, routed `:187`); from invocations (`invocations.ts:159`). Pipeline PO-internal (planning→searching→selecting→reading→assessing→finishing, one job step each, `research.ts:175`).
+- **Contract:** `{text ≤4000, conversationId?}` → `RunView` (run id, state, step, landscape/blockers). Results: ranked prospects with sources and verbatim-checked quotes (`researchSources`, `prospects` collections `app.ts:722,748`).
+- **Deps:** FeltKit jobs, intelligence (optional; rules fallback), `websearch`/`openaisearch` integrations, page reader `_pages.ts` (SSRF guards), FeltDB.
+- **Auth:** `research.run`; from surfaces `personalos.research.run`, re-checked before every step (`app.ts:692`).
+- **Effect:** execute, write (run/sources/prospects), external-state (web reads, search quota). Contacts no one. Cancellable; results kept.
+- **Tests:** `tests/research.test.ts` (12: "ACCEPTANCE: \"Find me some new customers for FeltKit\"…", "missing capability…", "cancellation stops between steps…", "authorization: …"), `tests/research-model.test.ts` (9), `tests/pages.test.ts` (3), `tests/invocations.test.ts` "ACCEPTANCE: a shared page…", `invocations-authboundry-real.test.ts` (skipped). Evidence: `docs/evidence/research-live-2026-11-12.json`.
+- **Status:** complete; blocked at runtime until a search provider is configured (`app.ts:180-184`).
+- **Rationale:** eve has `web_search`/`web_fetch` built-ins but not a durable, step-checked, evidence-bearing prospect research run under per-person delegation; agents should start it via a new contract.
+
+### PO-31 Research read — Contract adaptation
+
+- `feltkit/research.ts:126` (list), `:135` (get: run + sources + prospects). `research.read`. Observation. Tests: research.test.ts "authorization…", "prospects keep sources and assessments apart…". Needed as the result-retrieval side of PO-30.
+
+### PO-32 Cancel / retry research — Contract adaptation
+
+- `feltkit/research.ts:113` (cancel between steps, keeps findings), `:105` (re-discover and resume). `research.run`. Tests: research.test.ts "cancellation stops between steps…; retry resumes…". UI `src/research.tsx:87`.
+
+### PO-33 Web search integrations — Already available
+
+- `feltkit/app.ts:185` (Brave `GET /res/v1/web/search`, observation), `:213` (OpenAI Responses `web_search`, readOnly). Parsers `_search.ts:63,94`. Published as catalog capabilities (`websearch.search`, `openaisearch.search`). `research.search`. Tests: research-model.test.ts "OpenAI web search results are only pages the search returned or cited…", research.test.ts "the provider refuses the credential…".
+- **Rationale:** eve `web_search` built-in (`docs/concepts/built-in-tools.md:243`) already provides provider web search; only PO-30 needs these internally.
+
+### PO-34 Delegation grants — Already available
+
+- `feltkit/delegation.ts:28` (list `CAPABILITIES` with granted/expiry), `:53` (set exactly these; retry-safe overlap-then-revoke `_delegation.ts:23`). `ctx.authority.grants` (local `@authboundry/local`, or hosted when `AUTHBOUNDRY_URL`). Tests: `tests/delegation-set.test.ts` (4), `tests/delegation-local.test.ts` (2, skipped w/o AuthBoundry).
+- **Rationale:** grant/revoke is AuthBoundry's (and the destination appport-agent already uses `@authboundry/local` per-user delegation). Must never be agent-callable; reuse the `personalos.*` capability names and `CAPABILITY_LABELS` (`_authority.ts:48-63`).
+
+### PO-35 Identity linking (Resolver) — AnywhereAide — Integration required
+
+- **Source:** `feltkit/links.ts:55` start (code digest only, 10-min TTL), redeemed in a DM by `interactions.receive` (`interactions.ts:~110-135`) or an X mention (`xsurface.ts:249`), `:102` owner confirms, `:79` revoke, `:72` list; `identityAgent` `links.ts:121` writes Resolver via `identitylinks.put/revoke` (`_resolver.ts:157,172`); resolution `_resolver.ts:133` (lookup → resolve, ambiguous fails closed).
+- **Contract:** start `{adapter?}` → `{id, adapter, code, expiresAt}`; confirm `{id}` → Link; revoke `{id}`.
+- **Deps:** Resolver (`RESOLVER_URL`, two least-privilege keys `resolver-resolve` read-only on `ref://identity/personalos/*`, `resolver-link` write/create-only).
+- **Auth:** `links.*` (owner); Resolver writes only by `identitylinker` role (no session can hold it).
+- **Effect:** write, external-state (Resolver refs); revocable (revoked refs never resolve again; history kept).
+- **Tests:** `tests/interactions.test.ts` (≈15 linking/Resolver tests: "linking: a code issued in PersonalOS…", "identity security: …", "Resolver: an ambiguous identity … fails closed"), `tests/x.test.ts` "10: after Ada disconnects X…".
+- **Rationale:** an eve channel sender (Slack/Telegram/X) must be mapped to the person whose delegation applies; that requires wiring eve channel identities to Resolver identity links, which neither eve nor the appport-agent does today.
+
+### PO-36 Surface interactions (receive/status/cancel) — AnywhereAide — Duplicate
+
+- `feltkit/interactions.ts:83` (7-step pipeline: authenticate bridge, idempotency per adapter key, identity via Resolver, audience private/shared, understand, execute via `_ops.ts`, record), `:368` status (`afterSeq` updates, `revoked`), `:382` cancel. Contract `personalos.interaction/1` (`_interaction.ts`, states `received…refused`). Bridge role `interactions.receive`. AuthBoundry `capabilityFor(intent)` with `onBehalfOf user:<owner>`.
+- Tests: `tests/interactions.test.ts` (37). Complete (Multiplayer bridge).
+- **Rationale:** eve channels (Slack, Telegram, custom HTTP, etc.) plus the appport-agent's per-user delegation and `POST /work` already provide "a surface hands the agent a request"; the Multiplayer bridge contract would not be re-implemented. Preserve its invariants as tests (see port notes).
+
+### PO-37 Owner's interaction list — AnywhereAide — Internal only
+
+- `feltkit/interactions.ts:450`; `interactions.read`. PersonalOS Settings/Activity view.
+
+### PO-38 Invocation submit — AnywhereAide — Duplicate
+
+- `feltkit/invocations.ts:47` (validated envelope `personalos.invocation/1`, `_invocation.ts`; idempotent per (person, invocationId), digest-checked; queues `invocation.process`), job `:118` (interpret → AuthBoundry decide → research | assistant | save | answer). Shared content is data, never instructions.
+- Clients: Chrome extension `extension/src/summonform.tsx:26`, iOS `ios/Shared/PersonalOSClient.swift:76`.
+- Tests: `tests/invocations.test.ts` (13), `tests/browser-summon.test.ts` (9), `continuity.test.ts`. Complete.
+- **Rationale:** the destination's `POST /work` route + FeltDB durable work records already accept a person's durable, idempotent submission; the envelope's content-as-data and context validation rules should carry over as tests.
+
+### PO-39 Run a waiting invocation — AnywhereAide — Internal only
+
+- `feltkit/invocations.ts:85`: an answer asked from a surface waits for the owner (`needs_approval`, `waitingFor: owner`) and runs from their own session. Tests: x.test.ts "4: an answer asked from X waits for the owner…". Owner approval UI.
+
+### PO-40 Invocation receipts — AnywhereAide — Duplicate
+
+- `feltkit/invocationstate.ts:97,108`; `invocations.read`. Receipt: state accepted|processing|needs_approval|completed|failed, work refs. Duplicates the destination's work-record status.
+
+### PO-41 X mention intake (@anywhereaide) — AnywhereAide — Integration required
+
+- **Source:** `feltkit/xsurface.ts:86` startPolling / `:100` stopPolling (xadapter session), `:170` poll job (`x.poll`, backoff `nextDelay`, cursor `sinceId`, baseline so old mentions aren't requests), `:249` receive (one record per post id; link code / unlinked / linked → invocation surface `x`); parsing `_x.ts`. X integration `app.ts:261` (OAuth2 PKCE bot credential managed by FeltKit: refresh, rotation, revoke).
+- **Auth:** role `xadapter` (`x.read`, `x.poll`, `x.receive`); author resolved via Resolver link; AuthBoundry per intent.
+- **Effect:** read X, write FeltDB, execute (invocations), external-state (generic public acknowledgement replies). Unlinked authors get no reply.
+- **Tests:** `tests/x.test.ts` (14), `tests/x-authboundry-real.test.ts` (skipped), fixture `tests/fixtures/x-api.ts`.
+- **Rationale:** eve has no X channel (`/home/user/eve2/docs/channels`: a2a, chat-sdk, custom, discord, eve, github, linear, linq, mcp, photon, recall, slack, teams, telegram, twilio). It would be a custom polling channel plus Resolver identity resolution and FeltKit-held OAuth credential.
+
+### PO-42 X reply delivery — AnywhereAide — Integration required
+
+- `feltkit/xsurface.ts:493` (`x.reply` job), claim/settle `:442,457` (pending|sent|failed|unknown; an unclear post is never retried blind; rate-limit backoff); calls `x.reply` with `idempotencyKey x-reply:<postId>:<index>` (`:475`). `x.post`. Tests: x.test.ts "12: across a restart … an unclear reply is never posted twice…". Part of the X channel.
+
+### PO-43 Publish on X — AnywhereAide — Integration required
+
+- `feltkit/xsurface.ts:545`: owner's explicit text (≤1000 → publication rules), AuthBoundry `personalos.x.publish` decided; queued for delivery (PO-42); denial recorded. `x.publish`. Tests: x.test.ts "11: … publishing is only the owner's explicit, authorized act". Consequential, irreversible public post.
+- **Rationale:** requires the X channel/integration; if agent-exposed at all, only as an approval-required proposal.
+
+### PO-44 Owner's X views — AnywhereAide — Internal only
+
+- `feltkit/xsurface.ts:511` (mine), `:519` (post), `:531` (bot health). UI.
+
+### PO-45 Surface clients (Chrome extension, iOS share) — AnywhereAide — Integration required
+
+- `extension/src/{background.ts,summon.ts,summonform.tsx,sidepanel.tsx,pagebar.tsx,connect.tsx}` (MV3 side panel; captures URL/title/selection; bearer session, no cookies `nocookies.ts:8`); `ios/ShareExtension/*`, `ios/Shared/PersonalOSClient.swift` (`POST /api/mutation/invocations:submit`). Tests: `tests/browser-summon.test.ts` (capture rules, acceptance), e2e `e2e/extension.mjs`, `e2e/share-invocation.mjs`. Limitations: Chrome only, password/operator session, 7-day sessions (`docs/LIMITATIONS.md:29-35`).
+- **Rationale:** to reach an eve agent these clients must be retargeted to `POST /work` (or an eve custom channel) with eve/AuthBoundry auth.
+
+### PO-46 Resolver integrations on /appport — Internal only
+
+- `feltkit/app.ts:152` (`identity.lookup`, `identity.resolve`), `:163` (`identitylinks.put`, `identitylinks.revoke`). Published by FeltKit but every person/bridge role is refused (`app.ts:75-78`); tested: interactions.test.ts "identity security: the Resolver integrations cannot be called directly…". PersonalOS is a Resolver **client** (AppPort envelopes `_resolver.ts:89`). Keep internal.
+
+### PO-47 Outbound webhooks — Internal only
+
+- FeltKit `webhooks` service (`app.ts:124`): `task.completed`, `reminder.fired`, `document.added`, `interaction.updated` (names the interaction only). Tested: interactions.test.ts "events: an approval or cancellation emits interaction.updated…". Stays FeltKit.
+
+## Internal mechanisms (keep internal; not capabilities)
+
+- **Ops kernel** `feltkit/_ops.ts`: `me`/`actingFor` (`:30,36`, surface acts for a linked owner), `own` (NOT_FOUND isolation), `record` action log, `verify` read-back evidence, `NEEDS_APPROVAL`/`propose`/`execute` (`:286-303`).
+- **Rules interpreter** `feltkit/_interpret.ts:111` (intents, `relevance` keyword recall `:94`), dates `_dates.ts`, clock `_clock.ts`.
+- **Turn state** `feltkit/turnstate.ts:9,33,49` (idempotent user message by clientId, reply recording, context).
+- **Interaction state machine** `feltkit/_interaction.ts` (`CONTRACT`, `STATES`, `TERMINAL`, `LIMITS`, `audienceOf :125`, `threadKey`, `LINK_CODE`, `digest`).
+- **Invocation state machine** `feltkit/invocationstate.ts:122-231` (`forProcess`, `begin`, `authorityUnavailable` give-up after N, `save`, `answer`, `replyOf`, `settle`), envelope normalize/digest `_invocation.ts:127-179`, job `invocations.ts:118`.
+- **Research pipeline** `feltkit/research.ts:175` (`step`), `researchstate.ts:64-254` (`create`, `resume`, `answer`, `forStep`, `advance` compare-and-apply), model prompts/acceptance rules `_researchmodel.ts:41-225` (plan/selection/assessment; quotes checked verbatim), `_research.ts` (`notAProspect`, outcome), provider selection `_search.ts`.
+- **Capability discovery** `feltkit/_capabilities.ts:81` (`discover` from `ctx.agent.catalog`: available / not configured / not permitted / connectable).
+- **Page fetcher safety** `feltkit/_pages.ts`: private/local address refusal (`:47-68`), ports 80/443 only, robots.txt, manual redirects ≤4, 1.5 MB / 20k chars, 12 s timeout; statuses read | unavailable | extraction-failed | not-allowed.
+- **Delegation set logic** `feltkit/_delegation.ts:23` (grant-new-then-revoke-old, retry-safe).
+- **Resolver client** `feltkit/_resolver.ts` (canonical refs, `LINK_SCHEMA`, lookup/resolve/link/revoke/linkActive), `identityAgent` `links.ts:121`.
+- **X polling internals** `feltkit/xsurface.ts:109-167,430-490` (`stopForOtherAccount`, `pollState`, `botIs`, `beginPoll`, `polled`, `waitingReplies`, `claimReply`, `settleReply`), `_x.ts` parsing/`publication`.
+- **Authority mapping** `_authority.ts:16` `capabilityFor`, `authorityPrincipal`.
+
+## Port details (Contract adaptation / Integration required)
+
+Common to all Contract adaptation items:
+
+- **Existing contract:** where marked "Pub", FeltKit already serves `name@1` on `POST /appport` (+ `/mcp`), with input/output schemas from the function, `observation` for queries, `consequential` + `idempotency: supported` for mutations. **Gap:** authorization is the caller's FeltKit permission (needs the person's own session/bearer); FeltKit API keys are disabled (`docs/LIMITATIONS.md:14`). An eve agent acting _for_ a person needs these calls decided by AuthBoundry under the person's delegation to the agent — the same path `interactions.ts`/`invocations.ts` already use (`ctx.authority.decide({capability: personalos.*, onBehalfOf: user:<owner>})` + `actingFor`). Proposed: publish delegated variants under the `personalos.*` namespace whose authorization is the AuthBoundry capability, executed via `actingFor`, and record the decision (decisionId, delegationId, executor) in the action log as interactions do.
+- **Evidence to record:** PersonalOS action id + `evidence {collection,id,version,verified}` (`_ops.ts`), AuthBoundry decision (`capability, outcome, principal, onBehalfOf, delegationId, decisionId`), agent operation-ledger idempotency key, `via: "agent"` (new `Via` value; today `chat|ui|model|job`).
+- **Platform gaps:** (1) FeltKit has no on-behalf-of identity on `/appport` (`_ops.ts:24-26` comment; ANYWHERE.md platform gaps) — needs FeltKit support or a PersonalOS-side delegated capability wrapper; (2) AppPort `approval` is declarative only (FeltKit doc M1 audit): destructive ops must use FeltKit proposals (`feltkit_agent_propose`) and PersonalOS owner approval; (3) idempotency only for mutations; actions (`research.begin`) are not idempotent through AppPort.
+
+| ID    | Source to reuse                                                                                | Proposed AppPort contract                                  | Effect / idempotency                                                                                       | Input → output sketch                                                                                                  | Runtime deps                                                               | AuthBoundry permission                                                                                   | Tests to carry / write                                                                                                                         |
+| ----- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| PO-06 | tasks.ts:8                                                                                     | `personalos.tasks.list@1`                                  | observation                                                                                                | `{status?}` → `Task[]` (id,title,due,priority,status,projectId)                                                        | FeltDB                                                                     | `personalos.tasks.read`                                                                                  | assistant "DoD 7-8"; new: delegated read denied without grant                                                                                  |
+| PO-07 | tasks.ts:16, _ops.ts:107                                                                       | `personalos.tasks.create@1`                                | consequential, idempotency required (agent key)                                                            | `{title, notes?, due?, time?, timeZone, reminder?, recurrence?, priority?, projectId?}` → `{task, actionId, evidence}` | FeltDB, FeltKit jobs+notifications                                         | `personalos.tasks.create` (`personalos.reminders.create` when `reminder`)                                | "DoD 5-6", interactions "a reminder from a channel…", authboundry-real create/deny/revoke/expire                                               |
+| PO-08 | tasks.ts:25, _ops.ts:164                                                                       | `personalos.tasks.update@1`                                | consequential, idempotent                                                                                  | `{id, …fields}` → task+evidence                                                                                        | FeltDB, jobs                                                               | `personalos.tasks.update`                                                                                | "move that task to Friday"                                                                                                                     |
+| PO-09 | tasks.ts:34, _ops.ts:134                                                                       | `personalos.tasks.complete@1`                              | consequential, idempotent (complete-if-open)                                                               | `{id}` → task (+next occurrence id)                                                                                    | FeltDB, jobs, webhooks                                                     | `personalos.tasks.update`                                                                                | recurrence test                                                                                                                                |
+| PO-10 | _ops.ts:156                                                                                    | fold into `personalos.tasks.update@1` (`status: "open"`)   | consequential                                                                                              | —                                                                                                                      | FeltDB                                                                     | `personalos.tasks.update`                                                                                | new                                                                                                                                            |
+| PO-11 | _ops.ts:192,289-298                                                                            | `personalos.tasks.delete@1` (approval required → proposal) | consequential, idempotent; irreversible                                                                    | `{id}` → `{proposalId, state}`                                                                                         | FeltDB, FeltKit agent approvals                                            | `personalos.tasks.delete`                                                                                | "DoD 9", interactions approval tests                                                                                                           |
+| PO-13 | memory.ts:7                                                                                    | `personalos.memory.list@1` (+ optional `query`)            | observation                                                                                                | `{query?, kind?}` → `Memory[]` with status/provenance                                                                  | FeltDB                                                                     | `personalos.memory.read`                                                                                 | "DoD 3-4"; shared-audience privacy test                                                                                                        |
+| PO-14 | memory.ts:14, _ops.ts:212                                                                      | `personalos.memory.add@1`                                  | consequential, idempotent (dedupe exists)                                                                  | `{kind, subject, content, date?, status?}` → memory+evidence                                                           | FeltDB                                                                     | `personalos.memory.write`                                                                                | "volunteered facts are stored as inferred…"                                                                                                    |
+| PO-16 | _ops.ts:265                                                                                    | `personalos.memory.forget@1` (approval required)           | consequential; irreversible                                                                                | `{id}` → proposal                                                                                                      | FeltDB, approvals                                                          | `personalos.memory.delete`                                                                               | "forgetting needs approval too"                                                                                                                |
+| PO-17 | projects.ts:5                                                                                  | `personalos.projects.list@1`                               | observation                                                                                                | `{}` → `Project[]` (+open/done)                                                                                        | FeltDB                                                                     | `personalos.tasks.read` (no projects.read capability exists; consider adding `personalos.projects.read`) | new                                                                                                                                            |
+| PO-18 | _ops.ts:273                                                                                    | `personalos.projects.create@1`                             | consequential, idempotent                                                                                  | `{name, description?}` → project                                                                                       | FeltDB                                                                     | `personalos.projects.create`                                                                             | new (none today)                                                                                                                               |
+| PO-20 | documents.ts:16                                                                                | `personalos.documents.list@1` (metadata only)              | observation                                                                                                | `{projectId?, taskId?}` → `Doc[]`                                                                                      | FeltDB (+Files metadata)                                                   | **gap**: no `personalos.documents.read`; propose adding                                                  | "Files…" + new delegated test                                                                                                                  |
+| PO-25 | briefing.ts:24, _briefing.ts                                                                   | `personalos.briefing.today@1`                              | observation                                                                                                | `{timeZone}` → Briefing                                                                                                | FeltDB                                                                     | `personalos.tasks.read` (as `capabilityFor("briefing")`)                                                 | "DoD 7-8"                                                                                                                                      |
+| PO-30 | research.ts:64, researchstate.ts:64, research.ts:175, _pages.ts, _search.ts, _researchmodel.ts | `personalos.research.start@1`                              | consequential (creates durable run, consumes quota; no outbound contact), idempotency required (key → run) | `{goal ≤4000, conversationId?, shared?: {url,title,text}}` → `{runId, state, blockers[]}`                              | FeltKit jobs, intelligence (optional), websearch/openaisearch, page reader | `personalos.research.run` (re-checked per step)                                                          | research.test.ts ACCEPTANCE, missing capability, provider refusal, cancellation; invocations "revoking the delegation mid-run…"; pages.test.ts |
+| PO-31 | research.ts:126,135                                                                            | `personalos.research.get@1` / `.list@1`                    | observation                                                                                                | `{runId}` → run + prospects + sources (quotes with source ids)                                                         | FeltDB                                                                     | `personalos.research.run` (no separate read capability; consider `personalos.research.read`)             | "prospects keep sources and assessments apart…"                                                                                                |
+| PO-32 | research.ts:105,113                                                                            | `personalos.research.cancel@1`, `.retry@1`                 | consequential, idempotent                                                                                  | `{runId}` → RunView                                                                                                    | jobs                                                                       | `personalos.research.run`                                                                                | "cancellation stops between steps…; retry resumes"                                                                                             |
+
+Integration required:
+
+| ID    | Source to reuse                                    | Integration / contract                                                                                                                                                                                                                                                    | Runtime deps                                                        | AuthBoundry / identity                                                               | Evidence                                 | Tests                                                                | Gaps                                                                                    |
+| ----- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| PO-35 | links.ts, _resolver.ts, identityAgent links.ts:121 | eve channel senders resolved to a PersonalOS owner through Resolver `resolver.lookup@1`/`resolver.resolve@1` (read-only key); linking stays PersonalOS owner UI. No new agent-facing capability (at most `personalos.identity.resolve@1` observation for the agent host). | Resolver (`RESOLVER_URL`, `resolver-resolve` key)                   | Resolution precedes every AuthBoundry `onBehalfOf`; fail closed on ambiguous/revoked | link ref, revision, resolution outcome   | interactions.test.ts Resolver/identity tests; x.test.ts 8-10         | eve channels have no Resolver hook; mapping of eve principal ↔ `user:<owner>` undefined |
+| PO-41 | xsurface.ts:86-430, _x.ts                          | eve custom channel "x" (polling; no CRC webhook endpoint) feeding the agent; or keep FeltKit adapter and forward invocations to `POST /work`                                                                                                                              | X API v2 (`X_API_URL`), FeltKit-managed OAuth2 bot credential, jobs | xadapter-equivalent service identity; author via PO-35; AuthBoundry per intent       | post id, author id, resolution, decision | x.test.ts 1-3, 7-12, polling/backoff/renamed/other-account           | eve has no X channel; OAuth refresh/rotation is FeltKit custody                         |
+| PO-42 | xsurface.ts:442-510                                | channel outbound with claim/settle and `idempotencyKey x-reply:<postId>:<i>`                                                                                                                                                                                              | X API                                                               | `x.post` service                                                                     | reply status pending/sent/failed/unknown | x.test.ts 12                                                         | "unknown" outcome needs ledger indeterminate handling (destination ledger has it)       |
+| PO-43 | xsurface.ts:545                                    | `personalos.x.publish@1` consequential, approval-required proposal only                                                                                                                                                                                                   | X channel                                                           | `personalos.x.publish`                                                               | decision + queued reply                  | x.test.ts 11, x-authboundry-real                                     | public, irreversible; never automatic                                                   |
+| PO-45 | extension/src/_, ios/_                             | retarget `personalos.invocation/1` clients to `POST /work` (map envelope: instruction, context[] as data, returnTo)                                                                                                                                                       | eve/AuthBoundry session for the person                              | person's own session; delegation at processing                                       | invocation id, digest, surface/device    | browser-summon.test.ts, invocations.test.ts envelope/content-as-data | auth for extension (OAuth absent), envelope→work mapping                                |
+
+## Invariants worth carrying over as tests (from AnywhereAide)
+
+- Identity is the authenticated session/adapter plus a confirmed Resolver link; names, handles, text never identity (interactions.test.ts "forged identity…", x.test.ts 8-9).
+- Shared/selected content is data, never instructions (invocations.test.ts "shared content cannot instruct…", browser-summon "page content is untrusted…").
+- Shared-audience replies never carry private data (interactions.test.ts "a mention in a shared conversation never exposes…").
+- Authority decided at execution time and per step; revocation stops the next step (invocations "revoking the delegation mid-run…", continuity Scenario D).
+- Duplicate delivery executes once, across restart (interactions "duplicate and replayed delivery…", x.test.ts 7).
