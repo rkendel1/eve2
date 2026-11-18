@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 import { defineCapability, s } from "@appport/sdk";
 
@@ -44,17 +44,36 @@ const host = await startInventoryHost({
   ],
   extraPermissions: ["probe.write"],
   idempotencyFault: async (point, entry) => {
+    const planFile = process.env.PROBE_CRASH_FILE;
+    const planned =
+      planFile !== undefined && existsSync(planFile) && readFileSync(planFile, "utf8").trim();
+    if (planned === `${point} ${entry.capability}`) {
+      rmSync(planFile);
+      process.kill(process.pid, "SIGKILL");
+    }
     if (entry.key.includes(`[crash:${point}]`)) process.kill(process.pid, "SIGKILL");
   },
   port: Number(required("APPPORT_PORT")),
   provenanceFile: required("APPPORT_PROVENANCE_FILE"),
 });
-for (const delegator of (process.env.PROBE_GRANTS ?? "").split(",").filter(Boolean)) {
-  await host.authority.grant({
-    agent: AGENT_ID,
-    capabilities: ["catalog.read", "probe.write"],
-    delegator,
-  });
+const list = (name) => (process.env[name] ?? "").split(",").filter(Boolean);
+const grants = {};
+for (const delegator of list("PROBE_REVOKE")) {
+  for (const grant of await host.authority.delegations(delegator, { agent: AGENT_ID }))
+    if (grant.status === "active") await host.authority.revoke(grant.id);
 }
+for (const [names, capabilities] of [
+  [list("PROBE_GRANTS"), ["catalog.read", "catalog.reserve", "probe.write"]],
+  [list("PROBE_READ_GRANTS"), ["catalog.read"]],
+]) {
+  for (const delegator of names) {
+    if (list("PROBE_REVOKE").includes(delegator)) continue;
+    grants[delegator] = (
+      await host.authority.grant({ agent: AGENT_ID, capabilities, delegator })
+    ).id;
+  }
+}
+if (process.env.PROBE_GRANTS_FILE)
+  writeFileSync(process.env.PROBE_GRANTS_FILE, JSON.stringify(grants));
 writeFileSync(required("PROBE_AUTHORITY_PID_FILE"), String(host.authority.process.pid));
 console.log(`[probe-host] owner ${host.idempotency.owner} listening at ${host.url}`);
