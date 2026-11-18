@@ -3,7 +3,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { canonicalize } from "@appport/protocol";
 import type { CapabilityManifestEntry } from "@appport/protocol";
 
-import { sendRequest, type Caller, type InvocationResult } from "./appport";
+import { resolveCapability, sendRequest, type Caller, type InvocationResult } from "./appport";
+import { decide, type BusinessCheck, type DestinationStatus } from "./reconcile";
 import { fault } from "./faults";
 import {
   AGENT_ID,
@@ -58,6 +59,13 @@ export interface OperationRecord {
   } | null;
   readonly request_ids: readonly string[];
   readonly requester: string;
+  readonly reconciliations?: readonly {
+    readonly at: string;
+    readonly finding: string;
+    readonly reader: string;
+    readonly reason: string | null;
+    readonly request_id: string | null;
+  }[];
   readonly resolution: string | null;
   readonly retry_safety: RetrySafety;
   readonly state: OperationState;
@@ -67,8 +75,12 @@ export interface OperationRecord {
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 
+function digestOf(capability: string, version: number, input: unknown): string {
+  return `sha256:${digest(canonicalize({ capability, input, version }))}`;
+}
+
 export function inputDigest(entry: CapabilityManifestEntry, input: unknown): string {
-  return `sha256:${digest(canonicalize({ capability: entry.name, input, version: entry.latestVersion }))}`;
+  return digestOf(entry.name, entry.latestVersion, input);
 }
 
 export function operationIdFor(
@@ -207,14 +219,16 @@ async function attempt_(
 ): Promise<{ kind: "recorded"; invoked: boolean; operation: OperationRecord }> {
   let current = existing;
   const settled = { invoked: false, kind: "recorded" as const };
-  if (
-    current.state === "succeeded" ||
-    current.state === "failed" ||
-    current.state === "indeterminate"
-  ) {
+  if (current.state === "succeeded" || current.state === "failed") {
     return { ...settled, operation: current };
   }
+  if (current.state === "indeterminate") {
+    return { ...settled, operation: await reconcileOperation(current) };
+  }
   const reconciling = current.state === "executing";
+  if (reconciling && reconcilerFor(current.capability) !== undefined) {
+    return { ...settled, operation: await reconcileOperation(current) };
+  }
   if (reconciling && current.retry_safety === "none") {
     return {
       ...settled,
@@ -319,13 +333,138 @@ function idempotencyReason(result: InvocationResult): string | undefined {
 
 export async function settleAbandoned(operationId: string): Promise<OperationRecord | null> {
   const current = await readOperation(operationId);
-  if (current === null || current.state !== "executing" || current.retry_safety !== "none")
-    return current;
+  if (current === null) return current;
+  if (reconcilerFor(current.capability) !== undefined) return await reconcileOperation(current);
+  if (current.state !== "executing" || current.retry_safety !== "none") return current;
   if (current.executor === PROCESS_ID || inFlight.has(operationId)) return current;
   return await transition(current, {
     executor: null,
     resolution:
       "The attempt that started this operation stopped before its outcome was recorded, and the capability offers no idempotency key. It is not retried automatically; a person must establish whether it took effect.",
+    state: "indeterminate",
+  });
+}
+
+function reconcilerFor(capability: string): string | undefined {
+  for (const pair of (process.env.APPPORT_AGENT_RECONCILERS ?? "").split(",")) {
+    const [target, reader] = pair.split("=").map((part) => part.trim());
+    if (target === capability && reader) return reader;
+  }
+  return undefined;
+}
+
+function parseStatus(value: unknown, current: OperationRecord): DestinationStatus {
+  const status = value as Record<string, unknown> | null | undefined;
+  if (status?.kind === "committed") {
+    const operation = status.operation as { key?: unknown; input?: unknown } | undefined;
+    if (typeof operation?.key !== "string")
+      return { kind: "unknown", reason: "the destination named no operation key" };
+    return {
+      kind: "committed",
+      operation: {
+        binding: digestOf(current.capability, current.capability_version, operation.input),
+        key: operation.key,
+      },
+      receipt: typeof status.receipt === "string" ? status.receipt : null,
+      reported: status.reported ?? null,
+    };
+  }
+  if (status?.kind === "not_applied")
+    return {
+      barred: status.barred === true,
+      basis: String(status.basis ?? ""),
+      kind: "not_applied",
+    };
+  return {
+    kind: "unknown",
+    reason: `unrecognised destination status: ${JSON.stringify(value) ?? "none"}`,
+  };
+}
+
+function parseCheck(value: unknown): BusinessCheck | undefined {
+  const check = value as Record<string, unknown> | null | undefined;
+  if (check?.kind === "present") return { evidence: String(check.evidence ?? ""), kind: "present" };
+  if (check?.kind === "absent") return { evidence: String(check.evidence ?? ""), kind: "absent" };
+  if (check?.kind === "unavailable")
+    return { kind: "unavailable", reason: String(check.reason ?? "") };
+  return undefined;
+}
+
+export async function reconcileOperation(current: OperationRecord): Promise<OperationRecord> {
+  const reader = reconcilerFor(current.capability);
+  const key = current.idempotency_key;
+  const stale =
+    current.state === "executing" &&
+    current.executor !== PROCESS_ID &&
+    !inFlight.has(current.operation_id);
+  if (reader === undefined || key === null || !(stale || current.state === "indeterminate"))
+    return current;
+
+  const caller = { principalId: current.requester };
+  let status: DestinationStatus;
+  let check: BusinessCheck | undefined;
+  let requestId: string | null = null;
+  const resolved = await resolveCapability(caller, reader);
+  if (!resolved.ok || resolved.entry.effect !== "observation") {
+    status = { kind: "unknown", reason: `${reader} is not an exposed read-only capability` };
+  } else {
+    const answer = await sendRequest(caller, resolved.entry, { key }, current.work_id, undefined);
+    requestId = answer.requestId;
+    if (!answer.ok) {
+      status = { kind: "unknown", reason: `${reader} answered ${answer.error.code}` };
+    } else {
+      const output = answer.output as { status?: unknown; business?: unknown } | null;
+      status = parseStatus(output?.status, current);
+      check = parseCheck(output?.business);
+    }
+  }
+  const finding = decide({ binding: current.input_digest, key }, status, check);
+  const reconciliations = [
+    ...(current.reconciliations ?? []),
+    {
+      at: new Date().toISOString(),
+      finding: finding.kind,
+      reader,
+      reason: finding.kind === "indeterminate" ? finding.reason : null,
+      request_id: requestId,
+    },
+  ];
+  if (finding.kind === "completed") {
+    return await transition(current, {
+      executor: null,
+      outcome: {
+        error: null,
+        ok: true,
+        output: finding.reported,
+        output_digest: `sha256:${digest(canonicalize(finding.reported ?? null))}`,
+        reconciled_after_interruption: true,
+        request_id: requestId ?? "",
+      },
+      reconciliations,
+      resolution: `Established by ${reader}: the destination committed this operation (receipt ${finding.receipt ?? "none"}) and its effect is present.`,
+      state: "succeeded",
+    });
+  }
+  if (finding.kind === "not_executed") {
+    return await transition(current, {
+      executor: null,
+      outcome: {
+        error: { code: "NOT_EXECUTED", message: finding.basis, reason: null },
+        ok: false,
+        output: null,
+        output_digest: null,
+        reconciled_after_interruption: true,
+        request_id: requestId ?? "",
+      },
+      reconciliations,
+      resolution: `Established by ${reader}: not executed and barred (${finding.basis}).`,
+      state: "failed",
+    });
+  }
+  return await transition(current, {
+    executor: null,
+    reconciliations,
+    resolution: `Not established by ${reader}: ${finding.reason}. It is not retried automatically.`,
     state: "indeterminate",
   });
 }

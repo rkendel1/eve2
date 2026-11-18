@@ -20,7 +20,7 @@ Authentication, delegation and capability authorization are separate steps, each
    - it allows only on `allow`, which comes with the person's `delegation_id`;
    - any other answer is `FORBIDDEN` (`delegation_missing`, `delegation_revoked`, `delegation_expired`, and so on);
    - if AuthBoundry is unreachable the call fails closed (`INTERNAL_ERROR`).
-5. **Exposure.** Only capabilities listed in `APPPORT_AGENT_CAPABILITIES` are ever sent (the default lists only `catalog.lookup`). A capability that is not `effect: "observation"` is sent only as a durable operation within accepted work; see [Durable operations](#durable-operations).
+5. **Exposure.** Only capabilities listed in `APPPORT_AGENT_CAPABILITIES` are ever sent (the run command below lists `catalog.lookup`, `catalog.reserve` and `catalog.reservation`). A capability that is not `effect: "observation"` is sent only as a durable operation within accepted work; see [Durable operations](#durable-operations).
 6. **Provenance** goes to `APPPORT_PROVENANCE_FILE`, joined by `requestId`:
    - `authorization`: agent, person, decision, `decisionId`, `delegationId`, reason;
    - `execution`: written by the handler, only when it ran;
@@ -124,6 +124,38 @@ Transitions are compare-and-set on the record version.
 - **Calls outside accepted work.** Consequential capabilities are refused outside accepted work.
 - **A model that changes the input on retry.** That creates a new operation.
 
+## The state-changing capability: `catalog.reserve`
+
+`catalog.reserve@1` is the one capability that changes state. It reserves units of a catalog item for the requesting person, and the reserved units stop being available.
+
+| Property        | Value                                                                          |
+| --------------- | ------------------------------------------------------------------------------ |
+| Effect          | `consequential`                                                                |
+| Idempotency     | `supported`                                                                    |
+| Authorization   | Needs `catalog.reserve`, granted by the person through AuthBoundry             |
+| Idempotency key | Required (`IDEMPOTENCY_KEY_REQUIRED` otherwise). eve's operation id is the key |
+
+**State.** Inventory lives in the host's FeltDB store, `<APPPORT_HOST_DATA_DIR>/inventory`, seeded once from `catalog.json`.
+
+- A reservation commits in **one** FeltDB transaction: the item's stock goes down (compare-and-set on its version), and a `reservations` record is created.
+- The reservation records the person, the agent, the AuthBoundry `delegation_id`, the AppPort `request_id` and the idempotency key.
+- The reservation id is derived from the scoped key, so one key can never hold two reservations.
+- `catalog.lookup` reads the same state.
+
+**Reversal.** Reversal is an operator action, not a capability: `inventory.release(reservationId)` in `appport-host/inventory.mjs` restores the stock in one transaction.
+
+**Reconciliation.** This uses Stack-Agent's `decide`, ported from `chip-agent-state/src/reconcile.rs`.
+
+- **Where it applies:** an operation whose outcome eve lost (its process stopped while it was executing), or one already `indeterminate`.
+- **How it is resolved:** by **reading** `catalog.reservation@1`, never by dispatching again. That read capability is configured with `APPPORT_AGENT_RECONCILERS=catalog.reserve=catalog.reservation`.
+- **What the read reports**, for the caller's key:
+  - the destination's own record of the operation (committed with its input, or not applied);
+  - whether the reservation is still held.
+- **What the ledger concludes:**
+  - `completed` (the operation becomes `succeeded`) only if the destination committed **this** key and input **and** the effect is present;
+  - a missing reservation does not prove the operation never ran, because the host does not bar the key, so the operation stays `indeterminate`.
+- Every query is recorded in the operation's `reconciliations`.
+
 ## Durable AppPort idempotency
 
 The example host replaces AppPort's in-memory idempotency store with `appport-host/idempotency-store.mjs`. It implements AppPort's own `IdempotencyStore` interface (`get`, `set`, `claim`, `release`, `findByRequestId`) on a FeltDB collection in `<APPPORT_HOST_DATA_DIR>/idempotency`. AppPort's runtime is unchanged.
@@ -204,7 +236,9 @@ AUTHBOUNDRY_ADMIN_SECRET=<32+ chars> APPPORT_AGENT_CREDENTIAL_FILE=$PWD/.appport
 EVE_MODEL_CATALOG=bundled pnpm build
 ANTHROPIC_API_KEY=… AGENT_JWT_SECRET=<32+ chars> APPPORT_URL=http://127.0.0.1:4317/appport \
   APPPORT_AGENT_CREDENTIAL_FILE=$PWD/.appport-host/agent-credential \
-  APPPORT_AGENT_CAPABILITIES=catalog.lookup APPPORT_AGENT_WORK_DIR=$PWD/.appport-agent-work pnpm start
+  APPPORT_AGENT_CAPABILITIES=catalog.lookup,catalog.reserve,catalog.reservation \
+  APPPORT_AGENT_RECONCILERS=catalog.reserve=catalog.reservation \
+  APPPORT_AGENT_WORK_DIR=$PWD/.appport-agent-work pnpm start
 ```
 
 The host keeps AuthBoundry's state and its check credential in `APPPORT_HOST_DATA_DIR` (default `.appport-host`).
@@ -265,6 +299,15 @@ Every rejected call is checked to have no `execution` record.
   - per-person key scope;
   - no claim for an unauthenticated caller;
   - eve's ledger replaying through the durable store after both eve and the host restart;
+- **Always, `test/reserve.test.mjs`.** `catalog.reserve` end to end with the host as its own process. It covers:
+  - an authorized reservation with its delegation in provenance;
+  - Bob without the delegation, and a forged credential;
+  - a repeated request (one AppPort request), and concurrent requests (one handler run);
+  - eve crashing before invoking, and after the effect (reconciled by reading);
+  - the host crashing after the effect (uncertain across the restart, then reconciled) and after the claim (stays indeterminate);
+  - revocation;
+  - inventory totals matching every recorded outcome, and an operator release.
+- **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;
 - a replayed key after restarts runs nothing;
@@ -277,4 +320,5 @@ The scripted agent replaces `agent/lib/faults.ts` (a no-op in the real agent) to
 - an unauthenticated request gets 401;
 - Alice's answer comes through her delegation;
 - the same session continues after a kill and restart;
-- Bob is rejected.
+- Bob is rejected;
+- Alice's request to reserve 2 units of BETA-2 becomes one `catalog.reserve` operation under her delegation, and stock drops by exactly 2.

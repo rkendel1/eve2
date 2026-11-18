@@ -78,17 +78,24 @@ after(async () => {
 describe("AppPort with AuthBoundry delegation (real servers, no model)", () => {
   it("discovers the read-only capability and marks it invocable", async () => {
     const capabilities = await lib.listCapabilities({ principalId: ALICE });
-    assert.deepEqual(capabilities, [
-      {
-        authorization: ["catalog.read"],
-        description: "Reads one catalog item by SKU. Read-only.",
-        effect: "observation",
-        idempotency: "unsupported",
-        invocable: true,
-        name: "catalog.lookup",
-        version: 1,
-      },
-    ]);
+    assert.deepEqual(
+      capabilities.filter((entry) => entry.name === "catalog.lookup"),
+      [
+        {
+          authorization: ["catalog.read"],
+          description: "Reads one catalog item by SKU. Read-only.",
+          effect: "observation",
+          idempotency: "unsupported",
+          invocable: true,
+          name: "catalog.lookup",
+          version: 1,
+        },
+      ],
+    );
+    const reserve = capabilities.find((entry) => entry.name === "catalog.reserve");
+    assert.equal(reserve.effect, "consequential");
+    assert.equal(reserve.idempotency, "supported");
+    assert.equal(reserve.invocable, false);
   });
 
   it("reads the capability's contract and input schema", async () => {
@@ -275,7 +282,8 @@ describe("eve agent end to end (real Anthropic model)", { skip: ANTHROPIC_API_KE
       AGENT_JWT_SECRET,
       ANTHROPIC_API_KEY,
       APPPORT_AGENT_CREDENTIAL_FILE: agentCredentialFile,
-      APPPORT_AGENT_CAPABILITIES: "catalog.lookup",
+      APPPORT_AGENT_CAPABILITIES: "catalog.lookup,catalog.reserve,catalog.reservation",
+      APPPORT_AGENT_RECONCILERS: "catalog.reserve=catalog.reservation",
       APPPORT_AGENT_WORK_DIR: join(scratch, "work"),
       APPPORT_URL,
       PORT: "0",
@@ -349,5 +357,46 @@ describe("eve agent end to end (real Anthropic model)", { skip: ANTHROPIC_API_KE
           (entry.kind !== "request" || (!entry.success && entry.principal === BOB)),
       ),
     );
+  });
+
+  it("reserves stock as a durable operation under Alice's delegation", async () => {
+    const grant = await host.authority.grant({
+      agent: AGENT_ID,
+      capabilities: ["catalog.read", "catalog.reserve"],
+      delegator: ALICE,
+    });
+    const before = (await host.inventory.item("BETA-2")).quantity;
+    const submitted = await fetch(new URL("/work", agent.url), {
+      body: JSON.stringify({ objective: "Please reserve 2 units of SKU BETA-2 for me." }),
+      headers: {
+        authorization: `Bearer ${signAgentJwt("alice")}`,
+        "content-type": "application/json",
+        "idempotency-key": "real-model-reserve",
+      },
+      method: "POST",
+    });
+    const { workId } = await submitted.json();
+    let work;
+    await waitFor(
+      async () => {
+        const response = await fetch(new URL(`/work/${workId}`, agent.url), {
+          headers: { authorization: `Bearer ${signAgentJwt("alice")}` },
+        });
+        work = await response.json();
+        return work.status === "completed" || work.status === "blocked";
+      },
+      { attempts: 1800 },
+    );
+    assert.equal(work.status, "completed", JSON.stringify(work.decisions));
+    const reserves = work.operations.filter(
+      (operation) => operation.capability === "catalog.reserve",
+    );
+    assert.equal(reserves.length, 1);
+    assert.equal(reserves[0].state, "succeeded");
+    assert.equal((await host.inventory.item("BETA-2")).quantity, before - 2);
+    const decision = provenance().find(
+      (entry) => entry.kind === "authorization" && entry.requestId === reserves[0].requestIds[0],
+    );
+    assert.equal(decision.delegationId, grant.id);
   });
 });

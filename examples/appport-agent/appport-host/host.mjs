@@ -7,6 +7,7 @@ import { AppPortError, createApplication, createServer, defineCapability, s } fr
 import { serve } from "@appport/sdk/node";
 
 import { createDurableIdempotencyStore } from "./idempotency-store.mjs";
+import { InventoryRefusal, openInventory } from "./inventory.mjs";
 
 export const APPLICATION_ID = "inventory";
 export const AGENT_ID = "agent:appport-agent";
@@ -39,7 +40,7 @@ export async function startInventoryHost({
   port = 4317,
   provenanceFile,
 }) {
-  const permissions = ["catalog.read", ...extraPermissions];
+  const permissions = ["catalog.read", "catalog.reserve", ...extraPermissions];
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const checkCredentialFile = join(dataDir, "check-credential");
   const record = (entry) =>
@@ -51,6 +52,10 @@ export async function startInventoryHost({
   const idempotency = createDurableIdempotencyStore({
     fault: idempotencyFault,
     path: join(dataDir, "idempotency"),
+  });
+  const inventory = await openInventory({
+    path: join(dataDir, "inventory"),
+    seed: JSON.parse(readFileSync(here("./catalog.json"), "utf8")).items,
   });
 
   const authority = await startLocalAuthority({
@@ -139,7 +144,7 @@ export async function startInventoryHost({
     authorization: ["catalog.read"],
     input: s.object({ sku: s.string() }),
     output: s.object({ sku: s.string(), name: s.string(), quantity: s.integer() }),
-    handler({ sku }, ctx) {
+    async handler({ sku }, ctx) {
       record({
         capability: "catalog.lookup",
         delegationId: ctx.authorizationDecision?.evidenceId ?? null,
@@ -147,17 +152,127 @@ export async function startInventoryHost({
         onBehalfOf: ctx.principal?.id ?? null,
         requestId: ctx.requestId,
       });
-      const { items } = JSON.parse(readFileSync(here("./catalog.json"), "utf8"));
-      const item = items.find((entry) => entry.sku === sku);
-      if (item === undefined) throw new Error(`No catalog item has SKU ${sku}.`);
-      return item;
+      const item = await inventory.item(sku);
+      if (item === null) throw new Error(`No catalog item has SKU ${sku}.`);
+      return { name: item.name, quantity: item.quantity, sku: item.sku };
+    },
+  });
+
+  const scopedKey = (ctx, key) => `${ctx.session?.id ?? "anonymous"}|catalog.reserve@1|${key}`;
+
+  const catalogReserve = defineCapability({
+    name: "catalog.reserve",
+    version: 1,
+    description:
+      "Reserves units of one catalog item for the requesting person; the reserved units are no longer available. Requires an idempotencyKey: one key reserves at most once.",
+    effect: "consequential",
+    idempotency: "supported",
+    authorization: ["catalog.reserve"],
+    input: s.object({ quantity: s.integer(), sku: s.string() }),
+    output: s.object({
+      quantity: s.integer(),
+      remaining: s.integer(),
+      reservation_id: s.string(),
+      sku: s.string(),
+    }),
+    async handler({ quantity, sku }, ctx) {
+      if (ctx.idempotencyKey === undefined)
+        throw new AppPortError("INVALID_REQUEST", "catalog.reserve requires an idempotencyKey.", {
+          details: { reason: "IDEMPOTENCY_KEY_REQUIRED" },
+        });
+      if (!Number.isInteger(quantity) || quantity < 1)
+        throw new AppPortError("INVALID_INPUT", "quantity must be a positive integer.");
+      let reservation;
+      try {
+        reservation = await inventory.reserve({
+          agent: ctx.principal?.attributes?.agent ?? null,
+          delegationId: ctx.authorizationDecision?.evidenceId ?? null,
+          idempotencyKey: ctx.idempotencyKey,
+          principal: ctx.principal?.id ?? null,
+          quantity,
+          requestId: ctx.requestId,
+          scopedKey: scopedKey(ctx, ctx.idempotencyKey),
+          sku,
+        });
+      } catch (error) {
+        if (error instanceof InventoryRefusal)
+          throw new AppPortError(error.code, error.message, { details: { reason: error.reason } });
+        throw error;
+      }
+      record({
+        capability: "catalog.reserve",
+        delegationId: reservation.delegation_id,
+        kind: "execution",
+        onBehalfOf: reservation.principal,
+        requestId: ctx.requestId,
+        reservationId: reservation.reservation_id,
+      });
+      const item = await inventory.item(sku);
+      return {
+        quantity: reservation.quantity,
+        remaining: item.quantity,
+        reservation_id: reservation.reservation_id,
+        sku: reservation.sku,
+      };
+    },
+  });
+
+  const catalogReservation = defineCapability({
+    name: "catalog.reservation",
+    version: 1,
+    description:
+      "Reports, for one idempotency key of the caller, whether catalog.reserve applied it and whether the reservation is held. Read-only; it never reserves.",
+    effect: "observation",
+    authorization: ["catalog.read"],
+    input: s.object({ key: s.string() }),
+    output: s.unknown(),
+    async handler({ key }, ctx) {
+      const reservation = await inventory.reservation(scopedKey(ctx, key));
+      if (reservation === null) {
+        return {
+          business: { evidence: "no reservation exists for this key", kind: "absent" },
+          status: {
+            barred: false,
+            basis: "no reservation was recorded for this key",
+            kind: "not_applied",
+          },
+        };
+      }
+      const item = await inventory.item(reservation.sku);
+      const held =
+        reservation.status === "held" && item !== null && item.reserved >= reservation.quantity;
+      return {
+        business: held
+          ? {
+              evidence: `${reservation.quantity} of ${reservation.sku} held as ${reservation.reservation_id}; ${item.reserved} reserved in total`,
+              kind: "present",
+            }
+          : {
+              evidence: `reservation ${reservation.reservation_id} is ${reservation.status}`,
+              kind: "absent",
+            },
+        status: {
+          kind: "committed",
+          operation: {
+            input: { quantity: reservation.quantity, sku: reservation.sku },
+            key: reservation.idempotency_key,
+          },
+          receipt: reservation.reservation_id,
+          reported: {
+            quantity: reservation.quantity,
+            remaining: item?.quantity ?? null,
+            reservation_id: reservation.reservation_id,
+            sku: reservation.sku,
+          },
+        },
+      };
     },
   });
 
   const application = createApplication({
     application: { id: APPLICATION_ID, name: "Inventory", version: "1.0.0" },
     authorizer: delegatedAuthority,
-    capabilities: [catalogLookup, ...extraCapabilities],
+    capabilities: [catalogLookup, catalogReserve, catalogReservation, ...extraCapabilities],
     idempotency,
     mode: "production",
     telemetry: { record: (entry) => record({ ...entry, kind: "request" }) },
@@ -185,10 +300,12 @@ export async function startInventoryHost({
   return {
     authority,
     idempotency,
+    inventory,
     async close() {
       await running.close();
       await authority.close();
       await idempotency.close();
+      await inventory.close();
     },
     url: running.url,
   };

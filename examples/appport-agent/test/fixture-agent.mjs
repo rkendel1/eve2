@@ -18,6 +18,20 @@ export default defineAgent({
         return toolResults.length === 0
           ? { toolCalls: [{ name: "await_approval", input: {} }] }
           : "Approved.";
+      const reserve = /Reserve (\\d+) of (\\S+)/u.exec(String(lastUserMessage));
+      if (reserve !== null) {
+        const calls = String(lastUserMessage).includes("[repeat]") ? 2 : 1;
+        if (toolResults.length < calls)
+          return {
+            toolCalls: [
+              {
+                name: "appport_invoke",
+                input: { input: { quantity: Number(reserve[1]), sku: reserve[2] }, name: "catalog.reserve" },
+              },
+            ],
+          };
+        return "Reserved: " + JSON.stringify(toolResults.map((entry) => entry.output));
+      }
       const apply = /Apply (\\S+) via (\\S+)/u.exec(String(lastUserMessage));
       if (apply !== null) {
         const message = String(lastUserMessage);
