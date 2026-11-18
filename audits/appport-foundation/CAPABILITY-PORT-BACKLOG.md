@@ -220,14 +220,11 @@ Personal OS asserts the person with its own ES256 identity token, and keeps the 
 
 **Not live-verified:** real X (stand-in only) and the Multiplayer side (the bridge was played by the test).
 
-## 7. voice-agent delegated tools (EXT)
+## 7. voice-agent delegated tools (EXT). **Closed, not applicable:** [VOICE-AGENT-DELEGATED-TOOLS-REPORT.md](VOICE-AGENT-DELEGATED-TOOLS-REPORT.md)
 
-OA-voice-03–08, 10 are already published, but bound to a runtime principal. Rebinding them to delegation follows the 2.0 pattern. Realtime phone voice (OA-voice-02) and transfer (OA-voice-09) are integration work in voice-agent, after the delegated tools.
+The source inspection found a category error in this item. voice-agent is a multi-tenant business receptionist: the public calls a business, and its tools (OA-voice-03–08, 10) act for that business on the business's data, under voice-agent's own agent-profile grants. There is no authenticated person on a call; caller ID is not authentication.
 
-**Acceptance:**
-
-- [ ] A booking made by the agent carries the business owner's delegation.
-- [ ] Revoking it stops bookings.
+The tools stay business-scoped. No code changed. The two directions this item implied are deferred below, each with its prerequisite.
 
 ## 8. Contract-verified replacement (CORE)
 
@@ -245,17 +242,19 @@ OA-voice-03–08, 10 are already published, but bound to a runtime principal. Re
 
 ## Deferred, or needs a decision
 
-| Item                                                                   | Why deferred                                                   | Decision needed                                |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------- |
-| Foundry evidence check (OA-foundry-14)                                 | AGPL: re-implement only                                        | Fold into 4b, or drop                          |
-| Foundry coding, approvals and projects (OA-foundry-01–03)              | Duplicates eve sandboxes and approvals except the network path | Is Foundry a product to integrate, or retired? |
-| IMAP email (OA-foundry-15)                                             | No mailbox exists anywhere in the platform                     | Is email in Personal OS's scope?               |
-| Office host tools (ai-office 01–04)                                    | UNLICENSED, outside the ecosystem                              | Owner and license                              |
-| saaskit reserve/commit/release and spending authority (OA-prod-06, 07) | Overlaps `catalog.reserve` and per-delegation budgets          | Where budgets live                             |
-| Workflow mining (SA-42)                                                | No use case                                                    | A measured benefit                             |
-| Document extraction (OA-atomic-03), vision (OA-atomic-13)              | Runtime dependencies; multimodal support unverified            | Where extraction runs                          |
-| Compute and PAX (OA-foundry-04–06)                                     | Ownership unknown                                              | Are they platform services?                    |
-| Credential path policy (SA-33)                                         | No file tools enabled                                          | Revisit when they are                          |
+| Item                                                                   | Why deferred                                                                                  | Decision needed                                                                                                                      |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Foundry evidence check (OA-foundry-14)                                 | AGPL: re-implement only                                                                       | Fold into 4b, or drop                                                                                                                |
+| Foundry coding, approvals and projects (OA-foundry-01–03)              | Duplicates eve sandboxes and approvals except the network path                                | Is Foundry a product to integrate, or retired?                                                                                       |
+| IMAP email (OA-foundry-15)                                             | No mailbox exists anywhere in the platform                                                    | Is email in Personal OS's scope?                                                                                                     |
+| Office host tools (ai-office 01–04)                                    | UNLICENSED, outside the ecosystem                                                             | Owner and license                                                                                                                    |
+| saaskit reserve/commit/release and spending authority (OA-prod-06, 07) | Overlaps `catalog.reserve` and per-delegation budgets                                         | Where budgets live                                                                                                                   |
+| Workflow mining (SA-42)                                                | No use case                                                                                   | A measured benefit                                                                                                                   |
+| Document extraction (OA-atomic-03), vision (OA-atomic-13)              | Runtime dependencies; multimodal support unverified                                           | Where extraction runs                                                                                                                |
+| Compute and PAX (OA-foundry-04–06)                                     | Ownership unknown                                                                             | Are they platform services?                                                                                                          |
+| Credential path policy (SA-33)                                         | No file tools enabled                                                                         | Revisit when they are                                                                                                                |
+| Business-owner delegation of voice-agent tools (OA-voice-03–08, 10)    | FeltKit's delegated `/appport` carries no tenancy; voice-agent's FeltKit (0.3.19) predates it | Its own approved slice: tenant-scoped delegation in FeltKit with a business-as-principal authority model. Not on the current roadmap |
+| Personal OS by phone                                                   | No caller verification: caller ID is not identity                                             | A product decision on caller verification first (an unapproved direction)                                                            |
 
 ## Not to be ported
 

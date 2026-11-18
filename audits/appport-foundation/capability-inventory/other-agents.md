@@ -95,7 +95,7 @@ Shared facts for VA-03…VA-10 (model tools):
 | OA-voice-12 | Tool-invocation ledger                   | Per-call idempotency + allowed/failed record + denied-tool record (`gateway:toolDenied`, `feltkit/gateway.ts:447`)       | `tools.ts:35-66`, `invocations` collection `feltkit/app.ts:326`                                                                          | —                                                                  | write                                             | complete | **Duplicate** — the destination's durable operation ledger plus AuthBoundry decision records cover this.                                                                              |
 | OA-voice-13 | Operator surfaces                        | `calls.intervene`, `conversations.reply`, `numbers.attach`, `business.configure`, `agents.configure`                     | `feltkit/calls.ts:97`, `conversations.ts:65`, `numbers.ts`, `business.ts:75`, `agents.ts:52`                                             | staff UI/admin                                                     | write                                             | complete | **Internal only** — human/admin surfaces, not agent tools.                                                                                                                            |
 
-**Port block — OA-voice-03…10 (one AppPort contract family, already published by the app):**
+**Port block — OA-voice-03…10 (one AppPort contract family, already published by the app).** _Slice 7: reclassified **business-scoped**, outside the person-delegation path, and stays in voice-agent ([assessment](../VOICE-AGENT-DELEGATED-TOOLS-REPORT.md)). The notes below were the original plan._
 
 - **Source:** `voice-agent/feltkit/tools.ts`.
 - **Contracts:** keep the existing names, versioned as `contacts.lookup@1` … `conversations.history@1`. Effects: lookup/info/availability/history = observation (idempotent); book/followups/sms/transfer = consequential.
@@ -235,7 +235,7 @@ These repos are not agents, but each already publishes AppPort capabilities (and
 
 **Top port candidates:**
 
-1. **voice-agent OA-voice-03…10** — Contract adaptation of already-published AppPort caps. The work is a principal/delegation remap plus an idempotency-key remap.
+1. **voice-agent OA-voice-03…10** — _Reclassified in slice 7: business-scoped, not a person-delegation port._ Originally: contract adaptation of already-published AppPort caps (a principal/delegation remap plus an idempotency-key remap).
 2. **voice-agent OA-voice-02** — realtime ConversationRelay voice. Integration required: a capability eve lacks.
 3. **Foundry OA-foundry-14** (Jev evidence gate). Contract adaptation, re-implemented because of AGPL.
 4. **Foundry coding/approvals AppPort contract** (OA-foundry-01/02). Integration required for desktop reachability and AuthBoundry auth.
