@@ -8,6 +8,7 @@ import {
   HANDOFF_SECTIONS,
   initAgentDevHandoff,
   initAgentInstructions,
+  describeModelRouting,
   initAgentReadySummary,
   initExtensionHandoff,
   initExtensionInstructions,
@@ -48,9 +49,13 @@ describe("initAgentInstructions", () => {
 });
 
 describe("initAgentReadySummary", () => {
-  it("reports the model and generated instructions path", () => {
+  it("reports the model, its routing, and generated instructions path", () => {
     expect(stripAnsi(initAgentReadySummary(undefined, "/app"))).toBe(
-      "✓ Model openai/gpt-6-luna-fast (eve default)\n✓ Instructions /app/agent/instructions.md",
+      [
+        "✓ Model openai/gpt-6-luna-fast (eve default)",
+        `  ${describeModelRouting("openai/gpt-6-luna-fast")}`,
+        "✓ Instructions /app/agent/instructions.md",
+      ].join("\n"),
     );
     expect(stripAnsi(initAgentReadySummary("openai/gpt-5.5", "/app"))).toContain(
       "✓ Model openai/gpt-5.5\n",
@@ -58,9 +63,28 @@ describe("initAgentReadySummary", () => {
   });
 
   it("reports the agents directory for a workspace", () => {
-    expect(stripAnsi(initAgentReadySummary(undefined, "/app", { workspace: true }))).toBe(
-      "✓ Model openai/gpt-6-luna-fast (eve default)\n✓ Agents /app/agents",
+    expect(stripAnsi(initAgentReadySummary(undefined, "/app", { workspace: true }))).toContain(
+      "✓ Agents /app/agents",
     );
+  });
+});
+
+describe("describeModelRouting", () => {
+  it("names AI Gateway and the direct-provider switch for a gateway model ID", () => {
+    const routing = describeModelRouting("openai/gpt-6-luna-fast");
+    expect(routing).toContain("Vercel AI Gateway");
+    expect(routing).toContain("AI_GATEWAY_API_KEY");
+    expect(routing).toContain("eve set model anthropic-api/claude-sonnet-5");
+  });
+
+  it.each([
+    ["anthropic-api/claude-sonnet-5", "ANTHROPIC_API_KEY"],
+    ["openai-api/gpt-6-luna-fast", "OPENAI_API_KEY"],
+    ["chatgpt/gpt-6-luna-fast", "/login"],
+  ])("describes %s without AI Gateway", (selection, credential) => {
+    const routing = describeModelRouting(selection);
+    expect(routing).toContain(credential);
+    expect(routing).not.toContain("Gateway");
   });
 });
 

@@ -229,7 +229,7 @@ export default eveChannel({
 });
 ```
 
-In production, `placeholderAuth()` returns a structured `401`, so a generated web chat app can report that auth isn't configured. Replace it with your app's `AuthFn` or a shipped helper before browser callers reach production. Without an authored channel file, eve uses the same `[vercelOidc(), localDev(), placeholderAuth()]` policy, which also rejects production traffic.
+In production, on Vercel or a self-hosted `eve start` server, `placeholderAuth()` returns a structured `401` with code `eve_production_auth_not_configured`, so a generated web chat app can report that auth isn't configured. Under `eve dev` and on Vercel preview deployments it is skipped. Replace it with your app's `AuthFn` or a shipped helper before browser callers reach production. Without an authored channel file, eve uses the same `[vercelOidc(), localDev(), placeholderAuth()]` policy, which also rejects production traffic.
 
 You don't have to keep `vercelOidc()`. For a self-hosted app, an app-embedded frontend, or a non-Vercel identity system, use `httpBasic()`, `jwtHmac()`, `jwtEcdsa()`, generic `oidc()`, or a custom `AuthFn`. A custom `AuthFn` maps your verified user, session, or API key to a `SessionAuthContext`.
 

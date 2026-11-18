@@ -45,17 +45,13 @@ Run the process under the same process manager or container platform you use for
 
 ### Build inside a container image
 
-A `RUN eve build` step in a Dockerfile usually has no Docker daemon, so the build records no sandbox provider, even when the running container later mounts `/var/run/docker.sock`. Select `DockerSandbox.environment()` explicitly in that setup:
+`eve build` prepares Docker sandbox templates on the Docker daemon it can reach, and the server only uses templates that already exist on its own daemon. A `RUN eve build` step in a Dockerfile usually has no Docker daemon. `DefaultSandbox` then records no provider, and an explicit `DockerSandbox.environment()` fails the build. Choose one of these setups:
 
-```typescript title="agent/sandbox.ts"
-import { defineSandbox } from "eve/sandbox";
-import { DockerSandbox } from "eve/sandbox/docker";
+- Run `eve build` on the host whose Docker daemon the server will use, then copy `.output/` into the image. A container that runs `eve start` reaches that daemon by mounting `/var/run/docker.sock` or through `DOCKER_HOST`.
+- Move the template to the runtime daemon with `docker save` and `docker load`. `eve start` prints the template image name on its `sandbox:` line.
+- Select a provider that does not use a local Docker daemon, such as [Vercel Sandbox](/docs/sandbox/vercel) or a [custom provider](/docs/sandbox/custom-providers).
 
-export const environment = DockerSandbox.environment();
-export default defineSandbox(() => environment.open());
-```
-
-You can instead run `eve build` where Docker is reachable and copy the output into the image. See [Run the sandbox](#run-the-sandbox) for the other providers.
+`eve start` reports the sandbox it found before it serves requests. A `sandbox:` line with a warning means tool calls that open the sandbox fail.
 
 ## Configure proxy routes
 
@@ -93,14 +89,14 @@ eve remote connect --url https://your_agent.example.com
 
 ## Run the sandbox
 
-eve runs the sandbox in Docker when `eve build` can reach a Docker daemon, and records that choice in the build.
+eve runs the sandbox in Docker when `eve build` can reach a Docker daemon, and records that choice in the build. `eve start` checks that the Docker daemon is reachable and has the build's template image, and logs the result on a `sandbox:` line.
 
 A session starts its sandbox when a tool, a file attachment, or a skill's supporting files need it, and early when a client [prewarms](/docs/guides/frontend/use-eve-agent#prewarming) the session. Sessions, approvals, subagents, schedules, and authored tools that don't call `ctx.getSandbox()` work without a sandbox. Without one, a file attachment reaches the model as a text note instead of a file.
 
 To run sandboxes elsewhere, or when the build cannot reach Docker, select a provider in your sandbox module:
 
 - `VercelSandbox.environment()` creates hosted [Vercel Sandbox](/docs/sandbox/vercel) sessions from any host. Outside Vercel and without a linked project, set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID`.
-- `DockerSandbox.environment()` from `eve/sandbox/docker` selects [Docker](/docs/sandbox/docker) regardless of what the build can reach.
+- `DockerSandbox.environment()` from `eve/sandbox/docker` selects [Docker](/docs/sandbox/docker), and fails the build when Docker is unreachable instead of recording no provider.
 - `defineSandboxProvider()` connects a [custom provider](/docs/sandbox/custom-providers), such as your own container, virtual machine, or isolation service.
 
 See [Sandbox](/docs/sandbox) for provider configuration and selection order.

@@ -4,7 +4,7 @@ import { basename, join, resolve } from "node:path";
 import type { PackageManagerKind } from "../../package-manager.js";
 import { pinnedNodeEngineMajor } from "../../node-engine.js";
 import type { AgentReasoningDefinition } from "../../../shared/agent-definition.js";
-import { parseChatGptModelSelection } from "../../../shared/chatgpt-model.js";
+import { MODEL_HELPERS, parseModelHelper } from "../../../shared/model-helper.js";
 import { SUPPORTED_AUTHORED_MODULE_FILE_EXTENSIONS } from "../update/module-files.js";
 import { pathExists, writeTextFile } from "../files.js";
 import { blockingCreateInPlaceEntries } from "../create-in-place.js";
@@ -85,9 +85,10 @@ function renderAgentTemplate(
   model: string,
   reasoning: AgentReasoningDefinition | undefined,
 ): string {
-  const chatGptModelId = parseChatGptModelSelection(model);
-  if (chatGptModelId !== undefined) {
-    return `import { defineAgent } from "eve";\nimport { chatgpt } from "eve/models/openai";\n\nexport default defineAgent({\n  model: chatgpt(${JSON.stringify(chatGptModelId)}),\n${reasoningTemplateLine(reasoning)}});\n`;
+  const helperSelection = parseModelHelper(model);
+  if (helperSelection !== undefined) {
+    const { helper, id } = helperSelection;
+    return `import { defineAgent } from "eve";\nimport { ${helper} } from "${MODEL_HELPERS[helper].module}";\n\nexport default defineAgent({\n  model: ${helper}(${JSON.stringify(id)}),\n${reasoningTemplateLine(reasoning)}});\n`;
   }
   return BASE_AGENT_TEMPLATE.replaceAll("__EVE_INIT_MODEL__", model).replaceAll(
     "__EVE_INIT_REASONING__",
@@ -102,7 +103,7 @@ function reasoningTemplateLine(reasoning: AgentReasoningDefinition | undefined):
 }
 
 function renderTemplate(content: string, ctx: TemplateContext): string {
-  if (content === BASE_AGENT_TEMPLATE && parseChatGptModelSelection(ctx.model) !== undefined) {
+  if (content === BASE_AGENT_TEMPLATE && parseModelHelper(ctx.model) !== undefined) {
     return renderAgentTemplate(ctx.model, ctx.reasoning);
   }
   return content

@@ -2105,3 +2105,89 @@ describe("runInitCommand", () => {
     },
   );
 });
+
+describe("init model routing", () => {
+  async function initProject(options: Parameters<typeof runInitCommand>[3], interactive: boolean) {
+    const parentDirectory = await mkdtemp(join(tmpdir(), "eve-init-routing-"));
+    const output = logger();
+    const deps = { ...dependencies(), hasInteractiveTerminal: () => interactive };
+    await runInitCommand(output, parentDirectory, "agent", options, deps);
+    const projectPath = join(parentDirectory, "agent");
+    return {
+      agentSource: await readFile(join(projectPath, "agent/agent.ts"), "utf8"),
+      deps,
+      manifest: JSON.parse(await readFile(join(projectPath, "package.json"), "utf8")) as {
+        dependencies: Record<string, string>;
+      },
+      messages: stripAnsi(output.messages.join("\n")),
+      projectPath,
+    };
+  }
+
+  it("asks for a model provider during plain interactive init", async () => {
+    const { deps } = await initProject({}, true);
+
+    expect(deps.startInitOnboarding).toHaveBeenCalledOnce();
+    expect(deps.spawnPackageManager).toHaveBeenCalledWith(
+      "pnpm",
+      expect.any(String),
+      expect.arrayContaining(["dev", "--onboarded"]),
+    );
+  });
+
+  it("names AI Gateway routing and the direct-provider switch in plain non-interactive init", async () => {
+    const { agentSource, deps, messages } = await initProject({ nonInteractive: true }, false);
+
+    expect(deps.startInitOnboarding).not.toHaveBeenCalled();
+    expect(agentSource).toContain('model: "openai/gpt-6-luna-fast"');
+    expect(messages).toContain("✓ Model openai/gpt-6-luna-fast (eve default)");
+    expect(messages).toContain("Routes through Vercel AI Gateway with AI_GATEWAY_API_KEY");
+    expect(messages).toContain("eve set model anthropic-api/claude-sonnet-5");
+  });
+
+  it.each([
+    {
+      model: "anthropic-api/claude-sonnet-5",
+      importLine: 'import { anthropic } from "eve/models/anthropic";',
+      modelLine: 'model: anthropic("claude-sonnet-5")',
+      credential: "ANTHROPIC_API_KEY",
+    },
+    {
+      model: "openai-api/gpt-6-luna-fast",
+      importLine: 'import { openai } from "eve/models/openai";',
+      modelLine: 'model: openai("gpt-6-luna-fast")',
+      credential: "OPENAI_API_KEY",
+    },
+  ])(
+    "scaffolds $model as a direct provider with no gateway model string",
+    async ({ model, importLine, modelLine, credential }) => {
+      const { agentSource, manifest, messages, projectPath } = await initProject(
+        { model, nonInteractive: true },
+        false,
+      );
+
+      expect(agentSource).toContain(importLine);
+      expect(agentSource).toContain(modelLine);
+      expect(agentSource).not.toMatch(/model:\s*["']/);
+      expect(Object.keys(manifest.dependencies).sort()).toEqual(
+        ["@vercel/connect", "ai", "eve", "zod"].sort(),
+      );
+      expect(messages).toContain(credential);
+      expect(messages).not.toContain("Vercel AI Gateway");
+      await expect(pathExists(join(projectPath, ".vercel"))).resolves.toBe(false);
+      await expect(pathExists(join(projectPath, "vercel.json"))).resolves.toBe(false);
+    },
+  );
+
+  it("keeps an explicit AI Gateway model ID as a gateway string", async () => {
+    const { agentSource, messages } = await initProject(
+      { model: "anthropic/claude-sonnet-5", nonInteractive: true },
+      false,
+    );
+
+    expect(agentSource).toContain('model: "anthropic/claude-sonnet-5"');
+    expect(agentSource).not.toContain("eve/models/");
+    expect(messages).toContain("✓ Model anthropic/claude-sonnet-5\n");
+    expect(messages).toContain("Routes through Vercel AI Gateway");
+  });
+});

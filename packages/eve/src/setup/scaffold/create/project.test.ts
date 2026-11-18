@@ -11,6 +11,25 @@ describe("agent templates", () => {
       'import { chatgpt } from "eve/models/openai"',
     );
   });
+
+  it.each([
+    ["openai-api/gpt-6-luna-fast", "openai", "eve/models/openai", "gpt-6-luna-fast"],
+    ["anthropic-api/claude-sonnet-5", "anthropic", "eve/models/anthropic", "claude-sonnet-5"],
+  ])(
+    "authors %s as a direct provider model instead of a gateway string",
+    (slug, helper, module, id) => {
+      const source = agentTemplateFiles(slug)["agent/agent.ts"];
+      expect(source).toContain(`import { ${helper} } from "${module}"`);
+      expect(source).toContain(`model: ${helper}("${id}")`);
+      expect(source).not.toContain(slug);
+    },
+  );
+
+  it("keeps a gateway model ID as a string", () => {
+    expect(agentTemplateFiles("openai/gpt-6-luna-fast")["agent/agent.ts"]).toContain(
+      'model: "openai/gpt-6-luna-fast"',
+    );
+  });
 });
 
 describe("byok provider derivation", () => {

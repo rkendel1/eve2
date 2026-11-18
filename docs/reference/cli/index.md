@@ -27,7 +27,7 @@ The `eve` CLI scaffolds, runs, inspects, and deploys agents. Run it from the app
 
 ## CLI telemetry
 
-eve collects CLI telemetry by default. Run `eve telemetry disable` to turn it off for this machine, or set `EVE_TELEMETRY_DISABLED=1` for one command. See [CLI telemetry](/docs/reference/telemetry) for collected fields, exclusions, debug mode, and preference storage.
+CLI telemetry is off by default. Run `eve telemetry enable` to turn it on for this machine. `EVE_TELEMETRY_DISABLED=1` or `DO_NOT_TRACK=1` turns it off for one command. See [CLI telemetry](/docs/reference/telemetry) for collected fields, exclusions, debug mode, and preference storage.
 
 ## `eve init`
 
@@ -53,7 +53,7 @@ New projects use the parent workspace's package manager, or the one that launche
 
 | Flag                    | Type   | Default                                              | Description                                                                                                                   |
 | ----------------------- | ------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `--model <model>`       | string | `openai/gpt-6-luna-fast`                             | Set the root agent's AI Gateway model ID.                                                                                     |
+| `--model <model>`       | string | `openai/gpt-6-luna-fast`                             | Set the root agent's AI Gateway model ID. `openai-api/<id>` or `anthropic-api/<id>` authors a direct provider model instead.  |
 | `--reasoning <effort>`  | enum   | `high` without `--model`; otherwise provider default | Set reasoning to `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`. `provider-default` leaves the field unauthored.      |
 | `--agents <names>`      | string | unset                                                | Create a new workspace with comma-separated agent names, such as `support,research`, or add members to an existing workspace. |
 | `-y, --yes`             | flag   | off                                                  | Has no effect and prints a warning.                                                                                           |

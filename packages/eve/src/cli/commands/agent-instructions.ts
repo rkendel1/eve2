@@ -4,6 +4,7 @@ import { join } from "node:path";
 import pc from "#compiled/picocolors/index.js";
 
 import { DEFAULT_AGENT_MODEL_ID } from "#shared/default-agent-model.js";
+import { parseModelHelper, type ModelHelper } from "#shared/model-helper.js";
 
 export const SETUP_SECTIONS = [
   "intro-setup.md",
@@ -51,9 +52,23 @@ export function initAgentReadySummary(
   const authoredFiles = options.workspace
     ? `${pc.green("✓")} Agents ${pc.bold(join(projectPath, "agents"))}`
     : `${pc.green("✓")} Instructions ${pc.bold(join(projectPath, "agent/instructions.md"))}`;
-  return [`${pc.green("✓")} Model ${pc.bold(selectedModel)}${defaultLabel}`, authoredFiles].join(
-    "\n",
-  );
+  return [
+    `${pc.green("✓")} Model ${pc.bold(selectedModel)}${defaultLabel}`,
+    `  ${pc.dim(describeModelRouting(selectedModel))}`,
+    authoredFiles,
+  ].join("\n");
+}
+
+const DIRECT_MODEL_ROUTING: Record<ModelHelper, string> = {
+  chatgpt: "Calls ChatGPT through your /login subscription; local development only.",
+  openai: "Calls OpenAI directly with OPENAI_API_KEY.",
+  anthropic: "Calls Anthropic directly with ANTHROPIC_API_KEY.",
+};
+
+export function describeModelRouting(selection: string): string {
+  const helper = parseModelHelper(selection)?.helper;
+  if (helper !== undefined) return DIRECT_MODEL_ROUTING[helper];
+  return "Routes through Vercel AI Gateway with AI_GATEWAY_API_KEY or Vercel OIDC. To call a provider directly, run `eve set model anthropic-api/claude-sonnet-5` or `eve set model openai-api/gpt-6-luna-fast`.";
 }
 
 export function initAgentDevHandoff(options: { projectPath: string; devCommand: string }): string {

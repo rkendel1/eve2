@@ -39,7 +39,7 @@ function selectDefaultFileMemoryBackend(
   }
   if (probes.isEveDevelopment()) return DEVELOPMENT_BACKEND;
   throw new Error(
-    "fileMemory() requires an explicit backend outside Vercel and eve dev. Pass fileMemory({ backend }).",
+    'fileMemory() requires an explicit backend outside Vercel and eve dev. On a single self-hosted server, pass fileMemory({ backend: localFiles() }) from "eve/memory/file"; with several replicas, pass a shared backend.',
   );
 }
 

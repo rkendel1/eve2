@@ -80,8 +80,14 @@ async function isEnabled(): Promise<boolean> {
   return (
     process.env.NODE_ENV !== "test" &&
     !process.env.EVE_TELEMETRY_DISABLED &&
+    !doNotTrack() &&
     (await readEveTelemetryPreference()).enabled
   );
+}
+
+function doNotTrack(): boolean {
+  const value = process.env.DO_NOT_TRACK?.trim();
+  return value !== undefined && value !== "" && value !== "0";
 }
 
 function event(key: string, value: string): EveCliTelemetryEvent {
@@ -227,6 +233,7 @@ export function createEveCliTelemetry(version: string): EveCliTelemetry {
       if (
         process.env.NODE_ENV === "test" ||
         process.env.EVE_TELEMETRY_DISABLED ||
+        doNotTrack() ||
         !preference.enabled ||
         preference.notified ||
         !process.stderr.isTTY
