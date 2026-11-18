@@ -227,6 +227,12 @@ The same agent invokes a FeltKit application's published capabilities for the pe
 
 FeltKit decides each call with AuthBoundry as this agent, proven by its own credential, for that person and that capability, and runs the function as the person. Nothing else changes here: the ledger sends its operation id as the idempotency key, FeltKit's durable store replays it, and FORBIDDEN is a failure that is never retried.
 
+### Personal OS
+
+Personal OS's tasks, reminders and daily briefing are published FeltKit capabilities: `tasks.list`, `tasks.create`, `tasks.update`, `tasks.complete`, `tasks.reopen` and `briefing.today`. A person grants each one to the agent separately in Personal OS (`delegation.set` with `agent`), after an administrator registers the agent (`delegation.registerAgent`). Deleting a task stays the person's own act and is not available to an agent.
+
+The agent adds no task logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
+
 ## Operator settlement
 
 An `indeterminate` operation stays that way until a person resolves it. An operator settles it with:
@@ -365,6 +371,17 @@ Every rejected call is checked to have no `execution` record.
   - eve and FeltKit both killed after FeltKit applied the note: one note after restarts;
   - revocation;
   - FeltKit's audit records naming Alice, the agent, and the AuthBoundry decision and delegation.
+- **With `PERSONALOS_DIR`** (a Personal OS checkout with agent delegation, its dependencies installed, and a FeltKit with delegated `/appport`), `test/personalos.test.mjs`: real eve against a Personal OS server process (`test/personalos-host.mjs`, Personal OS's own `feltkit/` sources and installed FeltKit) with its private AuthBoundry. It covers:
+  - list, create with a reminder, update, complete and reopen, each only once granted;
+  - deletion never available;
+  - Grace never reaching Ada's tasks;
+  - revocation;
+  - a repeated call creating one task;
+  - eve and Personal OS crashing after the commit (one task);
+  - Personal OS dying before recording its answer (left indeterminate, never re-sent);
+  - the briefing reflecting eve's changes;
+  - the reminder firing through Personal OS's own job with eve stopped;
+  - eve's operation, FeltKit's audit record and Personal OS's action linked by request and decision ids.
 - **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;

@@ -56,6 +56,13 @@ const startFeltKit = (extra) =>
 async function stopFeltKit() {
   await stop(feltkit.child);
   assert.equal(groupAlive(feltkit.child.pid), false);
+  const pids = `${projectDir}.authority-pids`;
+  for (const pid of existsSync(pids)
+    ? readFileSync(pids, "utf8").split("\n").filter(Boolean).map(Number)
+    : []) {
+    if (groupAlive(pid)) process.kill(-pid, "SIGKILL");
+    await waitFor(() => !groupAlive(pid));
+  }
 }
 
 function report() {
@@ -150,6 +157,7 @@ before(async () => {
 });
 
 after(async () => {
+  if (feltkit) await stopFeltKit();
   await stopAll();
   rmSync(fixture, { force: true, recursive: true });
   rmSync(scratch, { force: true, recursive: true });

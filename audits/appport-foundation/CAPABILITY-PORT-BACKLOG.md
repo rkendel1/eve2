@@ -84,7 +84,7 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 **Contract as built:** an agent session plus `X-AppPort-On-Behalf-Of: <person>`. A capability is delegable only when listed in `authority.capabilities`, so 2a adds Personal OS's published names (`tasks.create`, …) there; today it lists only the `personalos.*` surface vocabulary. Local authority only.
 
-### 2a. Tasks, reminders and daily briefing
+### 2a. Tasks, reminders and daily briefing. **Done:** [PERSONALOS-TASKS-BRIEFING-REPORT.md](PERSONALOS-TASKS-BRIEFING-REPORT.md)
 
 |                      |                                                                                                                                                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -95,10 +95,12 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 **Acceptance:**
 
-- [ ] A person delegates tasks and the agent creates and completes a task for them.
-- [ ] Repeat and crash produce one task.
-- [ ] Revocation stops later calls.
-- [ ] The briefing reflects the change.
+- [x] A person delegates tasks and the agent creates and completes a task for them.
+- [x] Repeat and crash produce one task.
+- [x] Revocation stops later calls.
+- [x] The briefing reflects the change.
+
+**As built:** six capabilities, each granted separately: `tasks.list`, `tasks.create`, `tasks.update`, `tasks.complete`, `tasks.reopen` (newly published) and `briefing.today`. **Delete stays the person's own act**, as Personal OS's source states, and is not delegable; changing that is a product decision. Reminders remain Personal OS jobs. Running from npm still needs a FeltKit release from main (after 0.3.32).
 
 ### 2b. Memory
 
