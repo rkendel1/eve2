@@ -48,7 +48,9 @@ curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
    - `scope.project` = `inventory`.
 4. **Start the session.** Send the objective to the eve session at address = work id, with eve's delivery `idempotencyKey`.
 
-**Repeated submissions.** The same key and objective return the same work and session and run nothing again. The same key with a different objective returns `409 IDEMPOTENCY_KEY_REUSED`.
+**Repeated submissions.** The same key and objective return the same work and session and run nothing again. The same key with a different objective, or a different `readOnly`, returns `409 IDEMPOTENCY_KEY_REUSED`.
+
+**Read-only work.** A body of `{ "objective": …, "readOnly": true }` is stored in the submission. That work runs only capabilities whose manifest declares `effect: "observation"`; any other or undeclared effect is refused with `READ_ONLY_WORK` before an operation is recorded or sent, on the first call, a retry or recovery alike. The model cannot set or clear it.
 
 **Progress** is recorded by the `work` channel's event handlers as immutable FeltDB checkpoints, never overwritten:
 
@@ -60,7 +62,8 @@ curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
 
 | Outcome                                                                                      | When                                                                                                                                     |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `completed`                                                                                  | At least one invocation was authorized                                                                                                   |
+| `completed`                                                                                  | At least one invocation was authorized, and the completion gate below passes                                                             |
+| `blocked` with `blocked: not completed: <reason>`                                            | The turn would complete, but the ledger does not prove it (completion gate)                                                              |
 | `blocked` with `waiting: every AppPort invocation was rejected`                              | Every invocation was rejected                                                                                                            |
 | `blocked` with `failed: the eve turn ended failed`                                           | The turn failed                                                                                                                          |
 | `blocked` with `indeterminate: N AppPort operation(s) without an established outcome: <ids>` | An `appport_invoke` call settled while its operation's outcome is unknown (see Durable operations). The ids are what an operator settles |
@@ -69,9 +72,24 @@ When an operator settled any of the work's operations, the decision ends with `;
 
 The agent's reply is kept in the summary as the agent's claim.
 
+**Completion gate.** Every write of `completed` (a turn, recovery, settlement) is checked against the operation ledger. It requires all of the following; otherwise the work is `blocked: not completed: <reason>`:
+
+- at least one operation;
+- every operation `succeeded` or `failed`, none `prepared`, `executing` or `indeterminate`;
+- each operation requested by the submitter and consistent with any settlement;
+- at least one success, with a recorded result (`output_digest` and request id, or an operator's settled success);
+- each success cited.
+
 **Invocation evidence.** Each call is a durable operation (below). The work cites `appport_operations` records, never model text. AppPort's `traceId` is the work id, so the host's provenance carries the work id beside the AuthBoundry `delegationId`, `decisionId` and authority.
 
-**Reading work.** `GET /work/:id` returns a requester's own work only; anyone else gets 404. The response includes status, history, decisions, evidence, invocation outcomes, the recorded session, and the session eve currently holds for that address.
+**Reading work.** `GET /work/:id` returns a requester's own work only; anyone else gets 404. The response includes:
+
+- status, history, decisions and evidence;
+- invocation outcomes;
+- `ledger`: every operation, with state, contract digest and checks, effect and settlement;
+- `refusals`: calls refused before an operation existed;
+- `readOnly`;
+- the recorded session, and the session eve currently holds for that address.
 
 Only one eve process may open the work store: FeltDB holds an exclusive lock.
 
@@ -98,6 +116,13 @@ prepared ─▶ executing ─▶ succeeded | failed | indeterminate
 4. The outcome is committed from AppPort's actual response.
 
 Transitions are compare-and-set on the record version.
+
+**Contract pinning.** `prepared` records the capability's contract as AppPort's `capabilityDigest`, with that version's manifest entry and integration declaration. Before every send (the first, a retry or recovery), the current manifest is compared with AppPort's `compareManifests`, for that capability only:
+
+- the same digest, or a compatible change, is sent against the pinned entry and version. A compatible change is recorded in `contract_checks`; the pin is never replaced;
+- a breaking change, a changed integration declaration, or a contract that is gone is not sent:
+  - an operation never sent becomes `failed` (`CONTRACT_CHANGED` / `CONTRACT_UNAVAILABLE`);
+  - one sent before becomes `indeterminate` for an operator to settle.
 
 **Repeated attempts.**
 
@@ -204,14 +229,15 @@ Run it right after start: from the supervisor (for example a systemd `ExecStartP
 
 For each record, the reconciler reads eve's recorded events in process (`sessions.attach(id).stream({ follow: false })` from `eve/server`), folds them with `eve/events` selectors, and decides:
 
-| eve shows                                                    | Work becomes                                                                                 | Runs anything?               |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------- |
-| No session for the work, record `ready`, submission recorded | Submitted at its address with the original delivery key; decision `recovered: submitted…`    | Yes: the accepted turn, once |
-| No session, record not `ready`, or no submission record      | `blocked`, `indeterminate: …`                                                                | No                           |
-| A turn still running                                         | `running`; eve's own world resumes it                                                        | No                           |
-| A turn waiting on an interaction (approval)                  | `blocked`, `waiting: …`                                                                      | No                           |
-| A settled turn                                               | The live outcome rule, prefixed by `recovered: final state reconstructed from eve session …` | No                           |
-| A session that cannot be read                                | `blocked`, `indeterminate: eve session … could not be read`                                  | No                           |
+| eve shows                                                                                                                                                    | Work becomes                                                                                 | Runs anything?               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------- |
+| No session for the work, record `ready`, submission recorded                                                                                                 | Submitted at its address with the original delivery key; decision `recovered: submitted…`    | Yes: the accepted turn, once |
+| No session, record not `ready`, or no submission record                                                                                                      | `blocked`, `indeterminate: …`                                                                | No                           |
+| A turn still running                                                                                                                                         | `running`; eve's own world resumes it                                                        | No                           |
+| A turn running with no AppPort call in flight, no interaction awaited, and no session or ledger activity for `APPPORT_AGENT_STALL_AFTER_MS` (default 15 min) | `blocked`, `stalled: no progress since …`; reclassified on each pass                         | No                           |
+| A turn waiting on an interaction (approval)                                                                                                                  | `blocked`, `waiting: …`                                                                      | No                           |
+| A settled turn                                                                                                                                               | The live outcome rule, prefixed by `recovered: final state reconstructed from eve session …` | No                           |
+| A session that cannot be read                                                                                                                                | `blocked`, `indeterminate: eve session … could not be read`                                  | No                           |
 
 **Idempotent.** A pass writes only when the derived status or decision differs from the record, so repeated passes change nothing.
 
@@ -361,6 +387,14 @@ Every rejected call is checked to have no `execution` record.
   - the host crashing after the effect (uncertain across the restart, then reconciled) and after the claim (stays indeterminate);
   - revocation;
   - inventory totals matching every recorded outcome, and an operator release.
+- **Always, `test/safety.test.mjs`.** Runtime safety, with real eve, FeltDB, the host process (restarted with changed contracts) and AuthBoundry. It covers:
+  - a stalled turn, durably and after restart; an operation that takes long, not stalled;
+  - the completion gate on live and recovery paths;
+  - contract pinning with compatible, breaking and removed contracts before send, retry and recovery;
+  - read-only work, including an undeclared effect, a flipped `readOnly`, and recovery.
+
+  See [`RUNTIME-SAFETY-REPORT.md`](../../audits/appport-foundation/RUNTIME-SAFETY-REPORT.md).
+
 - **Always, `test/settle.test.mjs`.** Operator settlement, with real eve, FeltDB, the host process and AuthBoundry. It covers:
   - work blocked while an operation is indeterminate;
   - settling the host-crash-after-effect reservation as succeeded (the work completes) and the crash-after-claim one as failed (after reconciliation kept it indeterminate);

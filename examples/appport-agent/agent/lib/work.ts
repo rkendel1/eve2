@@ -72,6 +72,8 @@ export interface SubmissionRecord {
   readonly accepted_at: string;
   readonly auth: AuthResult;
   readonly objective: string;
+  /** Submitted read-only by the requester: its operations may only observe. Fixed when accepted. */
+  readonly read_only?: boolean;
   readonly requester: string;
   readonly work_id: string;
 }
@@ -89,6 +91,7 @@ export async function acceptWork(
   auth: AuthResult & { readonly principalId: string },
   idempotencyKey: string,
   objective: string,
+  readOnly = false,
 ): Promise<Acceptance> {
   const { db, state } = await workStore();
   const requester = auth.principalId;
@@ -101,6 +104,7 @@ export async function acceptWork(
           accepted_at: new Date().toISOString(),
           auth,
           objective,
+          read_only: readOnly,
           requester,
           work_id: workId,
         },
@@ -112,7 +116,8 @@ export async function acceptWork(
     }
     submission = await readSubmission(workId);
   }
-  if (submission?.objective !== objective) return { outcome: "conflict", workId };
+  if (submission?.objective !== objective || (submission.read_only === true) !== readOnly)
+    return { outcome: "conflict", workId };
   if ((await state.getTask(workId)) !== null) return { outcome: "replayed", workId };
   try {
     await state.createTask({
@@ -152,7 +157,7 @@ export async function recordedSession(workId: string): Promise<string | null> {
 }
 
 export async function readWork(requester: string, workId: string) {
-  const { state } = await workStore();
+  const { db, state } = await workStore();
   const current = await state.getTask(workId);
   if (current === null || current.task.scope.workspace !== requester) return null;
   const entries = await history(state, current.task);
@@ -174,10 +179,36 @@ export async function readWork(requester: string, workId: string) {
       state: record?.state ?? null,
     });
   }
+  // Every operation the work recorded (cited or not), with the contract it was pinned to and any drift,
+  // and every call refused before an operation existed (read-only work, an unknown contract, …).
+  const ledger = (await db.collection<Record<string, any>>(OPERATIONS).find({ work_id: workId }))
+    .sort((left, right) => String(left.created_at).localeCompare(String(right.created_at)))
+    .map((record) => ({
+      capability: record.capability,
+      contractChecks: record.contract_checks ?? [],
+      contractDigest: record.contract?.digest ?? null,
+      effect: record.effect ?? null,
+      errorCode: record.outcome?.error?.code ?? null,
+      operationId: record.operation_id,
+      resolution: record.resolution ?? null,
+      settlement: record.settlement ?? null,
+      state: record.state,
+    }));
+  const refusals = (await db.collection<Record<string, any>>(CALLS).find({ work_id: workId }))
+    .filter((link) => link.refusal)
+    .map((link) => ({
+      callId: link.call_id,
+      detail: link.detail ?? null,
+      recordedAt: link.recorded_at,
+      refusal: link.refusal,
+    }));
   return {
     agent: current.task.owner,
     createdAt: current.task.created_at,
     decisions: current.checkpoint.decisions,
+    ledger,
+    readOnly: (await readSubmission(workId))?.read_only === true,
+    refusals,
     evidence: current.checkpoint.evidence,
     history: entries.map((entry) => ({
       at: entry.created_at,
@@ -202,6 +233,64 @@ export async function readWork(requester: string, workId: string) {
 
 export type ProgressInput = Omit<AgentCheckpointInput, "actor" | "expectedVersion">;
 
+interface LedgerOperation {
+  readonly operation_id: string;
+  readonly work_id: string;
+  readonly requester: string;
+  readonly state: string;
+  readonly outcome?: {
+    readonly ok?: boolean;
+    readonly output_digest?: string | null;
+    readonly request_id?: string;
+  } | null;
+  readonly settlement?: { readonly outcome?: string } | null;
+}
+
+/**
+ * Why this work may not be recorded completed, or null. Completion rests on the ledger, never on the
+ * agent's reply: every operation the work recorded has a final state (none prepared, executing or
+ * indeterminate), each was the requester's own, at least one succeeded, each success has its result
+ * recorded (or an operator's settlement), and the checkpoint cites it.
+ */
+async function completionRefusal(
+  workId: string,
+  checkpoint: AgentCheckpoint,
+  input: ProgressInput,
+): Promise<string | null> {
+  const { db } = await workStore();
+  const submission = await readSubmission(workId);
+  if (submission === null) return "the work has no durable submission";
+  const operations = await db.collection<LedgerOperation>(OPERATIONS).find({ work_id: workId });
+  if (operations.length === 0)
+    return "no AppPort operation was recorded for it; a reply is not evidence";
+  for (const operation of operations) {
+    if (operation.state !== "succeeded" && operation.state !== "failed")
+      return `operation ${operation.operation_id} is ${operation.state}`;
+    if (operation.requester !== submission.requester)
+      return `operation ${operation.operation_id} was made for another requester`;
+    if (operation.settlement && operation.settlement.outcome !== operation.state)
+      return `operation ${operation.operation_id} contradicts its settlement`;
+  }
+  const succeeded = operations.filter((operation) => operation.state === "succeeded");
+  if (succeeded.length === 0) return "no operation succeeded";
+  const cited = new Set(
+    [...checkpoint.evidence, ...(input.evidence ?? [])].flatMap((entry) =>
+      entry.kind === "record" && entry.collection === OPERATIONS ? [entry.id] : [],
+    ),
+  );
+  for (const operation of succeeded) {
+    const recorded =
+      operation.settlement?.outcome === "succeeded" ||
+      (operation.outcome?.ok === true &&
+        typeof operation.outcome.output_digest === "string" &&
+        Boolean(operation.outcome.request_id));
+    if (!recorded) return `operation ${operation.operation_id} has no recorded result`;
+    if (!cited.has(operation.operation_id))
+      return `operation ${operation.operation_id} is not cited as evidence`;
+  }
+  return null;
+}
+
 export async function recordProgress(
   workId: string,
   build: (current: { task: AgentTask; checkpoint: AgentCheckpoint }) => ProgressInput | null,
@@ -211,8 +300,23 @@ export async function recordProgress(
     const current = await state.getTask(workId);
     if (current === null) return false;
     if (current.task.status === "completed" || current.task.status === "cancelled") return false;
-    const input = build(current);
+    let input = build(current);
     if (input === null) return false;
+    // The one place work becomes completed: every path (a turn, recovery, settlement) passes this gate.
+    if (input.status === "completed") {
+      const refusal = await completionRefusal(workId, current.checkpoint, input);
+      if (refusal !== null) {
+        const decision = `blocked: not completed: ${refusal}`;
+        if (current.task.status === "blocked" && lastDecision(current.checkpoint) === decision)
+          return false;
+        input = {
+          ...input,
+          decisions: [decision],
+          status: "blocked",
+          summary: `Blocked: ${refusal}.`,
+        };
+      }
+    }
     try {
       await state.checkpoint(workId, {
         ...input,

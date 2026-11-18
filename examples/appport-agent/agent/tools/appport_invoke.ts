@@ -43,10 +43,15 @@ export default defineTool({
       caller,
       entry: resolved.entry,
       input,
+      manifest: resolved.manifest,
       objective: submission?.objective ?? "",
       operationKey,
+      readOnly: submission?.read_only === true,
       workId,
     });
+    if (result.kind === "refused") {
+      return { error: { code: result.code, message: result.message }, ok: false };
+    }
     if (result.kind === "conflict") {
       return {
         error: { code: "OPERATION_CONFLICT", message: result.message },

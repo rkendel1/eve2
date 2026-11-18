@@ -131,9 +131,9 @@ None of the contract tooling is an agent tool.
 - **Messaging:** no X channel.
 - **Research:** no citation-tracking research store.
 - **Memory provenance:** eve's file memory has no provenance.
-- **Contract safety:** no contract pinning.
-- **Loop protection:** no loop or stuck guard.
-- **Completion:** no completion gate over recorded outcomes.
+- **Contract safety:** no contract pinning. _Since built in the destination (slice 4)._
+- **Loop protection:** no loop or stuck guard. _Slice 4 added stuck-run detection; a repeated-call guard is still absent._
+- **Completion:** no completion gate over recorded outcomes. _Since built in the destination (slice 4)._
 - **Uncertain operations:** no operator resolution of indeterminate operations.
 - **Delegation:** no cross-channel identity linking in eve, and no on-behalf-of identity on FeltKit's `/appport`.
 

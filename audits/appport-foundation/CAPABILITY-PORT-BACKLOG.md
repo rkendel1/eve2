@@ -157,18 +157,25 @@ PO-17, 18 (projects list, create) and PO-20 (documents list). Reading a document
 - **Stops:** cancellation and revocation stop further calls at the next step.
 - **Not measured:** dollars, and page reads.
 
-## 4. Runtime safety mechanisms (INT)
+## 4. Runtime safety mechanisms (INT). **Done:** [RUNTIME-SAFETY-REPORT.md](RUNTIME-SAFETY-REPORT.md)
 
 Internal mechanisms only. None is model-facing. Each is independent.
 
-| Item                                | Source                                             | Destination                                                                                             | Acceptance                                                                                                                      |
-| ----------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 4a Stuck guard (SA-30, direct port) | `chip-core/src/stuck.rs:72` and its tests          | eve hook on settled calls → `ctx.cancel("stuck: …")`                                                    | A scripted model repeating an identical failing call is cancelled at the threshold with a recorded reason; varied calls are not |
-| 4b Completion gate (SA-38)          | `host_capabilities/mod.rs:499`                     | Work completes `succeeded` only when every consequential operation in it succeeded or was settled       | Work with an indeterminate operation cannot report success                                                                      |
-| 4c Contract-digest pinning (SA-13)  | `host_capabilities/appport.rs:215`, `digest.rs:33` | `appport_invoke` refuses a consequential call when the live contract digest differs from the pinned one | Changing the host's `catalog.reserve` schema blocks reserve with a precise error; reads are unaffected                          |
-| 4d Read-only goal gating (SA-32)    | stack-agent inspect-kind                           | Work declared read-only rejects consequential capabilities before dispatch                              | A read-only work item cannot call `catalog.reserve`                                                                             |
+| Item                               | As built                                                                                                                                                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 4a Stuck-run detection             | Reconciliation classifies running work as `stalled` (blocked, never success, nothing re-sent) when no AppPort call is in flight, no interaction is awaited, and eve's session and the ledger show no progress for `APPPORT_AGENT_STALL_AFTER_MS` |
+| 4b Completion gate (SA-38)         | The single checkpoint write refuses `completed` unless the ledger shows every operation final, at least one succeeded with a recorded result or a settled success, and each is cited                                                             |
+| 4c Contract-digest pinning (SA-13) | `capabilityDigest` pinned per operation before it is prepared; verified with `compareManifests` before every dispatch, retry and recovery. Breaking or unavailable gives `failed` if never sent, or `indeterminate` if sent before               |
+| 4d Read-only work (SA-32)          | `POST /work` `readOnly`, stored in the submission. Only effect `observation` runs; other or undeclared effects are refused before anything is recorded                                                                                           |
 
-**Deferred:** credential path policy SA-33. It applies only when file tools are enabled, and the destination sets `defaultTools: false`.
+**Acceptance:**
+
+- [x] Stalled work is detected durably; an operation that takes long is not marked stalled.
+- [x] Work with an indeterminate, unresolved or unrecorded operation cannot report success, on any path.
+- [x] An incompatible contract change blocks the operation with a precise, recorded error; a compatible one proceeds with the pin kept.
+- [x] A read-only work item cannot call `catalog.reserve`, or a capability with no declared effect.
+
+**Not built:** the original 4a idea, a guard that cancels identical repeated failing calls. **Deferred:** credential path policy SA-33. It applies only when file tools are enabled, and the destination sets `defaultTools: false`.
 
 ## 5. Identity linking, then AnywhereAide (EXT)
 

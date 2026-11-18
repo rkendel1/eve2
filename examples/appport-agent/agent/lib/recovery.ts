@@ -1,4 +1,13 @@
-import { callState, calls, emptySessionView, foldEvents, reply, turns, waiting } from "eve/events";
+import {
+  callState,
+  calls,
+  emptySessionView,
+  foldEvents,
+  reply,
+  runs,
+  turns,
+  waiting,
+} from "eve/events";
 import type { SessionView } from "eve/events";
 import type { RouteHandlerArgs } from "eve/channels";
 import { sessions } from "eve/server";
@@ -8,6 +17,7 @@ import { decideOutcome } from "./operations";
 import {
   citeNew,
   lastDecision,
+  OPERATIONS,
   readSubmission,
   recordedSession,
   recordProgress,
@@ -23,7 +33,7 @@ const SUBMITTED = "recovered: submitted to eve after an interrupted submission";
 export type Execution =
   | { readonly kind: "missing" }
   | { readonly kind: "not-started" }
-  | { readonly kind: "running" }
+  | { readonly kind: "running"; readonly lastActivityAt: number; readonly inFlight: boolean }
   | { readonly kind: "waiting" }
   | {
       readonly kind: "settled";
@@ -37,9 +47,16 @@ export function observeExecution(view: SessionView): Execution {
   const last = all.at(-1);
   if (last === undefined) return { kind: "not-started" };
   if (last.status === "running") {
-    return waiting(view, last.turnId)?.on === "interaction"
-      ? { kind: "waiting" }
-      : { kind: "running" };
+    if (waiting(view, last.turnId)?.on === "interaction") return { kind: "waiting" };
+    // What eve recorded, never what the model says: the latest moment a turn, a model run or a call
+    // started or ended; and whether an AppPort operation is outstanding (an appport_invoke call running).
+    const times = [...all, ...runs(view), ...calls(view)].flatMap((entry) => [
+      entry.startedAt,
+      entry.endedAt,
+    ]);
+    const lastActivityAt = Math.max(0, ...times.flatMap((at) => (at ? [Date.parse(at)] : [])));
+    const inFlight = invokeCallsOf(view).some((call) => !call.settled);
+    return { inFlight, kind: "running", lastActivityAt };
   }
   return {
     invokeCalls: invokeCallsOf(view),
@@ -163,7 +180,19 @@ export async function reconcileWork(ops: RouteOperations, workId: string): Promi
       );
     case "not-started":
       return { action: "unchanged", decision: null, observed: "not-started", workId };
-    case "running":
+    case "running": {
+      // Stalled: nothing has happened for longer than allowed, with no AppPort operation outstanding and
+      // no interaction awaited. An operation in flight is never stalled by age alone; nothing is re-sent.
+      const lastProgressAt = Math.max(execution.lastActivityAt, await lastLedgerUpdate(workId));
+      const idleMs = Date.now() - lastProgressAt;
+      if (!execution.inFlight && idleMs > stallAfterMs()) {
+        return await mark(
+          workId,
+          "stalled",
+          "blocked",
+          `stalled: no progress since ${new Date(lastProgressAt).toISOString()} (no AppPort operation in flight, no interaction awaited)`,
+        );
+      }
       return await mark(
         workId,
         "running",
@@ -171,6 +200,7 @@ export async function reconcileWork(ops: RouteOperations, workId: string): Promi
         null,
         recorded === null ? { execution: { adapter: "eve", conversation_id: sessionId } } : {},
       );
+    }
     case "waiting":
       return await mark(
         workId,
@@ -209,6 +239,19 @@ export async function reconcileWork(ops: RouteOperations, workId: string): Promi
       };
     }
   }
+}
+
+function stallAfterMs(): number {
+  const configured = Number(process.env.APPPORT_AGENT_STALL_AFTER_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : 15 * 60_000;
+}
+
+async function lastLedgerUpdate(workId: string): Promise<number> {
+  const { db } = await workStore();
+  const operations = await db
+    .collection<{ updated_at: string; work_id: string }>(OPERATIONS)
+    .find({ work_id: workId });
+  return Math.max(0, ...operations.map((operation) => Date.parse(operation.updated_at)));
 }
 
 export async function reconcileAll(ops: RouteOperations): Promise<Reconciliation[]> {

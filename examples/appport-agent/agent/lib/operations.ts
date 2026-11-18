@@ -3,7 +3,17 @@ import { createHash, randomUUID } from "node:crypto";
 import { canonicalize } from "@appport/protocol";
 import type { CapabilityManifestEntry } from "@appport/protocol";
 
-import { resolveCapability, sendRequest, type Caller, type InvocationResult } from "./appport";
+import {
+  contractPin,
+  resolveCapability,
+  sendRequest,
+  verifyContract,
+  type Caller,
+  type ContractPin,
+  type ContractVerdict,
+  type InvocationResult,
+} from "./appport";
+import type { AppPortManifest } from "@appport/protocol";
 import { decide, type BusinessCheck, type DestinationStatus } from "./reconcile";
 import { fault } from "./faults";
 import {
@@ -67,6 +77,17 @@ export interface OperationRecord {
     readonly request_id: string | null;
   }[];
   readonly resolution: string | null;
+  /** The capability contract this operation was prepared against (AppPort `capabilityDigest`), never replaced. */
+  readonly contract?: ContractPin;
+  /** The capability's declared effect when the operation was prepared. */
+  readonly effect?: string | null;
+  /** Each time the contract served before a dispatch differed from the pinned one, and what was decided. */
+  readonly contract_checks?: readonly {
+    readonly at: string;
+    readonly verdict: ContractVerdict["kind"];
+    readonly digest: string | null;
+    readonly detail: readonly string[];
+  }[];
   readonly retry_safety: RetrySafety;
   readonly settlement?: Settlement;
   readonly state: OperationState;
@@ -137,13 +158,18 @@ export interface OperationRequest {
   readonly caller: Caller;
   readonly entry: CapabilityManifestEntry;
   readonly input: unknown;
+  /** The manifest the entry was resolved from: what the contract is pinned to, and verified against. */
+  readonly manifest: AppPortManifest;
   readonly objective: string;
   readonly operationKey: string | undefined;
+  /** The work was submitted read-only (its durable submission): only observation capabilities may run. */
+  readonly readOnly: boolean;
   readonly workId: string;
 }
 
 export type OperationResult =
   | { readonly kind: "conflict"; readonly operationId: string; readonly message: string }
+  | { readonly kind: "refused"; readonly code: string; readonly message: string }
   | { readonly kind: "recorded"; readonly invoked: boolean; readonly operation: OperationRecord };
 
 export async function runOperation(request: OperationRequest): Promise<OperationResult> {
@@ -156,6 +182,18 @@ export async function runOperation(request: OperationRequest): Promise<Operation
       operationId: "",
     };
   }
+  // Read-only work runs observations only: an effect that is anything else, or undeclared, is refused
+  // before any operation is recorded or sent. The flag is the work's own durable submission.
+  if (request.readOnly && request.entry.effect !== "observation") {
+    const message = `This work was submitted read-only; ${request.entry.name} declares effect ${request.entry.effect ?? "(none)"}, not observation.`;
+    await linkCall(request.workId, request.callId, null, "READ_ONLY_WORK", {
+      capability: request.entry.name,
+      effect: request.entry.effect ?? null,
+      message,
+    });
+    return { code: "READ_ONLY_WORK", kind: "refused", message };
+  }
+  const pin = contractPin(request.manifest, request.entry.name, request.entry.latestVersion);
   const fingerprint = inputDigest(request.entry, request.input);
   const operationId = operationIdFor(
     request.workId,
@@ -166,6 +204,14 @@ export async function runOperation(request: OperationRequest): Promise<Operation
 
   const operations = db.collection<OperationRecord>(OPERATIONS);
   if ((await operations.get(operationId)) === null) {
+    if (pin === null) {
+      const message = `The contract of ${request.entry.name}@${request.entry.latestVersion} could not be established; nothing is prepared against an unknown contract.`;
+      await linkCall(request.workId, request.callId, null, "CONTRACT_UNAVAILABLE", {
+        capability: request.entry.name,
+        message,
+      });
+      return { code: "CONTRACT_UNAVAILABLE", kind: "refused", message };
+    }
     const now = new Date().toISOString();
     const safety = retrySafetyOf(request.entry);
     try {
@@ -175,7 +221,10 @@ export async function runOperation(request: OperationRequest): Promise<Operation
           attempts: 0,
           capability: request.entry.name,
           capability_version: request.entry.latestVersion,
+          contract: pin,
+          contract_checks: [],
           created_at: now,
+          effect: request.entry.effect ?? null,
           executor: null,
           idempotency_key: safety === "idempotency-key" ? operationId : null,
           input_digest: fingerprint,
@@ -251,6 +300,53 @@ async function attempt_(
     };
   }
 
+  // The contract is verified before every dispatch, the first and any retry or recovery alike.
+  const verdict: ContractVerdict = current.contract
+    ? verifyContract(current.contract, request.manifest)
+    : { kind: "unavailable", reason: "the operation has no pinned contract" };
+  if (verdict.kind !== "same") {
+    const check = {
+      at: new Date().toISOString(),
+      detail: verdict.kind === "unavailable" ? [verdict.reason] : verdict.changes,
+      digest: verdict.kind === "unavailable" ? null : verdict.digest,
+      verdict: verdict.kind,
+    };
+    const checks = [...(current.contract_checks ?? []), check].slice(-20);
+    if (verdict.kind === "compatible") {
+      current = await transition(current, { contract_checks: checks });
+    } else {
+      const code = verdict.kind === "unavailable" ? "CONTRACT_UNAVAILABLE" : "CONTRACT_CHANGED";
+      const why = `${current.capability}@${current.capability_version} ${verdict.kind === "unavailable" ? "cannot be verified" : "changed incompatibly"} since this operation was prepared (${check.detail.join("; ").slice(0, 400)}).`;
+      // Never sent: it did not run, and is refused. Sent before (its outcome unknown): it is not sent again.
+      const neverSent = current.request_ids.length === 0 && current.state === "prepared";
+      const refusal = neverSent
+        ? {
+            outcome: {
+              error: { code, message: why, reason: null },
+              ok: false,
+              output: null,
+              output_digest: null,
+              reconciled_after_interruption: false,
+              request_id: "",
+            },
+            resolution: `Not sent: ${why}`,
+            state: "failed" as const,
+          }
+        : {
+            resolution: `Not sent again: ${why} Whether the earlier attempt took effect is not established.`,
+            state: "indeterminate" as const,
+          };
+      return {
+        ...settled,
+        operation: await transition(current, {
+          ...refusal,
+          contract_checks: checks,
+          executor: null,
+        }),
+      };
+    }
+  }
+
   await fault("operation.prepared", { objective: request.objective, workId: request.workId });
   current = await transition(current, {
     attempts: current.attempts + 1,
@@ -260,10 +356,11 @@ async function attempt_(
 
   const result: InvocationResult = await sendRequest(
     request.caller,
-    request.entry,
+    current.contract?.entry ?? request.entry,
     request.input,
     request.workId,
     current.idempotency_key ?? undefined,
+    current.capability_version,
   );
   await fault("invocation.record", { objective: request.objective, workId: request.workId });
 
@@ -566,6 +663,7 @@ async function linkCall(
   callId: string,
   operationId: string | null,
   refusal?: string,
+  detail?: Record<string, unknown>,
 ) {
   const { db } = await workStore();
   const calls = db.collection<Record<string, unknown>>(CALLS);
@@ -577,6 +675,7 @@ async function linkCall(
       operation_id: operationId,
       recorded_at: new Date().toISOString(),
       refusal: refusal ?? null,
+      detail: detail ?? null,
       work_id: workId,
     },
     id,

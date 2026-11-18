@@ -63,8 +63,13 @@ export default defineChannel({
       const key = request.headers.get("idempotency-key") ?? "";
       if (key.length === 0 || key.length > MAX_KEY_LENGTH)
         return problem(400, "IDEMPOTENCY_KEY_REQUIRED", "Send an Idempotency-Key header.");
-      const body = (await request.json().catch(() => null)) as { objective?: unknown } | null;
+      const body = (await request.json().catch(() => null)) as {
+        objective?: unknown;
+        readOnly?: unknown;
+      } | null;
       const objective = body?.objective;
+      if (body?.readOnly !== undefined && typeof body.readOnly !== "boolean")
+        return problem(400, "INVALID_READ_ONLY", "readOnly must be a boolean.");
       if (
         typeof objective !== "string" ||
         objective.length === 0 ||
@@ -73,7 +78,12 @@ export default defineChannel({
         return problem(400, "INVALID_OBJECTIVE", "objective must be a non-empty string.");
       await reconcileOnce({ from, resolveSession });
 
-      const acceptance = await acceptWork({ ...caller, principalId }, key, objective);
+      const acceptance = await acceptWork(
+        { ...caller, principalId },
+        key,
+        objective,
+        body?.readOnly === true,
+      );
       if (acceptance.outcome === "conflict")
         return problem(
           409,
