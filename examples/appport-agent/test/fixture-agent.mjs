@@ -14,6 +14,8 @@ export default defineAgent({
     provider: "acceptance",
     respond: ({ lastUserMessage, toolResults }) => {
       if (String(lastUserMessage).includes("FAIL")) throw new Error("scripted model failure");
+      // A model call that never answers: a turn that makes no progress.
+      if (String(lastUserMessage).includes("[hang]")) return new Promise(() => undefined);
       if (String(lastUserMessage).includes("[approval]"))
         return toolResults.length === 0
           ? { toolCalls: [{ name: "await_approval", input: {} }] }
@@ -78,7 +80,7 @@ export default defineAgent({
 const FIXTURE_FAULTS = `import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-export type FaultPoint = "work.accepted" | "invocation.record" | "checkpoint.final";
+export type FaultPoint = "work.accepted" | "operation.prepared" | "invocation.record" | "checkpoint.final";
 
 export interface FaultContext {
   readonly objective: string;

@@ -18,29 +18,51 @@ const applied = (entry) =>
         .filter((line) => line === entry).length
     : 0;
 
-const probe = (name, idempotency) =>
-  defineCapability({
+// PROBE_CONTRACT changes probe.applykeyed's contract for this start: "compatible" (an optional input field
+// and new words), "breaking" (a new required input field), "removed" (not served at all).
+const contract = process.env.PROBE_CONTRACT ?? "";
+// While PROBE_HOLD_FILE exists, a probe handler waits: an operation that legitimately takes long.
+const holdFile = process.env.PROBE_HOLD_FILE;
+const held = async () => {
+  while (holdFile && existsSync(holdFile)) await new Promise((resolve) => setTimeout(resolve, 50));
+};
+
+const probe = (name, idempotency, effect = "consequential") => {
+  const changed = name === "probe.applykeyed" ? contract : "";
+  return defineCapability({
     authorization: ["probe.write"],
-    description: "Test-only side effect, appended to a file outside this process.",
-    effect: "consequential",
-    handler({ token }) {
+    description:
+      changed === "compatible"
+        ? "Test-only side effect, appended to a file outside this process (reworded)."
+        : "Test-only side effect, appended to a file outside this process.",
+    ...(effect ? { effect } : {}),
+    async handler({ token }) {
+      await held();
       appendFileSync(effectsFile, `${name}:${token}\n`);
       return { applied: applied(`${name}:${token}`), token };
     },
     idempotency,
-    input: s.object({ token: s.string() }),
+    input:
+      changed === "breaking"
+        ? s.object({ reason: s.string(), token: s.string() })
+        : changed === "compatible"
+          ? s.object({ note: s.optional(s.string()), token: s.string() })
+          : s.object({ token: s.string() }),
     name,
     output: s.object({ applied: s.integer(), token: s.string() }),
     version: 1,
   });
+};
 
 const host = await startInventoryHost({
   adminSecret: required("AUTHBOUNDRY_ADMIN_SECRET"),
   agentCredentialFile: required("APPPORT_AGENT_CREDENTIAL_FILE"),
   dataDir: required("APPPORT_HOST_DATA_DIR"),
   extraCapabilities: [
-    probe("probe.applykeyed", "supported"),
+    ...(contract === "removed" ? [] : [probe("probe.applykeyed", "supported")]),
     probe("probe.applyunkeyed", "unsupported"),
+    // No declared effect: neither an observation nor a known side effect.
+    probe("probe.unclassified", "unsupported", null),
   ],
   extraPermissions: ["probe.write"],
   idempotencyFault: async (point, entry) => {

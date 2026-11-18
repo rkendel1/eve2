@@ -2,7 +2,18 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { createClient } from "@appport/client";
-import type { AppRequest, AppResponse, CapabilityManifestEntry } from "@appport/protocol";
+import {
+  canonicalize,
+  capabilityDigest,
+  compareManifests,
+  getIntegration,
+} from "@appport/protocol";
+import type {
+  AppPortManifest,
+  AppRequest,
+  AppResponse,
+  CapabilityManifestEntry,
+} from "@appport/protocol";
 import { createHttpTransport } from "@appport/transport-http";
 
 export interface Caller {
@@ -110,8 +121,77 @@ export type InvocationResult =
     };
 
 export type ResolvedCapability =
-  | { readonly ok: true; readonly entry: CapabilityManifestEntry }
+  | {
+      readonly ok: true;
+      readonly entry: CapabilityManifestEntry;
+      readonly manifest: AppPortManifest;
+    }
   | { readonly ok: false; readonly result: InvocationResult };
+
+/**
+ * One capability version's contract as AppPort defines it: `capabilityDigest` (its definition and its
+ * integration declaration, independent of every other capability), with the entry and declaration it
+ * was computed from, so a later contract can be compared with AppPort's own rules.
+ */
+export interface ContractPin {
+  readonly digest: string;
+  readonly version: number;
+  readonly entry: CapabilityManifestEntry;
+  readonly integration: unknown;
+}
+
+export function contractPin(
+  manifest: AppPortManifest,
+  name: string,
+  version: number,
+): ContractPin | null {
+  const digest = capabilityDigest(manifest, name, version);
+  const entry = manifest.capabilities.find((candidate) => candidate.name === name);
+  if (digest === undefined || entry === undefined) return null;
+  const integration = getIntegration(manifest)?.capabilities[`${name}@${version}`] ?? null;
+  return {
+    digest,
+    entry: JSON.parse(JSON.stringify(entry)) as CapabilityManifestEntry,
+    integration,
+    version,
+  };
+}
+
+export type ContractVerdict =
+  | { readonly kind: "same" }
+  | { readonly kind: "compatible"; readonly changes: readonly string[]; readonly digest: string }
+  | { readonly kind: "breaking"; readonly changes: readonly string[]; readonly digest: string }
+  | { readonly kind: "unavailable"; readonly reason: string };
+
+/**
+ * The capability contract an operation was prepared against, compared with the one served now, by
+ * AppPort's own compatibility rules (`compareManifests`, specification §43) applied to that capability
+ * alone. A contract that cannot be found, or an integration declaration that changed (which those rules
+ * do not compare here), is never taken as unchanged.
+ */
+export function verifyContract(pinned: ContractPin, manifest: AppPortManifest): ContractVerdict {
+  const current = contractPin(manifest, pinned.entry.name, pinned.version);
+  if (current === null)
+    return {
+      kind: "unavailable",
+      reason: `${pinned.entry.name}@${pinned.version} is no longer in the manifest`,
+    };
+  if (current.digest === pinned.digest) return { kind: "same" };
+  if (canonicalize(current.integration ?? null) !== canonicalize(pinned.integration ?? null))
+    return {
+      changes: ["integration declaration changed (compatibility not established)"],
+      digest: current.digest,
+      kind: "breaking",
+    };
+  const report = compareManifests(
+    { ...manifest, capabilities: [pinned.entry] },
+    { ...manifest, capabilities: [current.entry] },
+  );
+  const changes = [...report.breaking, ...report.nonBreaking].map(
+    (change) => `${change.severity}: ${change.kind} ${change.target}`,
+  );
+  return { changes, digest: current.digest, kind: report.compatible ? "compatible" : "breaking" };
+}
 
 function refused(requestId: string, code: string, message: string): InvocationResult {
   return { error: { code, message }, ok: false, requestId };
@@ -128,10 +208,10 @@ function unavailable(requestId: string, error: unknown): InvocationResult {
 export async function resolveCapability(caller: Caller, name: string): Promise<ResolvedCapability> {
   const requestId = `eve_${randomUUID()}`;
   let entry;
+  let manifest;
   try {
-    entry = (await clientFor(caller).load()).capabilities.find(
-      (candidate) => candidate.name === name,
-    );
+    manifest = (await clientFor(caller).load()) as AppPortManifest;
+    entry = manifest.capabilities.find((candidate) => candidate.name === name);
   } catch (error) {
     return { ok: false, result: unavailable(requestId, error) };
   }
@@ -145,7 +225,7 @@ export async function resolveCapability(caller: Caller, name: string): Promise<R
       ),
     };
   }
-  return { entry, ok: true };
+  return { entry, manifest, ok: true };
 }
 
 export async function sendRequest(
@@ -154,10 +234,11 @@ export async function sendRequest(
   input: unknown,
   traceId: string | undefined,
   idempotencyKey: string | undefined,
+  version: number = entry.latestVersion,
 ): Promise<InvocationResult> {
   const requestId = `eve_${randomUUID()}`;
   const request: AppRequest = {
-    capability: { name: entry.name, version: entry.latestVersion },
+    capability: { name: entry.name, version },
     input,
     protocol: "appport/1",
     requestId,
