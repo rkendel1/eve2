@@ -429,7 +429,7 @@ importers:
         version: link:../../packages/eve-agent-browser
       '@github-tools/eve-extension':
         specifier: ^0.13.0
-        version: 0.13.0(f034ce7d65284856c20db9086fd4766e)
+        version: 0.13.0(409bbedcab38f657f2df64e0c960b052)
       '@jetty/eve':
         specifier: ^0.3.1
         version: 0.3.1(eve@packages+eve)
@@ -462,7 +462,7 @@ importers:
         version: 2.12.1(@opentelemetry/api@1.9.1)
       '@posthog/ai':
         specifier: 8.19.2
-        version: 8.19.2(3c6b5700900e9e34d4d35c197eec712b)
+        version: 8.19.2(6eb47fba58aa6076f54800135f6da8f5)
       '@sanity/context-eve':
         specifier: 0.1.0
         version: 0.1.0(eve@packages+eve)
@@ -504,7 +504,7 @@ importers:
         version: 0.3.1(eve@packages+eve)
       '@vercel/connect':
         specifier: 'catalog:'
-        version: 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
+        version: 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
       '@vercel/otel':
         specifier: 'catalog:'
         version: 2.3.0(@opentelemetry/api-logs@0.223.1)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.219.0(@opentelemetry/api@1.9.1)(supports-color@10.2.2))(@opentelemetry/resources@2.12.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.223.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@2.12.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.12.1(@opentelemetry/api@1.9.1))
@@ -664,7 +664,7 @@ importers:
         version: 0.41.3
       '@vercel/connect':
         specifier: 'catalog:'
-        version: 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
+        version: 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
       ai:
         specifier: 'catalog:'
         version: 7.0.172(zod@4.6.7)
@@ -1359,7 +1359,7 @@ importers:
         version: link:../../../packages/eve-agent-browser
       '@vercel/connect':
         specifier: 2.9.2
-        version: 2.9.2(593403a60853e604f43ac19c7bf472df)
+        version: 2.9.2(b07c33892f8610a48cea1d9cfae934d9)
       '@workflow/world-postgres':
         specifier: 'catalog:'
         version: 5.3.0(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.41.0)(kysely@0.29.8)(sql.js@1.14.2)(supports-color@10.2.2)(typescript@7.0.2)
@@ -1852,6 +1852,37 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
+  examples/appport-agent:
+    dependencies:
+      '@appport/client':
+        specifier: 1.1.8
+        version: 1.1.8
+      '@appport/protocol':
+        specifier: 1.5.0
+        version: 1.5.0
+      '@appport/transport-http':
+        specifier: 1.1.8
+        version: 1.1.8
+      ai:
+        specifier: ^7.0.172
+        version: 7.0.172(zod@4.6.7)
+      eve:
+        specifier: workspace:*
+        version: link:../../packages/eve
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@appport/sdk':
+        specifier: 1.9.0
+        version: 1.9.0(@cfworker/json-schema@4.1.6)(@types/node@26.6.6)(supports-color@10.2.2)(zod@4.6.7)
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   examples/json-render-slack:
     dependencies:
       '@json-render/chat':
@@ -1999,7 +2030,7 @@ importers:
         version: 2.9.0
       '@vercel/connect':
         specifier: 'catalog:'
-        version: 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(ffe7520ccc6ea076d06aab563aa3b80c))
+        version: 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(ffe7520ccc6ea076d06aab563aa3b80c))
       '@vercel/detect-agent':
         specifier: 1.2.7
         version: 1.2.7
@@ -2171,7 +2202,7 @@ importers:
     dependencies:
       '@vercel/connect':
         specifier: 'catalog:'
-        version: 2.9.2(593403a60853e604f43ac19c7bf472df)
+        version: 2.9.2(b07c33892f8610a48cea1d9cfae934d9)
       eve:
         specifier: workspace:*
         version: link:../eve
@@ -2228,7 +2259,7 @@ importers:
         version: 1.9.1
       '@vercel/connect':
         specifier: 'catalog:'
-        version: 2.9.2(593403a60853e604f43ac19c7bf472df)
+        version: 2.9.2(b07c33892f8610a48cea1d9cfae934d9)
       eve:
         specifier: workspace:*
         version: link:../eve
@@ -2411,6 +2442,72 @@ packages:
 
   '@antfu/install-pkg@2.1.0':
     resolution: {integrity: sha512-sdg9NxU3zR4Mnawfbc/x6GB5Wf17WYud5qOuEuxXjaKpYpMkISSJEjItGebXJ2bQ4DIcly4NYH23mtkGJjvKUw==}
+
+  '@appport/authorization@1.2.0':
+    resolution: {integrity: sha512-ZKEu0Wg59aqkk31DPjj9MJyfI7ktnZB+LXeIcIJRnLzHaNUUb8uMV5oyCHl371BPh9fkThAPgNirUpJ+N5BWzg==}
+    engines: {node: '>=20'}
+
+  '@appport/client@1.1.8':
+    resolution: {integrity: sha512-jrmZaLxFV1Y2NOco/uGaDp803fXga+3++I8Jr3sALgLcNhwKskAstzoSnt4ZaPX8gcUW+XBoeb5gI1vww6cdDQ==}
+    engines: {node: '>=20'}
+
+  '@appport/core@1.8.0':
+    resolution: {integrity: sha512-LRp65qDRZzpDCzVFn3hBJz0DT4HTY/NAkX3KqsAouDmJWK+gUrINBtM06yzhF4D1O7/9VqXcIfEWTC5ymJQ58g==}
+    engines: {node: '>=20'}
+
+  '@appport/mcp@1.3.9':
+    resolution: {integrity: sha512-gevlGByGr869ORXHbyh0A0vEdTW43/4b1lCyMGV6q3pTzsWyleHPO85+CXmxEsTa0VNZWXRNic9gDdTg8AV8kg==}
+    engines: {node: '>=20'}
+
+  '@appport/mobile@1.0.12':
+    resolution: {integrity: sha512-USVhbKNARQ4FP0T3Yb2OUaU73undq0WLyo31ERmqGr79tHBuviOzCrbnVe7dqcyjcOk5OcT07MloOmKzpGb2iA==}
+    engines: {node: '>=20'}
+
+  '@appport/protocol@1.5.0':
+    resolution: {integrity: sha512-16EgkvpfweVBEiEc//NZSqtnS+f4OdwgnBRk6N2OTLFRHRljpmXCsnhAY/5JxW5+4ixDT8jEun8OUwVqkEXNxQ==}
+    engines: {node: '>=20'}
+
+  '@appport/schema@1.1.6':
+    resolution: {integrity: sha512-ENXeZ7wsSZdf93TQ3EwDgLTVLcceaS7epVxZQBwyHawBhNXosm54gHTdQC7EDZq8BipebrI9uzTuvVQxLBe06Q==}
+    engines: {node: '>=20'}
+
+  '@appport/sdk@1.9.0':
+    resolution: {integrity: sha512-epz/LDUWqLhm7DoqUgZEtGVrV8+MZ6yceH3xmT1MG/rUhsaZiKHjUnnQwzEQmKynFVfB2iIgiaLH0/OeJzPU5g==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': '>=20'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
+  '@appport/server@1.3.3':
+    resolution: {integrity: sha512-ARAq01KQUzOa4LvTrdQKqAeLitCZEiP6brCDH1xU81UqTiV5IZJJiu2Hr8pDs/+6Pfo0L87Xxz9CxkP/i6bkwg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': '>=20'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
+  '@appport/transport-electron@1.0.16':
+    resolution: {integrity: sha512-fNddiezQpDgmN8K2lpEtF+vUPoxqiZX9T2aXapdWQCOX6L+s8sx261PHVS0m4C4Q+BFwsI9KCS9eE8rPoZ1Qeg==}
+    engines: {node: '>=20'}
+
+  '@appport/transport-http@1.1.8':
+    resolution: {integrity: sha512-o4QDvxolsC5h+7qW1lwHJPNfPfV92a4aqC8h1NhUTusHDmlOBkndJ9CNErp31JkaPXjvyMda8sprgQdzXqCtCg==}
+    engines: {node: '>=20'}
+
+  '@appport/transport-inprocess@1.0.16':
+    resolution: {integrity: sha512-xEeBhTvNDHpzF9Ok+6CBwZarHkYCLVC5medwBMLpNGQdbQJiJ0XbRzd71PqywIOm0uT7xrdX3wiH0ZFYgkDo7A==}
+    engines: {node: '>=20'}
+
+  '@appport/transport-tauri@1.0.12':
+    resolution: {integrity: sha512-adrJVzUa+5mjVMe+AT3vZ50JB4FvHxe/Tf03vges0+LV7hoVVd2pJ+BBVpH2kjmNOqKcDo7PGoP6tHQwhSkdKw==}
+    engines: {node: '>=20'}
+
+  '@appport/transport-websocket@1.0.12':
+    resolution: {integrity: sha512-ZC0QX58hnEJuCTRtg1K0stajN19+kRZWxm+tHYxKufyA5SDNO9ExyKxI0MMk9r1VApOney/ixlgn09civBG9hQ==}
+    engines: {node: '>=20'}
 
   '@auth/core@0.41.3':
     resolution: {integrity: sha512-sJ3JMHHkXMD3aOjopv7mOBTO1Ocw4b0fAEXJBz6k7YHLpYQI6C40jCUPc5fNvUKxXRXNE1/sRISA15UrwWJBTw==}
@@ -4012,8 +4109,8 @@ packages:
     resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
     engines: {node: '>=20'}
 
-  '@modelcontextprotocol/sdk@1.30.0':
-    resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
+  '@modelcontextprotocol/sdk@1.32.2':
+    resolution: {integrity: sha512-SWsVtH/0vULSQStoZ6xxH2K09Li8fXYTMC64ZeogCdpZ3XSi1eCPOByV1OpuJxuI3OcmHhosDWYyii07tpPsLw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -15498,6 +15595,104 @@ snapshots:
       package-manager-detector: 1.9.0
       tinyexec: 1.3.1
 
+  '@appport/authorization@1.2.0':
+    dependencies:
+      '@appport/protocol': 1.5.0
+
+  '@appport/client@1.1.8':
+    dependencies:
+      '@appport/protocol': 1.5.0
+
+  '@appport/core@1.8.0':
+    dependencies:
+      '@appport/authorization': 1.2.0
+      '@appport/protocol': 1.5.0
+      '@appport/schema': 1.1.6
+
+  '@appport/mcp@1.3.9(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)':
+    dependencies:
+      '@appport/core': 1.8.0
+      '@appport/protocol': 1.5.0
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
+      - zod
+
+  '@appport/mobile@1.0.12':
+    dependencies:
+      '@appport/client': 1.1.8
+      '@appport/protocol': 1.5.0
+      '@appport/transport-http': 1.1.8
+      '@appport/transport-websocket': 1.0.12
+
+  '@appport/protocol@1.5.0': {}
+
+  '@appport/schema@1.1.6':
+    dependencies:
+      '@appport/protocol': 1.5.0
+
+  '@appport/sdk@1.9.0(@cfworker/json-schema@4.1.6)(@types/node@26.6.6)(supports-color@10.2.2)(zod@4.6.7)':
+    dependencies:
+      '@appport/authorization': 1.2.0
+      '@appport/client': 1.1.8
+      '@appport/core': 1.8.0
+      '@appport/mcp': 1.3.9(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
+      '@appport/mobile': 1.0.12
+      '@appport/protocol': 1.5.0
+      '@appport/schema': 1.1.6
+      '@appport/server': 1.3.3(@types/node@26.6.6)
+      '@appport/transport-electron': 1.0.16(@types/node@26.6.6)
+      '@appport/transport-http': 1.1.8
+      '@appport/transport-inprocess': 1.0.16(@types/node@26.6.6)
+      '@appport/transport-tauri': 1.0.12
+      '@appport/transport-websocket': 1.0.12
+    optionalDependencies:
+      '@types/node': 26.6.6
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - supports-color
+      - zod
+
+  '@appport/server@1.3.3(@types/node@26.6.6)':
+    dependencies:
+      '@appport/authorization': 1.2.0
+      '@appport/core': 1.8.0
+      '@appport/protocol': 1.5.0
+    optionalDependencies:
+      '@types/node': 26.6.6
+
+  '@appport/transport-electron@1.0.16(@types/node@26.6.6)':
+    dependencies:
+      '@appport/client': 1.1.8
+      '@appport/protocol': 1.5.0
+      '@appport/server': 1.3.3(@types/node@26.6.6)
+    transitivePeerDependencies:
+      - '@types/node'
+
+  '@appport/transport-http@1.1.8':
+    dependencies:
+      '@appport/client': 1.1.8
+      '@appport/protocol': 1.5.0
+
+  '@appport/transport-inprocess@1.0.16(@types/node@26.6.6)':
+    dependencies:
+      '@appport/client': 1.1.8
+      '@appport/protocol': 1.5.0
+      '@appport/server': 1.3.3(@types/node@26.6.6)
+    transitivePeerDependencies:
+      - '@types/node'
+
+  '@appport/transport-tauri@1.0.12':
+    dependencies:
+      '@appport/client': 1.1.8
+      '@appport/protocol': 1.5.0
+
+  '@appport/transport-websocket@1.0.12':
+    dependencies:
+      '@appport/client': 1.1.8
+      '@appport/protocol': 1.5.0
+
   '@auth/core@0.41.3':
     dependencies:
       '@panva/hkdf': 1.2.1
@@ -16652,13 +16847,13 @@ snapshots:
       - react-native
       - supports-color
 
-  '@github-tools/eve-extension@0.13.0(f034ce7d65284856c20db9086fd4766e)':
+  '@github-tools/eve-extension@0.13.0(409bbedcab38f657f2df64e0c960b052)':
     dependencies:
-      '@github-tools/sdk': 1.22.0(e901f5d552f734035c279de41256dc0c)
+      '@github-tools/sdk': 1.22.0(1be3c325791801f90979ab4d300e8a6a)
       eve: link:packages/eve
       zod: 4.6.7
     optionalDependencies:
-      '@vercel/connect': 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
+      '@vercel/connect': 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
     transitivePeerDependencies:
       - '@ai-sdk/workflow'
       - '@nestjs/common'
@@ -16684,14 +16879,14 @@ snapshots:
       - vite
       - workflow
 
-  '@github-tools/sdk@1.22.0(e901f5d552f734035c279de41256dc0c)':
+  '@github-tools/sdk@1.22.0(1be3c325791801f90979ab4d300e8a6a)':
     dependencies:
       ai: 7.0.172(zod@4.6.7)
       evlog: 2.35.1(acb802553a10e932a6741e513dac9848)
       octokit: 5.0.5
       zod: 4.6.7
     optionalDependencies:
-      '@vercel/connect': 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
+      '@vercel/connect': 2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)
       eve: link:packages/eve
     transitivePeerDependencies:
       - '@nestjs/common'
@@ -16713,14 +16908,14 @@ snapshots:
       - react-router
       - vite
 
-  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(bufferutil@4.1.0)(supports-color@10.2.2)':
+  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(bufferutil@4.1.0)(supports-color@10.2.2)':
     dependencies:
       google-auth-library: 10.9.1(supports-color@10.2.2)
       p-retry: 4.6.2
       protobufjs: 7.6.6
       ws: 8.22.2(bufferutil@4.1.0)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -16763,7 +16958,6 @@ snapshots:
   '@hono/node-server@2.1.1(hono@4.13.8)':
     dependencies:
       hono: 4.13.8
-    optional: true
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -17245,7 +17439,7 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)':
+  '@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.8)
       ajv: 8.20.0
@@ -17268,7 +17462,6 @@ snapshots:
       '@cfworker/json-schema': 4.1.6
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   '@modelcontextprotocol/server@2.4.0':
     dependencies:
@@ -18459,7 +18652,7 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
-  '@posthog/ai@8.19.2(3c6b5700900e9e34d4d35c197eec712b)':
+  '@posthog/ai@8.19.2(6eb47fba58aa6076f54800135f6da8f5)':
     dependencies:
       '@posthog/core': 1.67.1
       posthog-node: 5.52.4
@@ -18467,7 +18660,7 @@ snapshots:
       zod: 4.6.7
     optionalDependencies:
       '@ai-sdk/provider': 3.0.16
-      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(bufferutil@4.1.0)(supports-color@10.2.2)
+      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(bufferutil@4.1.0)(supports-color@10.2.2)
       '@langchain/core': 1.2.11(@opentelemetry/api@1.9.1)(@opentelemetry/sdk-trace-base@2.12.1(@opentelemetry/api@1.9.1))(openai@6.49.0(@smithy/signature-v4@5.7.5)(ws@8.22.2(bufferutil@4.1.0))(zod@4.6.7))(ws@8.22.2(bufferutil@4.1.0))
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/exporter-trace-otlp-http': 0.223.1(@opentelemetry/api@1.9.1)
@@ -21534,40 +21727,40 @@ snapshots:
       better-auth: 1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94)
       eve: link:packages/eve
 
-  '@vercel/connect@2.9.2(593403a60853e604f43ac19c7bf472df)':
+  '@vercel/connect@2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)':
     dependencies:
       '@vercel/oidc': 4.0.9
     optionalDependencies:
       '@ai-sdk/mcp': 2.0.99(zod@4.6.7)
       '@auth/core': 0.41.3
       '@chat-adapter/slack': 4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7)
-      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
-      ai: 7.0.172(zod@4.6.7)
-      better-auth: 1.7.19(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.169.5(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.3.2)(rollup@4.68.2)(supports-color@10.2.2)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(drizzle-orm@0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.41.0)(kysely@0.29.8)(pg@8.23.1)(sql.js@1.14.2))(next@16.4.6(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.70.0))(vitest@5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vue@3.5.45(typescript@7.0.2))
-      eve: link:packages/eve
-
-  '@vercel/connect@2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94))(eve@packages+eve)':
-    dependencies:
-      '@vercel/oidc': 4.0.9
-    optionalDependencies:
-      '@ai-sdk/mcp': 2.0.99(zod@4.6.7)
-      '@auth/core': 0.41.3
-      '@chat-adapter/slack': 4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7)
-      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
       ai: 7.0.172(zod@4.6.7)
       better-auth: 1.7.19(c6ed61ca3eb42548ab2f364a96ff6a94)
       eve: link:packages/eve
 
-  '@vercel/connect@2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(ffe7520ccc6ea076d06aab563aa3b80c))':
+  '@vercel/connect@2.9.2(@ai-sdk/mcp@2.0.99(zod@4.6.7))(@auth/core@0.41.3)(@chat-adapter/slack@4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.172(zod@4.6.7))(better-auth@1.7.19(ffe7520ccc6ea076d06aab563aa3b80c))':
     dependencies:
       '@vercel/oidc': 4.0.9
     optionalDependencies:
       '@ai-sdk/mcp': 2.0.99(zod@4.6.7)
       '@auth/core': 0.41.3
       '@chat-adapter/slack': 4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7)
-      '@modelcontextprotocol/sdk': 1.30.0(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
       ai: 7.0.172(zod@4.6.7)
       better-auth: 1.7.19(ffe7520ccc6ea076d06aab563aa3b80c)
+
+  '@vercel/connect@2.9.2(b07c33892f8610a48cea1d9cfae934d9)':
+    dependencies:
+      '@vercel/oidc': 4.0.9
+    optionalDependencies:
+      '@ai-sdk/mcp': 2.0.99(zod@4.6.7)
+      '@auth/core': 0.41.3
+      '@chat-adapter/slack': 4.44.0(ai@7.0.172(zod@4.6.7))(bufferutil@4.1.0)(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(zod@4.6.7)
+      '@modelcontextprotocol/sdk': 1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)
+      ai: 7.0.172(zod@4.6.7)
+      better-auth: 1.7.19(@opentelemetry/api@1.9.1)(@tanstack/react-start@1.169.5(esbuild@0.28.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.3.2)(rollup@4.68.2)(supports-color@10.2.2)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(drizzle-orm@0.45.4(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.41.0)(kysely@0.29.8)(pg@8.23.1)(sql.js@1.14.2))(next@16.4.6(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(svelte@5.57.3(@typescript-eslint/types@8.70.0))(vitest@5.1.0(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vue@3.5.45(typescript@7.0.2))
+      eve: link:packages/eve
 
   '@vercel/detect-agent@1.2.5': {}
 
@@ -24296,7 +24489,6 @@ snapshots:
   eventsource@3.0.7:
     dependencies:
       eventsource-parser: 3.1.0
-    optional: true
 
   evlog@2.35.1(acb802553a10e932a6741e513dac9848):
     optionalDependencies:
@@ -24363,7 +24555,6 @@ snapshots:
       ip-address: 10.7.2
     transitivePeerDependencies:
       - supports-color
-    optional: true
 
   express@5.2.1(supports-color@10.2.2):
     dependencies:
@@ -25270,8 +25461,7 @@ snapshots:
 
   hls.js@1.7.3: {}
 
-  hono@4.13.8:
-    optional: true
+  hono@4.13.8: {}
 
   hookable@5.5.3: {}
 

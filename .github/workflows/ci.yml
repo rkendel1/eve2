@@ -272,6 +272,13 @@ jobs:
         env:
           EVE_ACCEPTANCE_ANTHROPIC_API_KEY: ${{ secrets.EVE_ACCEPTANCE_ANTHROPIC_API_KEY }}
 
+      # AppPort agent example: real AppPort over HTTP always; with the secret, also
+      # the built agent end to end with a real model and a restart.
+      - name: Run AppPort agent acceptance tests
+        run: pnpm --filter appport-agent-example test
+        env:
+          APPPORT_AGENT_E2E_ANTHROPIC_API_KEY: ${{ secrets.EVE_ACCEPTANCE_ANTHROPIC_API_KEY }}
+
   # The desktop job installs apt packages and pulls agent-desktop from npm, so it
   # runs only when its package changes. It skips at the job level instead of
   # using `on.pull_request.paths`: a skipped job still reports, and a skipped

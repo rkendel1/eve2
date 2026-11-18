@@ -85,6 +85,7 @@ minimumReleaseAge: 2880 # 2 days
 
 minimumReleaseAgeExclude:
   - "@ai-sdk/*"
+  - "@appport/*" # Owned by this fork's maintainer.
   - ai
   - eve
   - "@vercel/*"
