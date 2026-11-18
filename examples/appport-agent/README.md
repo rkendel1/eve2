@@ -58,12 +58,14 @@ curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
 | `call.settled` for `appport_invoke` | `running`, citing the invocation record as evidence (verified by FeltDB inside the commit)                                                  |
 | `turn.settled`                      | One of the three outcomes below, decided from recorded evidence, never from the model's text                                                |
 
-| Outcome                                                                               | When                                                                                               |
-| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `completed`                                                                           | At least one invocation was authorized                                                             |
-| `blocked` with `waiting: every AppPort invocation was rejected`                       | Every invocation was rejected                                                                      |
-| `blocked` with `failed: the eve turn ended failed`                                    | The turn failed                                                                                    |
-| `blocked` with `indeterminate: N AppPort operation(s) without an established outcome` | An `appport_invoke` call settled while its operation's outcome is unknown (see Durable operations) |
+| Outcome                                                                                      | When                                                                                                                                     |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `completed`                                                                                  | At least one invocation was authorized                                                                                                   |
+| `blocked` with `waiting: every AppPort invocation was rejected`                              | Every invocation was rejected                                                                                                            |
+| `blocked` with `failed: the eve turn ended failed`                                           | The turn failed                                                                                                                          |
+| `blocked` with `indeterminate: N AppPort operation(s) without an established outcome: <ids>` | An `appport_invoke` call settled while its operation's outcome is unknown (see Durable operations). The ids are what an operator settles |
+
+When an operator settled any of the work's operations, the decision ends with `; N settled by an operator`.
 
 The agent's reply is kept in the summary as the agent's claim.
 
@@ -103,6 +105,7 @@ Transitions are compare-and-set on the record version.
 | --------------------------------------- | --------------------------------------------------------------------- |
 | `succeeded`, `failed`                   | The recorded outcome is returned; nothing is sent                     |
 | `indeterminate`                         | Returned as `OPERATION_INDETERMINATE`; never sent again automatically |
+| Settled by an operator                  | `succeeded` or `OPERATION_SETTLED_FAILED`; nothing is sent            |
 | `prepared`                              | Sent: nothing was sent before                                         |
 | `executing` from a process that is gone | Depends on the downstream guarantee (next table)                      |
 
@@ -214,6 +217,35 @@ For each record, the reconciler reads eve's recorded events in process (`session
 
 **No invented evidence.** Evidence comes only from committed invocation records belonging to that work. A settled `appport_invoke` call without one makes the work indeterminate.
 
+## Operator settlement
+
+An `indeterminate` operation stays that way until a person resolves it. An operator settles it with:
+
+```http
+POST /operations/:operationId/settle
+Authorization: Bearer <ES256 operator JWT>
+
+{ "outcome": "succeeded" | "failed", "reason": "…", "evidence": "…" }
+```
+
+**Who may settle.** Only a bearer of an ES256 JWT that verifies against `APPPORT_AGENT_OPERATOR_PUBLIC_KEY` (PEM), with issuer `APPPORT_AGENT_OPERATOR_ISSUER` and audience `appport-agent-settlement` (eve's `jwtEcdsa`). The recorded operator is the verified `issuer:subject`; the body cannot name one.
+
+- The eve process holds only the public key, so neither the agent nor anyone holding `AGENT_JWT_SECRET` can mint an operator token.
+- Requester tokens, the `/work/reconcile` operator token (HMAC), and the agent's AuthBoundry credential are all refused (401).
+- Without both variables the route answers 503; there is no fallback.
+- No tool or AppPort capability reaches settlement. The model's tools are unchanged.
+
+**Rules** (from Stack-Agent's `settle`, `chip-agent-state/src/lib.rs:1737`):
+
+- Only an `indeterminate` operation is settled. Anything else is refused (409), as is an unknown operation (404).
+- `outcome`, `reason` (1-1000 characters, one line) and `evidence` (1-512 characters, one line) are required. Unknown fields, including `operator`, are refused (400).
+- Settlement is written once, by compare-and-set on the record version. A second settlement, even an identical one, is refused (409).
+- It records nothing but `state` and an appended `settlement` (`at`, `operator`, `outcome`, `reason`, `evidence`, `prior_state`). Intent, key, attempts, request ids, AppPort's last answer, resolution and every reconciliation are kept as they were.
+- It performs nothing and invents no receipt. A settled `succeeded` carries the operator's attestation, not an AppPort output.
+- Afterwards the work is re-decided from its eve session, so completion reflects the settled outcome.
+
+**Unlike Stack-Agent**, a settled failure is final. Stack-Agent lets the normal path perform an intent settled as not executed. Here the operation is never dispatched again with that key, by a repeated model call or by reconciliation. Doing the action again takes a new operation.
+
 ## Who owns what
 
 | Concern                                      | Owner                                                                            |
@@ -307,6 +339,15 @@ Every rejected call is checked to have no `execution` record.
   - the host crashing after the effect (uncertain across the restart, then reconciled) and after the claim (stays indeterminate);
   - revocation;
   - inventory totals matching every recorded outcome, and an operator release.
+- **Always, `test/settle.test.mjs`.** Operator settlement, with real eve, FeltDB, the host process and AuthBoundry. It covers:
+  - work blocked while an operation is indeterminate;
+  - settling the host-crash-after-effect reservation as succeeded (the work completes) and the crash-after-claim one as failed (after reconciliation kept it indeterminate);
+  - refusal of the agent's credential, requester and HMAC operator tokens, another key, the wrong audience or issuer, and an expired token;
+  - malformed bodies, a second settlement, and a non-indeterminate operation;
+  - the appended record and its unchanged history;
+  - the model repeating a settled failure: no AppPort request;
+  - an eve restart and reconciliation;
+  - no tool or capability reaching settlement.
 - **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;

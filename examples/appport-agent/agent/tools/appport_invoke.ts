@@ -61,6 +61,17 @@ export default defineTool({
       replayedFromLedger: !invoked,
       requestId: operation.outcome?.request_id ?? null,
     };
+    const { settlement } = operation;
+    if (settlement !== undefined) {
+      const attested = `An operator settled this operation as ${settlement.outcome}: ${settlement.reason}. It is not invoked again.`;
+      if (operation.state === "succeeded")
+        return { ...recorded, ok: true, output: null, settledByOperator: attested };
+      return {
+        ...recorded,
+        error: { code: "OPERATION_SETTLED_FAILED", message: attested },
+        ok: false,
+      };
+    }
     if (operation.state === "succeeded")
       return { ...recorded, ok: true, output: operation.outcome?.output };
     if (operation.state === "failed")

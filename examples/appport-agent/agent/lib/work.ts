@@ -167,9 +167,10 @@ export async function readWork(requester: string, workId: string) {
     operations.push({
       capability: record?.capability ?? null,
       errorCode: outcome?.error?.code ?? null,
-      ok: outcome?.ok === true,
+      ok: record?.state === "succeeded",
       operationId: entry.id,
       requestIds: record?.request_ids ?? [],
+      settlement: record?.settlement ?? null,
       state: record?.state ?? null,
     });
   }

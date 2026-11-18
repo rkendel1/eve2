@@ -1,11 +1,11 @@
 import { defineChannel, GET, POST } from "eve/channels";
-import { jwtHmac, routeAuth } from "eve/channels/auth";
+import { jwtEcdsa, jwtHmac, routeAuth } from "eve/channels/auth";
 import { call } from "eve/events";
 import { toolResultFrom } from "eve/tools";
 
 import { fault } from "../lib/faults";
-import { invokeCallsOf, reconcileAll, replyOf } from "../lib/recovery";
-import { decideOutcome, readOperation } from "../lib/operations";
+import { invokeCallsOf, reconcileAll, reconcileWork, replyOf } from "../lib/recovery";
+import { decideOutcome, readOperation, settleOperation } from "../lib/operations";
 import {
   acceptWork,
   bindSession,
@@ -28,6 +28,16 @@ const auth = [
     secret: process.env.AGENT_JWT_SECRET ?? "",
   }),
 ];
+
+export const SETTLEMENT_AUDIENCE = "appport-agent-settlement";
+const MAX_SETTLEMENT_BYTES = 4096;
+
+function operatorAuth() {
+  const publicKey = process.env.APPPORT_AGENT_OPERATOR_PUBLIC_KEY;
+  const issuer = process.env.APPPORT_AGENT_OPERATOR_ISSUER;
+  if (!publicKey || !issuer) return null;
+  return [jwtEcdsa({ algorithm: "ES256", audiences: [SETTLEMENT_AUDIENCE], issuer, publicKey })];
+}
 
 const problem = (status: number, code: string, message: string) =>
   Response.json({ code, message, ok: false }, { status });
@@ -102,6 +112,36 @@ export default defineChannel({
         return problem(403, "FORBIDDEN", "Only the operator may reconcile work.");
       const results = await reconcileAll({ from, resolveSession });
       return Response.json({ results });
+    }),
+
+    POST("/operations/:operationId/settle", async (request, { from, params, resolveSession }) => {
+      const operatorKey = operatorAuth();
+      if (operatorKey === null)
+        return problem(
+          503,
+          "SETTLEMENT_NOT_CONFIGURED",
+          "Settlement needs APPPORT_AGENT_OPERATOR_PUBLIC_KEY and APPPORT_AGENT_OPERATOR_ISSUER.",
+        );
+      const operator = await routeAuth(request, operatorKey);
+      if (operator instanceof Response) return operator;
+      if (operator.principalId === undefined)
+        return problem(401, "UNAUTHENTICATED", "No operator principal.");
+      const text = await request.text();
+      if (text.length > MAX_SETTLEMENT_BYTES)
+        return problem(413, "SETTLEMENT_TOO_LARGE", "The settlement body is too large.");
+      let body: unknown;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        return problem(400, "INVALID_SETTLEMENT", "The settlement must be JSON.");
+      }
+      const result = await settleOperation(params.operationId ?? "", operator.principalId, body);
+      if (result.kind === "invalid") return problem(400, "INVALID_SETTLEMENT", result.message);
+      if (result.kind === "not_found")
+        return problem(404, "OPERATION_NOT_FOUND", "No such operation.");
+      if (result.kind === "refused") return problem(409, "SETTLEMENT_REFUSED", result.message);
+      const work = await reconcileWork({ from, resolveSession }, result.operation.work_id);
+      return Response.json({ operation: result.operation, work }, { status: 201 });
     }),
   ],
 

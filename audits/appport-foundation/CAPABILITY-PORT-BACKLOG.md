@@ -41,7 +41,7 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 ---
 
-## 1. Operator settlement of indeterminate operations (ADM). **Next slice.**
+## 1. Operator settlement of indeterminate operations (ADM). **Done:** [OPERATOR-SETTLEMENT-REPORT.md](OPERATOR-SETTLEMENT-REPORT.md).
 
 **Why first.** The last milestone left operations that cannot be proven applied or not applied as `indeterminate`, with no path to resolve them. That is the blocking reason `catalog.reserve` is not safe for unattended use. This slice is small, has a complete tested source implementation, and finishes a safety boundary rather than adding surface.
 
@@ -56,12 +56,12 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 **Acceptance:**
 
-- [ ] An operation stuck in `indeterminate` (test 10 of the reserve suite) is settled by an operator, and work completion reflects the settled outcome.
-- [ ] A second settlement of the same operation is refused.
-- [ ] Settling a non-indeterminate operation is refused.
-- [ ] The agent's own credential, and the model through any tool, cannot settle.
-- [ ] Settlement survives eve restart, and the record shows the operator, the reason and the prior reconciliations.
-- [ ] A settled `failed` operation is never re-dispatched with the same key.
+- [x] An operation stuck in `indeterminate` (test 10 of the reserve suite) is settled by an operator, and work completion reflects the settled outcome.
+- [x] A second settlement of the same operation is refused.
+- [x] Settling a non-indeterminate operation is refused.
+- [x] The agent's own credential, and the model through any tool, cannot settle.
+- [x] Settlement survives eve restart, and the record shows the operator, the reason and the prior reconciliations.
+- [x] A settled `failed` operation is never re-dispatched with the same key.
 
 ## 2. Delegated Personal OS capabilities (POS)
 
