@@ -41,7 +41,7 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 ---
 
-## 1. Operator settlement of indeterminate operations (ADM). **Next slice.**
+## 1. Operator settlement of indeterminate operations (ADM). **Done:** [OPERATOR-SETTLEMENT-REPORT.md](OPERATOR-SETTLEMENT-REPORT.md).
 
 **Why first.** The last milestone left operations that cannot be proven applied or not applied as `indeterminate`, with no path to resolve them. That is the blocking reason `catalog.reserve` is not safe for unattended use. This slice is small, has a complete tested source implementation, and finishes a safety boundary rather than adding surface.
 
@@ -56,18 +56,18 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 **Acceptance:**
 
-- [ ] An operation stuck in `indeterminate` (test 10 of the reserve suite) is settled by an operator, and work completion reflects the settled outcome.
-- [ ] A second settlement of the same operation is refused.
-- [ ] Settling a non-indeterminate operation is refused.
-- [ ] The agent's own credential, and the model through any tool, cannot settle.
-- [ ] Settlement survives eve restart, and the record shows the operator, the reason and the prior reconciliations.
-- [ ] A settled `failed` operation is never re-dispatched with the same key.
+- [x] An operation stuck in `indeterminate` (test 10 of the reserve suite) is settled by an operator, and work completion reflects the settled outcome.
+- [x] A second settlement of the same operation is refused.
+- [x] Settling a non-indeterminate operation is refused.
+- [x] The agent's own credential, and the model through any tool, cannot settle.
+- [x] Settlement survives eve restart, and the record shows the operator, the reason and the prior reconciliations.
+- [x] A settled `failed` operation is never re-dispatched with the same key.
 
 ## 2. Delegated Personal OS capabilities (POS)
 
 **Why.** Personal OS is the main product consumer. Seven of its capabilities are already published on FeltKit's `/appport` (PO-06–11, 13, 14, 17, 20, 25), so most of this is _making the existing contracts delegable_, not porting code. They are core daily workflows and the model tools already exist in Personal OS (`feltkit/turn.ts:28`).
 
-### 2.0 Prerequisite: on-behalf-of on FeltKit `/appport`
+### 2.0 Prerequisite: on-behalf-of on FeltKit `/appport`. **Done in FeltKit:** [FELTKIT-DELEGATED-EXECUTION-REPORT.md](FELTKIT-DELEGATED-EXECUTION-REPORT.md)
 
 |                 |                                                                                                                                                                                                                                |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -78,9 +78,11 @@ Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates
 
 **Acceptance:**
 
-- [ ] A delegated agent calling `tasks.create` creates the task in the delegating person's space.
-- [ ] An undelegated or revoked agent is refused before the function runs.
-- [ ] The action log records both the person and the agent.
+- [x] A delegated agent's write runs in the delegating person's space. Proven on a FeltKit test capability and from eve; Personal OS's own `tasks.create` is exercised in 2a.
+- [x] An undelegated or revoked agent is refused before the function runs.
+- [x] FeltKit's audit record names the person, the agent, and AuthBoundry's decision and delegation. Personal OS's action log does not yet record the agent (2a: read `ctx.auth.delegation`).
+
+**Contract as built:** an agent session plus `X-AppPort-On-Behalf-Of: <person>`. A capability is delegable only when listed in `authority.capabilities`, so 2a adds Personal OS's published names (`tasks.create`, …) there; today it lists only the `personalos.*` surface vocabulary. Local authority only.
 
 ### 2a. Tasks, reminders and daily briefing
 

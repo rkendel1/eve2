@@ -393,9 +393,11 @@ describe("durable work recovery (process-group crashes and restarts)", () => {
     );
     const work = await settled(ALICE, body.workId);
     assert.equal(work.status, "blocked");
-    assert.deepEqual(work.decisions, [
-      "indeterminate: 1 AppPort operation(s) without an established outcome",
-    ]);
+    assert.equal(work.decisions.length, 1);
+    assert.match(
+      work.decisions[0],
+      /^indeterminate: 1 AppPort operation\(s\) without an established outcome: \S+$/u,
+    );
     assert.deepEqual(work.evidence, []);
     assert.equal(lookupsFor(body.workId).length, 1);
     assert.equal(lookupsFor(body.workId)[0].success, true);
@@ -533,9 +535,10 @@ describe("durable operations (crash-after-effect boundary)", () => {
     await crashThenRestart();
     const work = await settled(ALICE, body.workId);
     assert.equal(work.status, "blocked");
+    const [unkeyed] = await operationsOf(body.workId);
     assert.equal(
       work.decisions.at(-1),
-      "indeterminate: 1 AppPort operation(s) without an established outcome",
+      `indeterminate: 1 AppPort operation(s) without an established outcome: ${unkeyed.operation_id}`,
     );
     assert.deepEqual(work.evidence, []);
     assert.equal(effectCount("probe.applyunkeyed", "U1"), 1);

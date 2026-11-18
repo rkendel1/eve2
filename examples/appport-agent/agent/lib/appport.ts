@@ -19,12 +19,22 @@ function agentCredential(): string {
   return readFileSync(requireEnv("APPPORT_AGENT_CREDENTIAL_FILE"), "utf8").trim();
 }
 
+function onBehalfOf(caller: Caller): string {
+  if (process.env.APPPORT_ON_BEHALF_OF !== "subject") return caller.principalId;
+  const prefix = `${process.env.AGENT_JWT_ISSUER ?? "appport-agent-operator"}:`;
+  if (!caller.principalId.startsWith(prefix))
+    throw new Error(
+      `${caller.principalId} was not issued by ${prefix.slice(0, -1)}; it names no person here.`,
+    );
+  return caller.principalId.slice(prefix.length);
+}
+
 function clientFor(caller: Caller) {
   return createClient({
     transport: createHttpTransport({
       headers: {
         authorization: `Bearer ${agentCredential()}`,
-        "x-appport-on-behalf-of": caller.principalId,
+        "x-appport-on-behalf-of": onBehalfOf(caller),
       },
       url: requireEnv("APPPORT_URL"),
     }),

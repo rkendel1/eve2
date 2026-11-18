@@ -107,7 +107,7 @@ The key appeared 0 times in the logs, and no processes were left running.
 **Operational limitations:**
 
 - **One host per store.** The inventory and idempotency stores are FeltDB local file stores held by one host process; a second host is refused.
-- **No barring.** The host does not bar an abandoned key, so a claim that died before its effect can never be proven not-executed. It stays `indeterminate` for a person to resolve, which is the next roadmap milestone.
+- **No barring.** The host does not bar an abandoned key, so a claim that died before its effect can never be proven not-executed. It stays `indeterminate` for a person to resolve. _Update:_ an operator can now settle it ([OPERATOR-SETTLEMENT-REPORT.md](OPERATOR-SETTLEMENT-REPORT.md)).
 - **The AuthBoundry orphan defect** still needs control-group supervision.
 - **No retention** for reservations or idempotency records.
 - **Reconciliation independence is limited.** The destination's operation record and the business effect come from the same transaction. The business check re-reads the item's reserved total, but both facts come from one host.
@@ -123,7 +123,7 @@ Within what was tested, yes:
 
 It is not yet safe for unattended use at scale, for three reasons:
 
-- indeterminate operations need a person and no resolution path exists;
+- indeterminate operations need a person (a resolution path now exists: operator settlement);
 - there is no rate or quantity limit beyond available stock;
 - a single host is a single point of failure.
 

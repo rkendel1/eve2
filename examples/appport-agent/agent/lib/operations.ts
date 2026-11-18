@@ -68,9 +68,19 @@ export interface OperationRecord {
   }[];
   readonly resolution: string | null;
   readonly retry_safety: RetrySafety;
+  readonly settlement?: Settlement;
   readonly state: OperationState;
   readonly updated_at: string;
   readonly work_id: string;
+}
+
+export interface Settlement {
+  readonly at: string;
+  readonly evidence: string;
+  readonly operator: string;
+  readonly outcome: "succeeded" | "failed";
+  readonly prior_state: "indeterminate";
+  readonly reason: string;
 }
 
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -469,6 +479,88 @@ export async function reconcileOperation(current: OperationRecord): Promise<Oper
   });
 }
 
+const MAX_REASON = 1000;
+const MAX_EVIDENCE = 512;
+const SETTLEMENT_FIELDS = new Set(["evidence", "outcome", "reason"]);
+
+export type SettlementResult =
+  | { readonly kind: "settled"; readonly operation: OperationRecord }
+  | { readonly kind: "invalid"; readonly message: string }
+  | { readonly kind: "not_found" }
+  | { readonly kind: "refused"; readonly operation: OperationRecord; readonly message: string };
+
+function oneLine(value: unknown, max: number): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (text.length === 0 || text.length > max || /\p{Cc}/u.test(text)) return null;
+  return text;
+}
+
+export async function settleOperation(
+  operationId: string,
+  operator: string,
+  request: unknown,
+): Promise<SettlementResult> {
+  const body = request as Record<string, unknown> | null;
+  if (body === null || typeof body !== "object" || Array.isArray(body))
+    return { kind: "invalid", message: "The settlement must be a JSON object." };
+  const unknown = Object.keys(body).filter((field) => !SETTLEMENT_FIELDS.has(field));
+  if (unknown.length > 0)
+    return { kind: "invalid", message: `Unknown settlement fields: ${unknown.join(", ")}.` };
+  const outcome = body.outcome;
+  if (outcome !== "succeeded" && outcome !== "failed")
+    return { kind: "invalid", message: 'outcome must be "succeeded" or "failed".' };
+  const reason = oneLine(body.reason, MAX_REASON);
+  if (reason === null)
+    return {
+      kind: "invalid",
+      message: `reason must be 1 to ${MAX_REASON} characters on one line.`,
+    };
+  const evidence = oneLine(body.evidence, MAX_EVIDENCE);
+  if (evidence === null)
+    return {
+      kind: "invalid",
+      message: `evidence must be 1 to ${MAX_EVIDENCE} characters on one line, referencing what the conclusion rests on.`,
+    };
+
+  const current = await readOperation(operationId);
+  if (current === null) return { kind: "not_found" };
+  if (current.settlement !== undefined)
+    return {
+      kind: "refused",
+      message: `Operation ${operationId} was already settled as ${current.settlement.outcome} by ${current.settlement.operator}; a settlement is written once.`,
+      operation: current,
+    };
+  if (current.state !== "indeterminate")
+    return {
+      kind: "refused",
+      message: `Operation ${operationId} is ${current.state}; only an indeterminate operation can be settled.`,
+      operation: current,
+    };
+  const settlement: Settlement = {
+    at: new Date().toISOString(),
+    evidence,
+    operator,
+    outcome,
+    prior_state: "indeterminate",
+    reason,
+  };
+  try {
+    return {
+      kind: "settled",
+      operation: await transition(current, { settlement, state: outcome }),
+    };
+  } catch (error) {
+    const now = await readOperation(operationId);
+    if (now === null || now.__version === current.__version) throw error;
+    return {
+      kind: "refused",
+      message: `Operation ${operationId} changed while it was being settled; it is now ${now.state}.`,
+      operation: now,
+    };
+  }
+}
+
 async function linkCall(
   workId: string,
   callId: string,
@@ -504,6 +596,7 @@ export async function decideOutcome(
 ): Promise<Outcome> {
   const said = reply.length > 0 ? ` Agent reply: ${reply.slice(0, 2000)}` : "";
   const resolved = new Map<string, boolean>();
+  const settledByOperator = new Set<string>();
   const unresolved = new Set<string>();
   let refused = 0;
   for (const call of invokeCalls) {
@@ -517,6 +610,8 @@ export async function decideOutcome(
       continue;
     }
     const operation = await settleAbandoned(String(link.operation_id));
+    if (operation?.settlement !== undefined && operation.work_id === workId)
+      settledByOperator.add(operation.operation_id);
     if (operation === null || operation.work_id !== workId) unresolved.add(`call:${call.callId}`);
     else if (operation.state === "succeeded") resolved.set(operation.operation_id, true);
     else if (operation.state === "failed") resolved.set(operation.operation_id, false);
@@ -526,6 +621,8 @@ export async function decideOutcome(
   for (const id of resolved.keys()) unresolved.delete(id);
   const evidence = [...resolved.keys()];
   const succeeded = [...resolved.values()].filter(Boolean).length;
+  const attested =
+    settledByOperator.size > 0 ? `; ${settledByOperator.size} settled by an operator` : "";
   if (turnOutcome !== "completed") {
     return {
       decision: `failed: the eve turn ended ${turnOutcome}`,
@@ -536,7 +633,7 @@ export async function decideOutcome(
   }
   if (unresolved.size > 0) {
     return {
-      decision: `indeterminate: ${unresolved.size} AppPort operation(s) without an established outcome`,
+      decision: `indeterminate: ${unresolved.size} AppPort operation(s) without an established outcome: ${[...unresolved].join(", ")}`,
       evidence,
       status: "blocked",
       summary: `Indeterminate: ${unresolved.size} AppPort operation(s) have no established outcome and are not retried automatically.`,
@@ -544,14 +641,14 @@ export async function decideOutcome(
   }
   if (resolved.size + refused > 0 && succeeded === 0) {
     return {
-      decision: "waiting: every AppPort invocation was rejected",
+      decision: `waiting: every AppPort invocation was rejected${attested}`,
       evidence,
       status: "blocked",
       summary: `Blocked: no capability invocation was authorized.${said}`,
     };
   }
   return {
-    decision: `completed after ${succeeded} authorized invocation(s)`,
+    decision: `completed after ${succeeded} authorized invocation(s)${attested}`,
     evidence,
     status: "completed",
     summary: `Completed after ${succeeded} authorized invocation(s).${said}`,

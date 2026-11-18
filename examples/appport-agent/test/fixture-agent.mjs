@@ -32,6 +32,12 @@ export default defineAgent({
           };
         return "Reserved: " + JSON.stringify(toolResults.map((entry) => entry.output));
       }
+      const listing = /List via (\\S+)/u.exec(String(lastUserMessage));
+      if (listing !== null) {
+        if (toolResults.length === 0)
+          return { toolCalls: [{ name: "appport_invoke", input: { input: {}, name: listing[1] } }] };
+        return "Listed: " + JSON.stringify(toolResults.at(-1)?.output);
+      }
       const apply = /Apply (\\S+) via (\\S+)/u.exec(String(lastUserMessage));
       if (apply !== null) {
         const message = String(lastUserMessage);
