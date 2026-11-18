@@ -120,9 +120,46 @@ Transitions are compare-and-set on the record version.
 
 **Not guaranteed.**
 
-- **Exactly-once effects.** Only the downstream key gives at-most-once execution, and only while AppPort's idempotency store holds the key. AppPort's default store is in memory, so a restart of the AppPort host loses it.
+- **Exactly-once effects.** The downstream key gives at-most-once execution of the handler, and the example host keeps its keys in a durable store (below). A durable claim and the capability's external effect are still not one transaction.
 - **Calls outside accepted work.** Consequential capabilities are refused outside accepted work.
 - **A model that changes the input on retry.** That creates a new operation.
+
+## Durable AppPort idempotency
+
+The example host replaces AppPort's in-memory idempotency store with `appport-host/idempotency-store.mjs`. It implements AppPort's own `IdempotencyStore` interface (`get`, `set`, `claim`, `release`, `findByRequestId`) on a FeltDB collection in `<APPPORT_HOST_DATA_DIR>/idempotency`. AppPort's runtime is unchanged.
+
+**Key scope.** AppPort scopes a key to `<session>|<capability>@<version>|<key>`. The host derives one AppPort session per (agent, person), so:
+
+- a key never answers another person's request;
+- a key never answers another agent's request;
+- an unauthenticated request never reaches the store.
+
+**Records.** One record per scoped key: `in-progress` (claim), `completed` (response), or `released`. Each record holds:
+
+- the capability and version;
+- AppPort's request digest (canonical capability, version and input);
+- the claiming `requestId`, session and principal;
+- the host instance (`owner`) that wrote it.
+
+| Store operation | FeltDB write                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| claim           | Create-if-absent (`requireAbsent`); a `released` record is re-claimed by compare-and-set                     |
+| set (completed) | Compare-and-set on the claim of the same `requestId`; another request's claim or record is never overwritten |
+| release         | Compare-and-set to `released`, only for the same `requestId`                                                 |
+
+**What a repeated request gets.** AppPort's runtime decides this from the stored record:
+
+| Stored                                           | Repeated request                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Nothing                                          | Claimed, then executed                                                                     |
+| `completed`                                      | The stored response is replayed (`idempotentReplay: true`), including after a host restart |
+| `in-progress`, live or abandoned                 | `CONFLICT` / `IDEMPOTENCY_OUTCOME_UNKNOWN`; not executed                                   |
+| Different capability, version or input           | `CONFLICT` / `IDEMPOTENCY_KEY_REUSED`; not executed                                        |
+| `released` (the handler threw, or never started) | Claimed again and executed. AppPort treats a throwing handler as having had no effect      |
+
+**Deliberate difference from the interface comment.** AppPort's interface says an expired entry counts as absent (24-hour TTL). This store never expires anything, so an abandoned claim stays uncertain until a person resolves it, instead of becoming executable after a day. Retention is left to the operator.
+
+**One host per store.** FeltDB's exclusive lock refuses a second host on the same data directory with `STATE_LOCKED`; the host opens the store before it starts AuthBoundry.
 
 ## Recovery
 
@@ -218,6 +255,16 @@ Every rejected call is checked to have no `execution` record.
   - a crash after the effect is replayed through the key once (keyed) or becomes indeterminate (unkeyed), and is never repeated;
   - indeterminate stays indeterminate across recovery passes;
   - repeats, conflicts, distinct operations, failures and Bob's authority are covered;
+- **Always, `test/idempotency.test.mjs`.** The host runs as its own process (`test/probe-host.mjs`, effects appended to a file). Each restart test kills the host and AuthBoundry, checks both are gone, reads the host's FeltDB records directly, and starts a new host on the same store. It covers:
+  - completed replay after a restart;
+  - key reuse with changed input;
+  - a crash after the claim;
+  - a crash after the effect but before the response;
+  - concurrency;
+  - a second host refused;
+  - per-person key scope;
+  - no claim for an unauthenticated caller;
+  - eve's ledger replaying through the durable store after both eve and the host restart;
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;
 - a replayed key after restarts runs nothing;

@@ -45,7 +45,11 @@ export interface OperationRecord {
   readonly operation_id: string;
   readonly operation_key: string | null;
   readonly outcome: {
-    readonly error: { readonly code: string; readonly message: string } | null;
+    readonly error: {
+      readonly code: string;
+      readonly message: string;
+      readonly reason: string | null;
+    } | null;
     readonly ok: boolean;
     readonly output: unknown;
     readonly output_digest: string | null;
@@ -241,7 +245,13 @@ async function attempt_(
 
   const requestIds = [...current.request_ids, result.requestId];
   const outcome = {
-    error: result.ok ? null : { code: result.error.code, message: result.error.message },
+    error: result.ok
+      ? null
+      : {
+          code: result.error.code,
+          message: result.error.message,
+          reason: idempotencyReason(result) ?? null,
+        },
     ok: result.ok,
     output: result.ok ? result.output : null,
     output_digest: result.ok ? `sha256:${digest(canonicalize(result.output ?? null))}` : null,
@@ -260,7 +270,10 @@ async function attempt_(
       }),
     };
   }
-  if (NOT_EXECUTED.has(result.error.code)) {
+  if (
+    NOT_EXECUTED.has(result.error.code) ||
+    idempotencyReason(result) === "IDEMPOTENCY_KEY_REUSED"
+  ) {
     return {
       ...settled,
       invoked: true,
@@ -296,6 +309,12 @@ async function attempt_(
       state: "indeterminate",
     }),
   };
+}
+
+function idempotencyReason(result: InvocationResult): string | undefined {
+  if (result.ok) return undefined;
+  const details = result.error.details as { reason?: unknown } | undefined;
+  return typeof details?.reason === "string" ? details.reason : undefined;
 }
 
 export async function settleAbandoned(operationId: string): Promise<OperationRecord | null> {
