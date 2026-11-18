@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readStampedPackageVersion } from "#internal/application/stamped-package-version.js";
-import { EVE_PACKAGE_NAME } from "#internal/package-name.js";
+import { canonicalPackageName, EVE_PACKAGE_NAME } from "#internal/package-name.js";
 
 let cachedPackageInfo: InstalledPackageInfo | undefined;
 let cachedPackageLocation: PackageLocation | undefined;
@@ -340,7 +340,7 @@ function normalizeInstalledPackageInfo(value: unknown): InstalledPackageInfo | u
   }
 
   return {
-    name: packageJson.name,
+    name: canonicalPackageName(packageJson.name),
     version: packageJson.version,
   };
 }
