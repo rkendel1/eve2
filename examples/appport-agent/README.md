@@ -217,6 +217,16 @@ For each record, the reconciler reads eve's recorded events in process (`session
 
 **No invented evidence.** Evidence comes only from committed invocation records belonging to that work. A settled `appport_invoke` call without one makes the work indeterminate.
 
+## Acting for a person in a FeltKit application
+
+The same agent invokes a FeltKit application's published capabilities for the person who submitted the work (FeltKit's delegated `/appport`; `docs/LOCAL-AUTHORITY.md` in FeltKit):
+
+- `APPPORT_URL` is the application's `/appport`.
+- `APPPORT_AGENT_CREDENTIAL_FILE` holds the agent's FeltKit session (`feltkit session create --type agent`). The application's operator registers the agent (`ctx.authority.agents.register`), and each person grants it capabilities.
+- `APPPORT_ON_BEHALF_OF=subject` names the person by the subject of the requester's verified token (the part after `AGENT_JWT_ISSUER:`): the requester issuer and the application must share person ids. A principal from another issuer names nobody, and the call fails. Without it the full principal id is sent, as the example host expects.
+
+FeltKit decides each call with AuthBoundry as this agent, proven by its own credential, for that person and that capability, and runs the function as the person. Nothing else changes here: the ledger sends its operation id as the idempotency key, FeltKit's durable store replays it, and FORBIDDEN is a failure that is never retried.
+
 ## Operator settlement
 
 An `indeterminate` operation stays that way until a person resolves it. An operator settles it with:
@@ -348,6 +358,13 @@ Every rejected call is checked to have no `execution` record.
   - the model repeating a settled failure: no AppPort request;
   - an eve restart and reconciliation;
   - no tool or capability reaching settlement.
+- **With `FELTKIT_SDK_DIR`** (a FeltKit `packages/sdk` checkout with delegated `/appport` and its dependencies), `test/feltkit.test.mjs`: real eve, a FeltKit server process (`test/feltkit-host.mjs`) with its private AuthBoundry, and FeltDB. It covers:
+  - Alice's delegated add and list, run as Alice;
+  - Bob without a grant, and Carol's read-only grant for a write: refused;
+  - a person's own session naming someone else: refused;
+  - eve and FeltKit both killed after FeltKit applied the note: one note after restarts;
+  - revocation;
+  - FeltKit's audit records naming Alice, the agent, and the AuthBoundry decision and delegation.
 - **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;
 - reconciliation run twice changes nothing;
