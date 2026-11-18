@@ -102,7 +102,7 @@ const startAgent = () =>
     cleanEnv({
       AGENT_JWT_SECRET,
       APPPORT_AGENT_CAPABILITIES:
-        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today,memory.list,memory.propose,memory.add,memory.confirm",
+        "tasks.list,tasks.create,tasks.update,tasks.complete,tasks.reopen,tasks.delete,briefing.today,memory.list,memory.propose,memory.add,memory.confirm,projects.list,projects.create,projects.update,documents.list,documents.update,documents.link",
       APPPORT_AGENT_CREDENTIAL_FILE: credentialFile,
       APPPORT_AGENT_OPERATOR: "appport-agent-operator:operator",
       APPPORT_AGENT_WORK_DIR: workDir,
@@ -563,6 +563,230 @@ describe(
       }
       const state = await snapshot();
       assert.equal(memory(state, "Ada likes jazz"), undefined);
+    });
+  },
+);
+
+describe(
+  "eve working with Ada's Personal OS projects and documents under her grants",
+  { skip: SKIP },
+  () => {
+    const base = `http://127.0.0.1:${port}`;
+    const bearer = (person) =>
+      `Bearer ${readFileSync(join(scratch, "personalos.tokens", person), "utf8")}`;
+    const asPerson = async (person, fn, args) => {
+      const response = await fetch(`${base}/api/mutation/${fn}`, {
+        body: JSON.stringify({ args }),
+        headers: { authorization: bearer(person), "content-type": "application/json" },
+        method: "POST",
+      });
+      return await response.json();
+    };
+    const project = (state, owner, name) =>
+      state.people[owner].projects.find((entry) => entry.name === name);
+    const doc = (state, owner, name) =>
+      state.people[owner].documents.find((entry) => entry.name === name);
+    let taxes;
+    let kitchen;
+
+    it("reads Ada's projects only with a project grant, and that grant reads no documents", async () => {
+      taxes = (await asPerson("ada", "projects:create", { name: "Taxes" })).value;
+      // A document saved the way the Documents screen saves one: an upload link, the bytes, then attach.
+      for (const [name, text, projectId] of [
+        ["w2.txt", "wages 100", taxes.id],
+        ["lease.txt", "rent 900", undefined],
+      ]) {
+        const link = (
+          await asPerson("ada", "documents:prepareUpload", { contentType: "text/plain", name })
+        ).value;
+        const put = await fetch(new URL(link.url, base), {
+          body: text,
+          headers: { "content-type": "text/plain", "x-file-name": name },
+          method: "PUT",
+        });
+        const file = await put.json();
+        assert.equal(put.ok, true, JSON.stringify(file));
+        const attached = await asPerson("ada", "documents:attach", {
+          fileId: file.id ?? file.file?.id,
+          ...(projectId ? { projectId } : {}),
+        });
+        assert.equal(attached.ok, true, JSON.stringify(attached));
+      }
+      const denied = await work("ada", "projects-denied", invoke("projects.list", {}));
+      assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=projects.list");
+      const listed = await work("ada", "projects-list", invoke("projects.list", {}));
+      assert.equal(listed.status, "completed", JSON.stringify(listed));
+      assert.match(listed.summary, /"name":"Taxes"/u);
+      const docs = await work(
+        "ada",
+        "docs-with-project-grant",
+        invoke("documents.list", { projectId: taxes.id }),
+      );
+      assert.equal(
+        docs.operations[0].errorCode,
+        "FORBIDDEN",
+        "a project grant does not read its documents",
+      );
+      const grace = await work("grace", "grace-projects", invoke("projects.list", {}));
+      assert.equal(grace.operations[0].errorCode, "FORBIDDEN");
+    });
+
+    it("creates and updates a project only with those grants, once for a repeated call, attributed to eve", async () => {
+      const before = await work(
+        "ada",
+        "project-create-denied",
+        invoke("projects.create", { name: "Kitchen" }),
+      );
+      assert.equal(before.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=projects.list+projects.create");
+      const created = await work(
+        "ada",
+        "project-create",
+        `[repeat] ${invoke("projects.create", { name: "Kitchen" })}`,
+      );
+      assert.equal(created.status, "completed", JSON.stringify(created));
+      assert.deepEqual(
+        [created.operations.length, created.operations[0].requestIds.length],
+        [1, 1],
+      );
+      const update = await work(
+        "ada",
+        "project-update-denied",
+        invoke("projects.update", { id: taxes.id, status: "paused" }),
+      );
+      assert.equal(update.operations[0].errorCode, "FORBIDDEN", "update needs its own grant");
+
+      let state = await snapshot();
+      kitchen = project(state, "ada", "Kitchen");
+      assert.equal(state.people.ada.projects.filter((entry) => entry.name === "Kitchen").length, 1);
+      const action = state.people.ada.actions.find(
+        (entry) => entry.kind === "project.create" && entry.evidence.id === kitchen.id,
+      );
+      assert.deepEqual(
+        [action.via, action.delegation.agent, action.delegation.capability],
+        ["agent", "appport-agent", "projects.create"],
+      );
+      const audit = state.audit.find(
+        (entry) => entry.authority.delegation?.decisionId === action.delegation.decisionId,
+      );
+      assert.deepEqual(
+        [audit.function, audit.principal.id, audit.requestId],
+        ["projects:create", "ada", created.operations[0].requestIds[0]],
+      );
+
+      await restartHost("ada=projects.list+projects.create+projects.update");
+      const paused = await work(
+        "ada",
+        "project-update",
+        invoke("projects.update", { id: kitchen.id, status: "paused" }),
+      );
+      assert.equal(paused.status, "completed", JSON.stringify(paused));
+      state = await snapshot();
+      assert.equal(project(state, "ada", "Kitchen").status, "paused");
+    });
+
+    it("refuses a second project with the same name, and leaves that operation unresolved rather than retrying it", async () => {
+      const duplicate = await work(
+        "ada",
+        "project-duplicate",
+        invoke("projects.create", { name: "kitchen" }),
+      );
+      assert.equal(duplicate.status, "blocked");
+      assert.match(duplicate.decisions.at(-1), /^indeterminate: /u);
+      const [operation] = await ledger(duplicate.workId);
+      assert.deepEqual(
+        [operation.state, operation.outcome.error.code],
+        ["indeterminate", "feltkit.FAILED_PRECONDITION"],
+      );
+      const state = await snapshot();
+      assert.equal(
+        state.people.ada.projects.filter((entry) => entry.name.toLowerCase() === "kitchen").length,
+        1,
+      );
+    });
+
+    it("reads and re-files Ada's documents only with document grants, never their contents", async () => {
+      await restartHost("ada=projects.list+documents.list");
+      const listed = await work("ada", "docs-list", invoke("documents.list", {}));
+      assert.equal(listed.status, "completed", JSON.stringify(listed));
+      assert.match(listed.summary, /lease\.txt/u);
+      assert.doesNotMatch(listed.summary, /rent 900|wages 100/u, "names and notes, never contents");
+      const link = await work("ada", "doc-link", invoke("documents.link", { id: "any" }));
+      assert.deepEqual(link.operations, [], "a download link is not a capability");
+
+      let state = await snapshot();
+      const lease = doc(state, "ada", "lease.txt");
+      const denied = await work(
+        "ada",
+        "doc-update-denied",
+        invoke("documents.update", { id: lease.id, projectId: kitchen.id }),
+      );
+      assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      await restartHost("ada=projects.list+documents.list+documents.update");
+      const filed = await work(
+        "ada",
+        "doc-update",
+        invoke("documents.update", {
+          id: lease.id,
+          note: "for the contractor",
+          projectId: kitchen.id,
+        }),
+      );
+      assert.equal(filed.status, "completed", JSON.stringify(filed));
+      state = await snapshot();
+      assert.deepEqual(
+        [doc(state, "ada", "lease.txt").projectId, doc(state, "ada", "lease.txt").note],
+        [kitchen.id, "for the contractor"],
+      );
+      assert.equal(
+        doc(state, "ada", "w2.txt").projectId,
+        taxes.id,
+        "the other relation is untouched",
+      );
+      const action = state.people.ada.actions.find(
+        (entry) => entry.kind === "document.update" && entry.evidence.id === lease.id,
+      );
+      assert.deepEqual(
+        [action.via, action.evidence.verified, action.delegation.capability],
+        ["agent", true, "documents.update"],
+      );
+    });
+
+    it("creates one project when eve crashes after Personal OS committed, and Personal OS restarts too", async () => {
+      await restartHost("ada=projects.list+projects.create");
+      const response = await fetch(new URL("/work", agent.url), {
+        body: JSON.stringify({
+          objective: `[crash:invocation.record] ${invoke("projects.create", { name: "Garage" })}`,
+        }),
+        headers: {
+          authorization: `Bearer ${signJwt(AGENT_JWT_SECRET, "ada")}`,
+          "content-type": "application/json",
+          "idempotency-key": "project-crash",
+        },
+        method: "POST",
+      });
+      const { workId } = await response.json();
+      await waitFor(async () => !(await reachable()));
+      await stop(agent.child);
+      await restartHost();
+      agent = await startAgent();
+      assert.equal((await outcome("ada", workId)).status, "completed");
+      const [operation] = await ledger(workId);
+      assert.deepEqual([operation.state, operation.attempts], ["succeeded", 2]);
+      const state = await snapshot();
+      assert.equal(state.people.ada.projects.filter((entry) => entry.name === "Garage").length, 1);
+    });
+
+    it("stops after Ada revokes", async () => {
+      await restartHost("ada=");
+      for (const [key, objective] of [
+        ["projects-after-revoke", invoke("projects.list", {})],
+        ["docs-after-revoke", invoke("documents.list", {})],
+      ]) {
+        const denied = await work("ada", key, objective);
+        assert.equal(denied.operations[0].errorCode, "FORBIDDEN");
+      }
     });
   },
 );

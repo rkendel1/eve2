@@ -233,7 +233,9 @@ Personal OS's tasks, reminders and daily briefing are published FeltKit capabili
 
 Memory works the same way, with `memory.list` and `memory.propose`. A proposal is stored as an unconfirmed (inferred) note, attributed to the agent; only the person confirms or drops it in Personal OS. Personal OS refuses every trusted-memory change made under an agent's delegation.
 
-The agent adds no task or memory logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
+Projects and documents use `projects.list`, `projects.create`, `projects.update`, `documents.list` and `documents.update`, each granted separately. A project grant never exposes documents. Uploading a document, a download link, and removing a document are never available to an agent.
+
+The agent adds no task, memory, project or document logic of its own: Personal OS creates the task, verifies it, schedules its reminder as the person, and records the action with the agent and the AuthBoundry decision.
 
 ## Operator settlement
 
@@ -390,6 +392,14 @@ Every rejected call is checked to have no `execution` record.
     - `memory.confirm` and `memory.add` refused;
     - Ada confirming and dropping proposals through Personal OS's own HTTP API;
     - one proposal across an eve and Personal OS crash;
+    - revocation;
+  - projects and documents:
+    - project reads that expose no documents;
+    - create and update, each only with its grant, and a repeated create stored once;
+    - a duplicate project name left unresolved, not retried;
+    - document reads without contents, and re-filing a document to a project;
+    - no download link;
+    - one project across an eve and Personal OS crash;
     - revocation.
 - **Always, `test/reconcile-decide.test.mjs`.** Every row of Stack-Agent's decision table.
 - waiting work stays waiting;

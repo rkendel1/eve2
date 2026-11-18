@@ -119,14 +119,20 @@ PO-13, 14, 16 (list, add, forget). Memory written by an agent is held **unconfir
 
 **Revised from the plan:** forgetting was planned as a grantable write. It is not delegable, because it removes trusted memory.
 
-### 2c. Projects and documents
+### 2c. Projects and documents. **Done:** [PERSONALOS-PROJECTS-DOCUMENTS-REPORT.md](PERSONALOS-PROJECTS-DOCUMENTS-REPORT.md)
 
 PO-17, 18 (projects list, create) and PO-20 (documents list). Reading a document's content needs a new `personalos.documents.read` capability. Uploads (PO-21) stay internal.
 
 **Acceptance:**
 
-- [ ] Read-only delegation lists projects and documents.
-- [ ] Content read requires its own grant.
+- [x] Read-only delegation lists projects and documents (separate grants; a project grant exposes no documents).
+- [ ] Content read requires its own grant. **Not built.** Personal OS's only content path is `documents.link`, a bearer download URL, and eve has no fetch tool. Reading contents needs a new contract, deferred and recorded.
+
+**As built:**
+
+- **Delegable, each with its own grant:** `projects.list`, `projects.create`, `projects.update`, `documents.list`, `documents.update`.
+- **Not delegable:** uploads (bytes travel outside AppPort), download links (bearer URLs) and document removal (the person's own act).
+- **Deferred finding:** eve's ledger marks FeltKit's `feltkit.FAILED_PRECONDITION` refusals indeterminate rather than failed.
 
 ## 3. Research runs (POS)
 

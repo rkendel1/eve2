@@ -71,12 +71,14 @@ if (process.argv[2] === "--report") {
       actions: await call(person(id), "actions:list"),
       briefing: await call(person(id), "briefing:today", { today: process.env.PERSONALOS_TODAY }),
       inbox: await call(person(id), "inbox:list"),
+      documents: await call(person(id), "documents:list"),
       memories: await call(person(id), "memory:list"),
+      projects: await call(person(id), "projects:list"),
       tasks: await call(person(id), "tasks:list"),
     };
   }
   const audit = (await runtime.auditTrail()).filter((entry) =>
-    /^(tasks|memory):/u.test(entry.function),
+    /^(tasks|memory|projects|documents):/u.test(entry.function),
   );
   const reminders = (await runtime.services.jobs.listJobs("personalos"))
     .filter((job) => job.type === "reminder.fire")
