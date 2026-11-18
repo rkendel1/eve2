@@ -6,9 +6,9 @@ last_updated: "2026-11-18"
 
 # Runtime dependency resolution
 
-> **AI status:** Written entirely by AI. First review (2026-11-18): the direction is approved in
-> principle; the public API needs refinement (this revision); the implementation is not approved.
-> Nothing here is implemented in `eve`.
+> **AI status:** Written entirely by AI. Reviewed twice (2026-11-18): the direction is approved; the
+> public API is under refinement (this revision answers the second review); the implementation is not
+> approved. Nothing here is implemented in `eve`.
 
 ## Summary
 
@@ -64,10 +64,9 @@ digest change is **not** a safe replacement mechanism:
 - **Compatible:** accepted, and the history records the comparison.
 
 eve does not ship `defineAppPortDependency` as stable until that is in a Resolver release. While it is
-experimental, eve refuses a resolution whose served digest differs from the digest the binding pinned
-when the requirement was first resolved in that deployment. It reports `contract_changed`, and an
-operator must acknowledge the change in Resolver. This is the conservative stopgap; it never accepts a
-breaking change silently.
+experimental, eve holds each requirement to a deployment baseline and reports `contract_changed`
+when the pinned digest moves away from it (see "Deployment baseline"). This is the conservative
+stopgap; it never accepts a breaking change silently.
 
 ### 2. Receipts belong in eve's harness
 
@@ -168,72 +167,98 @@ export default defineAppPortDependency({
 });
 ```
 
-#### `resolve(ctx): Promise<AppPortResolution>`
+**The guarantees come from eve's records, not the caller's.** eve issues every resolution and keeps it
+in its own records. The caller holds an identifier and nothing it can alter.
 
-For a new operation, it resolves the current binding of the Resolver `agent` reference, and checks:
+#### The resolution record
 
-1. every declared `name@version` is pinned by the binding;
-2. the origin serves each pinned digest exactly;
-3. the served application matches the binding's.
+`resolve` writes the resolution record into the session's **durable state**, not its view. Views have
+bounded retention; durable state survives crashes, redeploys and long sessions.
 
-It returns:
+The record is **create-only**, and nothing in the public API changes or deletes it. It holds:
 
-```ts
-interface AppPortResolution {
-  readonly ref: string;
-  readonly revision: number;
-  readonly origin: string;
-  readonly application: string;
-  readonly endpoint: string;
-  readonly contracts: Readonly<Record<string, string>>; // "name@version" → "sha256:…", as verified
-  readonly receiptId: string; // the dependency.resolved receipt for this resolution
-}
-```
+| Field                               | Content                                                                       |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| `resolutionId`                      | eve-issued, unique                                                            |
+| `operation`                         | The caller's operation identity (required; see below)                         |
+| `definition`                        | The dependency's file path                                                    |
+| `ref`, `revision`                   | The binding that was resolved                                                 |
+| `origin`, `application`, `endpoint` | The implementation selected                                                   |
+| `pins`                              | The binding's pinned `name@version → digest` at that revision                 |
+| `verified`                          | The capabilities this resolution verified, with the digests the origin served |
+| `receiptId`                         | The `dependency.resolved` receipt that recorded it                            |
 
-#### `at(resolution, ctx): Promise<AppPortResolution>`
+#### `resolve(ctx, { operation, capabilities })`
 
-For an existing operation: retry, recovery and reconciliation.
+**The call.** It resolves a new operation against the current binding.
 
-**What it does:**
+- `operation` is **required**: the caller's durable identity for the operation (for example, the ledger's
+  operation id), at most 200 characters.
+- `capabilities` is the set the operation will use: a non-empty subset of the declared requirements.
 
-- It **consumes the recorded resolution and never resolves the reference again.**
-- It contacts only `resolution.origin`, and verifies the requested capability's digest there against
-  `resolution.contracts`.
-- It returns the same resolution, with a new receipt for this use.
+**What it verifies,** for exactly that set:
 
-**What it never does:**
+1. Every capability in the set is pinned by the binding.
+2. The origin serves each pinned digest exactly.
+3. The application matches.
+4. In experimental mode, no pin has moved from the deployment baseline.
 
-- It never reads the current binding, and never switches to a replacement, however Resolver has changed.
-- It never falls back: no static URL, no current binding, no other origin.
-- It never relaxes the check. A digest that differs from the recorded one, an unreachable origin, or a
-  different application fails closed (`implementation_unavailable`, `contract_mismatch`).
+Capabilities outside the set are not verified, and the record says so (`verified` lists only the set).
 
-**What the caller does on failure.** The caller's own outcome rules apply. In the example agent, an
-operation never sent is failed, and one possibly sent stays indeterminate for operator settlement. There
-is no blind retry.
+**Idempotent per operation.** A second `resolve` in the same session with the same `operation`
+returns the first record, with a new use receipt. It does not resolve the reference again. So a caller
+that mistakenly calls `resolve` on a retry or recovery still gets the implementation the operation
+started on. A different `capabilities` set for an existing operation is refused (`operation_mismatch`).
 
-**Why `at` takes a whole resolution.** The `AppPortResolution` value is what an operation must persist
-(the example agent stores it on its ledger record). `at` accepts only that value, not a reference or an
-origin string.
+**It returns** `{ resolutionId, ...a read-only copy of the record }`. The copy is for display and the
+caller's own logs. eve never reads it back.
+
+#### `at(ctx, { resolutionId, operation, capabilities })`
+
+**The call.** It reuses an existing operation's resolution, for retry, recovery and reconciliation.
+
+**It accepts identifiers only, never resolution fields.** eve:
+
+1. loads the record by `resolutionId` from the **current session's** durable state, and refuses an
+   unknown identifier, or one from another session (`resolution_unknown`);
+2. requires `operation` to equal the record's (`operation_mismatch`);
+3. requires `capabilities` to be within the record's `verified` set (`capability_not_resolved`): an
+   existing operation cannot widen what was resolved for it;
+4. contacts only the record's origin, and verifies each requested capability's served digest against
+   the record's `verified` digests (`contract_mismatch`, `implementation_unavailable`);
+5. returns the same record, with a new use receipt.
+
+**What it never does:** read the current binding, ask Resolver, fall back, relax a check, or accept an
+origin, application or digest from the caller. A tampered copy of the record in the caller's own storage
+has no effect, because eve never reads it.
+
+**Why `operation` is mandatory.** The `resolve`/`at` distinction rests on operation identity:
+
+- It is what lets a recovered operation find its resolution after a crash.
+- It is what makes an accidental `resolve` safe.
+
+Model resolution needs no operation identity: its boundary is the turn.
 
 ## Receipts
 
 **Each use adds one durable session fact, `dependency.resolved`.** That means each `resolve`, each `at`,
 and each model resolution at a turn boundary.
 
-| Field             | Content                                                                                              |
-| ----------------- | ---------------------------------------------------------------------------------------------------- |
-| `receiptId`       | Unique per receipt                                                                                   |
-| `kind`            | `model` or `appport`                                                                                 |
-| `definition`      | The definition that asked (file path), e.g. `agent/lib/catalog.ts`, or `agent.model`                 |
-| `ref`, `revision` | The reference, and the revision that was resolved (or recorded, for `at`)                            |
-| `mode`            | `resolve` (current binding) or `at` (a recorded resolution)                                          |
-| `turnId`          | The turn it was resolved in                                                                          |
-| `callId`          | The tool call that asked, if any                                                                     |
-| `operationKey`    | Optional, from the caller (e.g. the ledger's operation id), to correlate a receipt with an operation |
-| `model`           | `{ provider, model, endpoint?, credentialRef, credentialRevision }`, never the credential's value    |
-| `appport`         | `{ origin, application, contracts }`: the verified digests                                           |
-| `outcome`         | `ok`, or the failure code                                                                            |
+| Field             | Content                                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `receiptId`       | Unique per receipt                                                                                                                                                        |
+| `kind`            | `model` or `appport`                                                                                                                                                      |
+| `definition`      | The definition that asked (file path), e.g. `agent/lib/catalog.ts`, or `agent.model`                                                                                      |
+| `ref`, `revision` | The reference, and the revision that was resolved (or recorded, for `at`)                                                                                                 |
+| `mode`            | `resolve` (current binding) or `at` (a recorded resolution)                                                                                                               |
+| `turnId`          | The turn it was resolved in                                                                                                                                               |
+| `callId`          | The tool call that asked, if any                                                                                                                                          |
+| `resolutionId`    | AppPort: the resolution record used (issued by `resolve`, reused by `at`)                                                                                                 |
+| `operation`       | AppPort: the caller's operation identity (required); absent for models                                                                                                    |
+| `model`           | `{ provider, model, endpoint?, credentialRef, credentialRevision }`, never the credential's value                                                                         |
+| `appport`         | `{ origin, application, verified }`: **only** the capabilities verified for this use, with the served digests. A receipt never implies a contract was checked that wasn't |
+| `baseline`        | AppPort, experimental mode: `established` or `matched`                                                                                                                    |
+| `outcome`         | `ok`, or the failure code                                                                                                                                                 |
 
 **Properties:**
 
@@ -250,26 +275,59 @@ This is the one change inside the harness.
 **Nothing falls back.** A model failure fails the turn; an AppPort failure fails `resolve` or `at`. The
 codes are separate per kind.
 
-| Kind    | Code                                        | When                                                                                                    |
-| ------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Both    | `resolver_not_configured`                   | `RESOLVER_URL` or `RESOLVER_API_KEY` unset                                                              |
-| Both    | `reference_missing` / `reference_forbidden` | Not found, revoked, or not readable by the deployment's key                                             |
-| Both    | `resolver_unavailable`                      | Resolver cannot be reached (`resolve` and models only; `at` never asks Resolver)                        |
-| Model   | `model_invalid`                             | Not a `model` reference, or a provider eve cannot construct                                             |
-| Model   | `credential_unavailable`                    | The credential cannot be revealed                                                                       |
-| AppPort | `reference_invalid`                         | Not an `agent` reference                                                                                |
-| AppPort | `contract_not_pinned`                       | A declared `name@version` has no pin in the binding                                                     |
-| AppPort | `contract_mismatch`                         | The origin serves a different digest or application than pinned (or than recorded, for `at`)            |
-| AppPort | `contract_changed`                          | Experimental stopgap: the binding's pin moved without Resolver's compatibility enforcement (decision 1) |
-| AppPort | `implementation_unavailable`                | The resolved or recorded origin cannot be reached                                                       |
+| Kind    | Code                                        | When                                                                                                                      |
+| ------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Both    | `resolver_not_configured`                   | `RESOLVER_URL` or `RESOLVER_API_KEY` unset                                                                                |
+| Both    | `reference_missing` / `reference_forbidden` | Not found, revoked, or not readable by the deployment's key                                                               |
+| Both    | `resolver_unavailable`                      | Resolver cannot be reached (`resolve` and models only; `at` never asks Resolver)                                          |
+| Model   | `model_invalid`                             | Not a `model` reference, or a provider eve cannot construct                                                               |
+| Model   | `credential_unavailable`                    | The credential cannot be revealed                                                                                         |
+| AppPort | `reference_invalid`                         | Not an `agent` reference                                                                                                  |
+| AppPort | `contract_not_pinned`                       | A declared `name@version` has no pin in the binding                                                                       |
+| AppPort | `contract_mismatch`                         | The origin serves a different digest or application than pinned (or than recorded, for `at`)                              |
+| AppPort | `contract_changed`                          | Experimental: a pin moved from the deployment baseline, without Resolver's compatibility enforcement                      |
+| AppPort | `resolution_unknown`                        | `at` with an identifier eve did not issue in this session                                                                 |
+| AppPort | `operation_mismatch`                        | `at` with a different operation than the record's, or `resolve` with a different capability set for an existing operation |
+| AppPort | `capability_not_resolved`                   | `at` for a capability outside the record's verified set                                                                   |
+| AppPort | `implementation_unavailable`                | The resolved or recorded origin cannot be reached                                                                         |
 
-## Still open
+## Deployment baseline (experimental `contract_changed`)
 
-- **Whether `contract_changed` is needed at all.** It is not, once Resolver enforces compatibility. The
-  proposal is to keep it only while experimental.
-- **The first-seen digest** that `contract_changed` compares against: stored per deployment (eve's
-  state) or derived from Resolver's history. The proposal derives it from Resolver's history, so eve
-  stores no second copy.
+**Definition.** For a deployment D, a reference R and a declared `name@version` C, the **baseline** is the
+digest from the first successful `resolve` in D that verified C on R. A deployment is the running eve
+application at one deployment identity, so a new deployment starts new baselines. From then on, while
+experimental:
+
+| The binding's pin for C is…                                                      | Result                                                                                                                           |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Equal to the baseline (including after a rollback that restores it)              | Accepted                                                                                                                         |
+| Different from the baseline, by any route: a re-pin, a replacement or a rollback | `contract_changed`. New operations needing C are refused; existing operations are unaffected, because `at` uses their own record |
+
+**Moving a baseline.** An operator can:
+
+- roll the binding back to the baseline digest; or
+- start a new deployment, which establishes new baselines and records the previous anchor.
+
+eve offers no route to change a baseline in place. That would make eve a control plane.
+
+**Anchoring, the decision needed.** Resolver's history alone cannot identify D's boundary. It records
+binding revisions, not which deployment first relied on which. eve has durable state per _session_, not
+per deployment. Two options; neither creates an operator-maintained registry:
+
+| Option              | Anchor                                                                                                                                                                                       | Recovery                                                                                   | Cost                                                                                                                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A (recommended)** | A create-only _baseline receipt_ in a new, deployment-scoped durable store in eve: one record per (D, R, C), holding the digest, Resolver revision, establishing session and its `receiptId` | Read the anchor; it cites the session receipt and Resolver's revision for the full context | A small deployment-scoped store in eve, the second harness change                                                                                                                                             |
+| B                   | The deployment's Resolver **consumer registration** (`register`), with the baseline in its declared dependency `contract` field (today informational, at most 200 characters, per reference) | Read the registration back from Resolver                                                   | No eve store, but the anchor lives in Resolver, written by the deployment: the agent's key would write Resolver state, and one field per reference cannot hold per-capability digests without a second lookup |
+
+**When `contract_changed` is removed.** Once a Resolver release enforces compatibility on binding
+changes, and eve can confirm that from Resolver's served capabilities:
+
+- eve drops baselines;
+- it trusts a compatible binding change;
+- it still verifies that the origin serves exactly the digest Resolver pins now.
+
+Until then, `contract_changed` distinguishes "the binding moved without the compatibility guarantee"
+from `contract_mismatch` ("the origin serves a digest other than the pinned one").
 
 ## Not in scope
 
@@ -282,6 +340,8 @@ codes are separate per kind.
 
 ## Tests
 
+- **Build gate.** The vendored digest does not ship until AppPort publishes the capability-digest
+  vectors. Canonical-JSON vectors alone do not establish capability-digest conformance.
 - **Unit:**
   - each failure code;
   - requirement and pin matching;
@@ -289,6 +349,21 @@ codes are separate per kind.
   - `at` never calling Resolver;
   - the receipt schema, and no secret in any receipt;
   - the vendored digest against both vector files.
+- **Integrity of resolutions.** `at` must refuse each of these before any request is sent:
+  - an identifier eve never issued;
+  - one issued in another session;
+  - one with a different `operation`;
+  - a capability outside the verified set;
+  - a hand-built object in place of an identifier (a runtime type check);
+  - a caller's stored copy with `origin`, `application`, `contracts` or `receiptId` altered. The test
+    shows eve contacts the record's origin, not the altered one.
+- **Idempotent `resolve`.** A second `resolve` with the same `operation`, after a replacement in
+  Resolver, returns the original implementation.
+- **Baseline:**
+  - established on first use;
+  - matched after a rollback to it;
+  - `contract_changed` after a re-pin, with existing operations unaffected;
+  - recovered after restart.
 - **Integration with a real local Resolver process:**
   - replacement without restart;
   - breaking-contract rejection, both by Resolver and by `contract_changed`;
@@ -304,6 +379,6 @@ codes are separate per kind.
 ## Migration
 
 `examples/appport-agent` replaces its own resolution (`agent/lib/appport.ts`: `currentResolution`, pin
-checks, endpoint discovery) with `defineAppPortDependency`. Its ledger stores the `AppPortResolution`
-per operation, and calls `at` for retry, recovery and reconciliation. Its slice-8 tests become
+checks, endpoint discovery) with `defineAppPortDependency`. Its ledger stores each operation's `resolutionId`, and uses its own
+operation id as `operation`. It calls `at` for retry, recovery and reconciliation. Its slice-8 tests become
 consumer-side acceptance tests.
