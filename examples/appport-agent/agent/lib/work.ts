@@ -68,13 +68,19 @@ export function workIdFor(requester: string, idempotencyKey: string): string {
   return `work_${digest.slice(0, 32)}`;
 }
 
+/** Where work submitted by the identity authority came from: what the surface delivered and how it was resolved. */
+export type SurfaceProvenance = Readonly<Record<string, string | number | boolean | null>>;
+
 export interface SubmissionRecord {
   readonly accepted_at: string;
+  /** The identity authority that asserted who the requester is (its verified principal), if one did. */
+  readonly asserted_by?: string | null;
   readonly auth: AuthResult;
   readonly objective: string;
   /** Submitted read-only by the requester: its operations may only observe. Fixed when accepted. */
   readonly read_only?: boolean;
   readonly requester: string;
+  readonly surface?: SurfaceProvenance | null;
   readonly work_id: string;
 }
 
@@ -92,6 +98,7 @@ export async function acceptWork(
   idempotencyKey: string,
   objective: string,
   readOnly = false,
+  assertion?: { readonly assertedBy: string; readonly surface: SurfaceProvenance },
 ): Promise<Acceptance> {
   const { db, state } = await workStore();
   const requester = auth.principalId;
@@ -102,6 +109,8 @@ export async function acceptWork(
       await db.collection(SUBMISSIONS).insert(
         {
           accepted_at: new Date().toISOString(),
+          asserted_by: assertion?.assertedBy ?? null,
+          surface: assertion?.surface ?? null,
           auth,
           objective,
           read_only: readOnly,
@@ -116,7 +125,11 @@ export async function acceptWork(
     }
     submission = await readSubmission(workId);
   }
-  if (submission?.objective !== objective || (submission.read_only === true) !== readOnly)
+  if (
+    submission?.objective !== objective ||
+    (submission.read_only === true) !== readOnly ||
+    (submission.asserted_by ?? null) !== (assertion?.assertedBy ?? null)
+  )
     return { outcome: "conflict", workId };
   if ((await state.getTask(workId)) !== null) return { outcome: "replayed", workId };
   try {
@@ -190,6 +203,7 @@ export async function readWork(requester: string, workId: string) {
       effect: record.effect ?? null,
       errorCode: record.outcome?.error?.code ?? null,
       operationId: record.operation_id,
+      requestIds: record.request_ids ?? [],
       resolution: record.resolution ?? null,
       settlement: record.settlement ?? null,
       state: record.state,
@@ -202,12 +216,15 @@ export async function readWork(requester: string, workId: string) {
       recordedAt: link.recorded_at,
       refusal: link.refusal,
     }));
+  const submission = await readSubmission(workId);
   return {
     agent: current.task.owner,
+    assertedBy: submission?.asserted_by ?? null,
     createdAt: current.task.created_at,
     decisions: current.checkpoint.decisions,
     ledger,
-    readOnly: (await readSubmission(workId))?.read_only === true,
+    readOnly: submission?.read_only === true,
+    surface: submission?.surface ?? null,
     refusals,
     evidence: current.checkpoint.evidence,
     history: entries.map((entry) => ({

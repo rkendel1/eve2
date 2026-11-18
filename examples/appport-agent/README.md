@@ -52,6 +52,13 @@ curl "$AGENT_URL/work/work_…" -H "authorization: Bearer $JWT"
 
 **Read-only work.** A body of `{ "objective": …, "readOnly": true }` is stored in the submission. That work runs only capabilities whose manifest declares `effect: "observation"`; any other or undeclared effect is refused with `READ_ONLY_WORK` before an operation is recorded or sent, on the first call, a retry or recovery alike. The model cannot set or clear it.
 
+**Identity authority (connected surfaces).** Personal OS resolves who sent a surface message (Resolver) and submits the work for that person. It authenticates with its own ES256 token: issuer `APPPORT_AGENT_IDENTITY_ISSUER`, verified with `APPPORT_AGENT_IDENTITY_PUBLIC_KEY`, audience `appport-agent-identity`. The issuer must differ from the requester issuer.
+
+- **What it may send:** only that token may carry `onBehalfOf` (the person) and `surface` (scalar provenance, at most 4 KB). Anyone else's token gets `403 ON_BEHALF_OF_NOT_ALLOWED`.
+- **Who the work is for:** it is accepted as `<requester issuer>:<person>`, the same requester as the person's own submissions, and runs under that person's grants.
+- **What is recorded:** the submission keeps who asserted the person (`assertedBy`) and the surface provenance. Both are shown by `GET /work/:id`, which the authority may read for work it submitted.
+- **Finding its work:** `GET /submissions/:person/:key` finds work the authority submitted by its own key. It lets the authority learn whether a submission with no definite answer was accepted, without sending it again.
+
 **Progress** is recorded by the `work` channel's event handlers as immutable FeltDB checkpoints, never overwritten:
 
 | eve event                           | Checkpoint                                                                                                                                  |
@@ -395,6 +402,7 @@ Every rejected call is checked to have no `execution` record.
 
   See [`RUNTIME-SAFETY-REPORT.md`](../../audits/appport-foundation/RUNTIME-SAFETY-REPORT.md).
 
+- **With `PERSONALOS_DIR`**, `test/anywhere.test.mjs`: AnywhereAide surfaces through Personal OS to this agent. It runs real eve, the Personal OS server process, its private AuthBoundry, the Resolver server process and FeltDB. The Multiplayer bridge and the X adapter's poll are played by the test with real service sessions; no X API is involved. See [`ANYWHEREAIDE-INTEGRATION-REPORT.md`](../../audits/appport-foundation/ANYWHEREAIDE-INTEGRATION-REPORT.md).
 - **Always, `test/settle.test.mjs`.** Operator settlement, with real eve, FeltDB, the host process and AuthBoundry. It covers:
   - work blocked while an operation is indeterminate;
   - settling the host-crash-after-effect reservation as succeeded (the work completes) and the crash-after-claim one as failed (after reconciliation kept it indeterminate);
