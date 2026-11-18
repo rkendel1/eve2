@@ -46,6 +46,8 @@ For a local ChatGPT subscription, use `chatgpt()` from `eve/models/openai` and s
 
 `/login` can switch a static Gateway string to an eve helper and manage its import, and `/model` changes the selected model and settings immediately. Edit custom provider SDK calls and dynamic expressions by hand. For provider-specific configuration, install an AI SDK provider package and pass its language model.
 
+eve reads each model's context window from the AI Gateway model catalog when it builds, to decide when to compact. When the catalog is unreachable, `eve build` uses the model metadata bundled with eve and warns with `compile/model-metadata-bundled`. Set `EVE_MODEL_CATALOG=bundled` to never request the catalog, for example on a build host without internet access. Set `modelContextWindowTokens` for a model neither source lists.
+
 Model use is subject to the terms, data-processing commitments, retention behavior, and available controls of the selected provider and routing path. Review the [AI Gateway model catalog](https://vercel.com/ai-gateway/models) for gateway-routed models, and review the provider's terms when you configure a direct model instance.
 
 eve fills some provider options by default. A value you set at the same path
@@ -162,8 +164,8 @@ The function returns a Gateway model ID, a model instance such as an AI SDK lang
 - **Serialization.** Only memo results must be JSON. The function can return a live provider
   instance built from those results. `ctx.model` is unavailable during model selection.
 - **Selection object.** `{ model, reasoning?, modelContextWindowTokens?, modelOptions? }`.
-  Omit `modelContextWindowTokens` to read it from the AI Gateway model catalog that `eve build` or
-  `eve dev` recorded, without a network request. A model that catalog doesn't list fails the turn. Set
+  Omit `modelContextWindowTokens` to read it from the model metadata that `eve build` or
+  `eve dev` recorded, without a network request. A model that metadata doesn't list fails the turn. Set
   `modelContextWindowTokens` for an unlisted, custom, or newly published model, or rebuild. Dynamic agents cannot set sibling `modelContextWindowTokens` or
   `modelOptions` fields; return per-model values from the function.
 

@@ -1,3 +1,4 @@
+import { isAllowedCallbackOrigin } from "#internal/workspace/peer-auth.js";
 import { z } from "#compiled/zod/index.js";
 
 import type { SessionCallback } from "#channel/types.js";
@@ -54,11 +55,14 @@ const sessionCallbackSchema = z
       });
     }
 
-    if (isBlockedDestinationHost(url.hostname, { allowLoopback: isLocalDevelopmentServer() })) {
+    if (
+      isBlockedDestinationHost(url.hostname, { allowLoopback: isLocalDevelopmentServer() }) &&
+      !isAllowedCallbackOrigin(url.origin)
+    ) {
       ctx.addIssue({
         code: "custom",
         message:
-          "Callback url host must not be a loopback, private, link-local, or reserved address. Loopback is allowed only on local development servers.",
+          "Callback url host must not be a loopback, private, link-local, or reserved address. Loopback is allowed only on local development servers and for origins listed in EVE_CALLBACK_ALLOWED_ORIGINS.",
         path: ["url"],
       });
     }

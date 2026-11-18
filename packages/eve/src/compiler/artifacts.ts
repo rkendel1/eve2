@@ -170,8 +170,11 @@ export async function writeCompilerArtifacts(
     projectDiscoverDiagnostic(diagnostic, ROOT_COMPILED_AGENT_NODE_ID),
   );
   const modelCatalog = createCompiledRuntimeModelCatalogLoader(input.manifest.appRoot);
-  if ((await modelCatalog.loadModelMetadata()).fetchedAt === null) {
-    diagnostics.push(createModelMetadataUnavailableDiagnostic(paths.modelMetadataPath));
+  const catalogMetadata = await modelCatalog.loadModelMetadata();
+  if (modelCatalog.usedBundledFallback()) {
+    diagnostics.push(
+      createBundledModelMetadataDiagnostic(paths.modelMetadataPath, catalogMetadata.fetchedAt),
+    );
   }
   const compiledManifest = await materializeWorkspaceResources({
     compileDirectoryPath: paths.compileDirectoryPath,
@@ -229,14 +232,15 @@ export async function writeCompilerArtifacts(
   };
 }
 
-function createModelMetadataUnavailableDiagnostic(modelMetadataPath: string): CompilerDiagnostic {
+function createBundledModelMetadataDiagnostic(
+  modelMetadataPath: string,
+  snapshotDate: string | null,
+): CompilerDiagnostic {
   return {
-    code: "compile/model-metadata-unavailable",
+    code: "compile/model-metadata-bundled",
     message:
-      "The AI Gateway model catalog was unavailable, so this build has no model metadata. " +
-      "Runtime model selections that omit modelContextWindowTokens, such as dynamic models and " +
-      "ctx.agent() model overrides, fail until you rebuild with network access to " +
-      "ai-gateway.vercel.sh or set modelContextWindowTokens on each selection.",
+      `The AI Gateway model catalog was unavailable, so this build used eve's bundled model metadata from ${snapshotDate?.slice(0, 10) ?? "an earlier release"}. ` +
+      "Set EVE_MODEL_CATALOG=bundled to skip the request, and set modelContextWindowTokens for models the bundled metadata doesn't list.",
     severity: "warning",
     sources: [{ nodeId: ROOT_COMPILED_AGENT_NODE_ID, sourcePath: modelMetadataPath }],
   };

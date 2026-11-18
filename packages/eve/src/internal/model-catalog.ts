@@ -34,6 +34,10 @@ export interface ModelCatalog {
   readonly providerAliases: Readonly<Record<string, string>>;
 }
 
+export interface ModelCatalogSnapshot extends ModelCatalog {
+  readonly fetchedAt: string;
+}
+
 export interface ModelCatalogEntry {
   readonly contextWindowTokens: number;
   readonly slug: string;

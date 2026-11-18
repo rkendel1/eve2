@@ -240,18 +240,42 @@ Updates, `enable`, `disable`, and `delete` affect future runs, not callbacks alr
 
 The built-in `vercelScheduleProvider()` uses Vercel Schedules in production and supports local development:
 
-| Environment                                      | Storage and delivery                                                                                           |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| Vercel deployments                               | Hosted Vercel Schedules delivers occurrences through Vercel Queues.                                            |
-| `eve dev` without local Vercel Schedules         | Process-local storage, with no background clock. Call `invoke` through the client to dispatch an occurrence.   |
-| `vc dev` with local Schedules and Queues support | Local Vercel Schedules stores timing, and eve delivers due occurrences automatically through local Queues.     |
-| Self-hosted production                           | [Create a provider](#create-a-provider-for-your-use-case) for your application's storage and scheduling needs. |
+| Environment                                      | Storage and delivery                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Vercel deployments                               | Hosted Vercel Schedules delivers occurrences through Vercel Queues.                                          |
+| `eve dev` without local Vercel Schedules         | Process-local storage, with no background clock. Call `invoke` through the client to dispatch an occurrence. |
+| `vc dev` with local Schedules and Queues support | Local Vercel Schedules stores timing, and eve delivers due occurrences automatically through local Queues.   |
+| Self-hosted production                           | Not supported; use [`workflowScheduleProvider()`](#run-schedules-on-the-workflow-world) instead.             |
 
 On Vercel, schedules belong to the deployment's track, selected by its OIDC credentials. Preview schedules are separate from production schedules. Occurrences run on the track's current leader deployment, so schedules follow updates within that track.
 
 Under `vc dev`, local queue errors appear in the dev server logs and retry after five seconds.
 
 Import `vercelScheduleProvider` from `eve/experimental/schedules/vercel` to configure the Vercel endpoint explicitly. Import the in-memory provider from `eve/experimental/schedules/testing` for code-driven tests.
+
+### Run schedules on the Workflow world
+
+`workflowScheduleProvider()` from `eve/experimental/schedules/workflow` stores and runs schedules on the agent's [Workflow world](/docs/guides/deployment/workflow-worlds), so they work under `eve start` without Vercel:
+
+```ts title="agent/schedules/reminders.ts"
+import { defineDynamicSchedules } from "eve/experimental/schedules";
+import { workflowScheduleProvider } from "eve/experimental/schedules/workflow";
+
+export default defineDynamicSchedules({
+  provider: workflowScheduleProvider(),
+  // inputSchema, auth, and run as above
+});
+```
+
+Each schedule is one durable workflow run that sleeps until its next occurrence:
+
+- Schedules, their state, and their payloads survive restarts.
+- An occurrence that comes due while the server is down runs once when it is back. When several cron occurrences were missed, only the latest runs.
+- A failing occurrence retries, then fires `occurrence.failed` and the schedule continues.
+- An occurrence's `executionId` is stable, so a retried delivery is recognized as the same occurrence.
+- `update`, `enable`, and `disable` replace the schedule's run and wait up to 30 seconds for it to take over.
+
+Timezones apply to cron and one-time expressions; a schedule without one uses UTC. `jitter` is accepted but not applied. `list` reads every schedule hook in the world, so keep collections to hundreds of schedules. With the local world, run one `eve start` process; with the Postgres world, each schedule runs in one process at a time.
 
 ### Create a provider for your use case
 

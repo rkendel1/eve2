@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { z } from "#compiled/zod/index.js";
+import { MODEL_CATALOG_SNAPSHOT } from "#compiler/model-catalog-snapshot.js";
 import { AI_GATEWAY_MODELS_CATALOG_URL, vercelGatewayFetch } from "#internal/gateway.js";
 import {
   catalogModelSchema,
@@ -18,6 +19,7 @@ const MODEL_CATALOG_CACHE_KIND = "eve-model-catalog-cache";
 const MODEL_CATALOG_CACHE_VERSION = 2;
 const MODEL_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
 const MODEL_CATALOG_FETCH_TIMEOUT_MS = 15_000;
+export const MODEL_CATALOG_SOURCE_ENV = "EVE_MODEL_CATALOG";
 
 const modelCatalogCacheSchema = z
   .object({
@@ -38,6 +40,7 @@ export interface CompiledRuntimeModelCatalogLoader {
     providerModelId: string,
   ): Promise<ModelCatalogEntry | null>;
   loadModelMetadata(): Promise<ModelMetadata>;
+  usedBundledFallback(): boolean;
 }
 
 export function resolveCompiledRuntimeModelCatalogCachePath(appRoot: string): string {
@@ -50,6 +53,7 @@ export function createCompiledRuntimeModelCatalogLoader(
   let cachedCatalogPromise: Promise<ModelCatalogCache | null> | null = null;
   let fetchedCatalogError: unknown = null;
   let fetchedCatalogPromise: Promise<ModelCatalogCache> | null = null;
+  let bundledFallback = false;
 
   const getCachedCatalog = async (): Promise<ModelCatalogCache | null> => {
     cachedCatalogPromise ??= readModelCatalogCache(appRoot);
@@ -81,6 +85,7 @@ export function createCompiledRuntimeModelCatalogLoader(
   const resolveCatalog = async (options?: {
     forceRefresh?: boolean;
   }): Promise<ModelCatalogCache> => {
+    if (usesBundledModelCatalogOnly()) return bundledModelCatalog();
     const cachedCatalog = await getCachedCatalog();
 
     if (options?.forceRefresh !== true && cachedCatalog !== null && isCacheFresh(cachedCatalog)) {
@@ -89,11 +94,10 @@ export function createCompiledRuntimeModelCatalogLoader(
 
     try {
       return await getFetchedCatalog();
-    } catch (error) {
-      if (cachedCatalog !== null) {
-        return cachedCatalog;
-      }
-      throw error;
+    } catch {
+      if (cachedCatalog !== null) return cachedCatalog;
+      bundledFallback = true;
+      return bundledModelCatalog();
     }
   };
 
@@ -112,13 +116,11 @@ export function createCompiledRuntimeModelCatalogLoader(
       ),
 
     async loadModelMetadata() {
-      try {
-        const catalog = await resolveCatalog();
-        return createModelMetadata({ catalog, fetchedAt: catalog.fetchedAt });
-      } catch {
-        return createModelMetadata(null);
-      }
+      const catalog = await resolveCatalog();
+      return createModelMetadata({ catalog, fetchedAt: catalog.fetchedAt });
     },
+
+    usedBundledFallback: () => bundledFallback,
   };
 }
 
@@ -172,4 +174,23 @@ function isCacheFresh(cache: ModelCatalogCache): boolean {
     return false;
   }
   return Date.now() - fetchedAt <= MODEL_CATALOG_CACHE_TTL_MS;
+}
+
+function usesBundledModelCatalogOnly(): boolean {
+  const source = process.env[MODEL_CATALOG_SOURCE_ENV]?.trim();
+  if (source === undefined || source === "" || source === "remote") return false;
+  if (source === "bundled") return true;
+  throw new Error(
+    `${MODEL_CATALOG_SOURCE_ENV} must be "remote" or "bundled", but it is "${source}".`,
+  );
+}
+
+function bundledModelCatalog(): ModelCatalogCache {
+  return {
+    fetchedAt: MODEL_CATALOG_SNAPSHOT.fetchedAt,
+    kind: MODEL_CATALOG_CACHE_KIND,
+    models: [...MODEL_CATALOG_SNAPSHOT.models],
+    providerAliases: { ...MODEL_CATALOG_SNAPSHOT.providerAliases },
+    version: MODEL_CATALOG_CACHE_VERSION,
+  };
 }

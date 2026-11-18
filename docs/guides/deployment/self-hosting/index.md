@@ -78,14 +78,14 @@ eve remote connect --url https://your_agent.example.com
 
 ## Configure additional features
 
-| Feature                                                            | Configuration                                                                                                     |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| Sandbox tools, file attachments, and skill supporting files        | [Run the sandbox](#run-the-sandbox) with Docker or another provider                                               |
-| [Schedules](/docs/schedules)                                       | Keep schedules enabled on [one `eve start` process](/docs/guides/deployment/self-hosted-operations#run-schedules) |
-| Slack, Microsoft Teams, and other [channels](/docs/channels)       | Expose `/eve/` over public HTTPS through your [proxy](#configure-proxy-routes)                                    |
-| Connection sign-in and [remote agents](/docs/guides/remote-agents) | Set a [public callback origin](#set-the-public-callback-origin)                                                   |
-| Agents in a workspace that call each other                         | Configure a [workspace-peer transport](/docs/subagents#vercel-workspace-peers)                                    |
-| Traces                                                             | Configure an [OpenTelemetry](/docs/observability/otel) destination                                                |
+| Feature                                                            | Configuration                                                                                                      |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Sandbox tools, file attachments, and skill supporting files        | [Run the sandbox](#run-the-sandbox) with Docker or another provider                                                |
+| [Schedules](/docs/schedules)                                       | Keep schedules enabled on [one `eve start` process](/docs/guides/deployment/self-hosted-operations#run-schedules)  |
+| Slack, Microsoft Teams, and other [channels](/docs/channels)       | Expose `/eve/` over public HTTPS through your [proxy](#configure-proxy-routes)                                     |
+| Connection sign-in and [remote agents](/docs/guides/remote-agents) | Set a [public callback origin](#set-the-public-callback-origin)                                                    |
+| Agents in a workspace that call each other                         | Run the workspace with [`eve start` from its root](/docs/guides/deployment/self-hosted-operations#run-a-workspace) |
+| Traces                                                             | Configure an [OpenTelemetry](/docs/observability/otel) destination                                                 |
 
 ## Run the sandbox
 
@@ -111,7 +111,7 @@ WORKFLOW_LOCAL_BASE_URL=https://support.example.com eve start --host 0.0.0.0
 
 With the local world, queued work is also delivered to that origin, so those deliveries pass through your proxy. Forward both [proxy route prefixes](#configure-proxy-routes), and keep a single process behind that origin; see [Use the local world](/docs/guides/deployment/workflow-worlds#use-the-local-world). The Postgres world delivers queued work inside each process, so its deliveries don't use this origin.
 
-For an agent mounted under a path prefix, also set `EVE_PUBLIC_ROUTE_PREFIX`; see [Run workspace members](/docs/guides/deployment/self-hosted-operations#run-workspace-members).
+For an agent mounted under a path prefix, also set `EVE_PUBLIC_ROUTE_PREFIX`; see [Run members separately](/docs/guides/deployment/self-hosted-operations#run-members-separately).
 
 ## Continue configuring production
 

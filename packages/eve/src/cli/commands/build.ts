@@ -1,4 +1,4 @@
-import { relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import type { Command } from "#compiled/commander/index.js";
 import type { CliApplicationContext } from "#cli/application-command.js";
@@ -6,7 +6,6 @@ import { resolveInternalVercelServiceOutput } from "#cli/vercel-service-output.j
 import { createCliTheme, renderCliTaggedLine } from "#cli/ui/output.js";
 import { EVE_INTERNAL_AGENT_WORKSPACE_MEMBER_ENV } from "#internal/application/build-output-environment.js";
 import type { ApplicationBuildOptions } from "#internal/nitro/host/types.js";
-import type { AgentWorkspace } from "#internal/project-context.js";
 import {
   EVE_PUBLIC_ROUTE_PREFIX_ENV,
   normalizePublicRoutePrefix,
@@ -64,9 +63,26 @@ export function registerBuildCommand(input: {
           }),
         );
         if (!process.env.VERCEL) {
+          const buildMember =
+            input.buildHost ?? (await import("#internal/nitro/host.js")).buildApplication;
+          for (const member of projectContext.workspace.members) {
+            await buildMember(member.appRoot, {
+              publicRoutePrefix: undefined,
+              skipSandboxPrewarm: options.skipSandboxPrewarm === true,
+              vercelServiceOutput: resolveInternalVercelServiceOutput(member.appRoot),
+              workspaceMember: true,
+            });
+            input.logger.log(
+              renderCliTaggedLine(theme, {
+                message: `built ${member.name} at ${join(member.appRoot, ".output")}`,
+                tag: "build",
+                tone: "success",
+              }),
+            );
+          }
           input.logger.log(
             renderCliTaggedLine(theme, {
-              message: workspaceSelfHostingHint(projectContext.workspace),
+              message: "Run `eve start` from the workspace root to serve every agent.",
               tag: "build",
               tone: "info",
             }),
@@ -107,15 +123,4 @@ export function registerBuildCommand(input: {
         }),
       );
     });
-}
-
-export function workspaceSelfHostingHint(workspace: AgentWorkspace): string {
-  const members = workspace.members.map(
-    (member) => relative(workspace.root, member.appRoot) || ".",
-  );
-  return [
-    "A workspace root build writes Vercel Build Output for `eve deploy` or a Vercel Git deployment.",
-    "To self-host, build and start each member from its own directory:",
-    ...members.map((member) => `  (cd ${member} && eve build && eve start)`),
-  ].join("\n");
 }

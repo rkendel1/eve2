@@ -372,6 +372,7 @@ async function loadGraphFromArtifacts(input: {
   return await resolveRuntimeAgentGraph({
     manifest,
     moduleMap,
+    resolveRemoteAgentUrls: false,
   });
 }
 

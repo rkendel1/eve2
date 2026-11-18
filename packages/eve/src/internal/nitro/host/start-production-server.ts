@@ -7,6 +7,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { loadDevelopmentEnvironmentFiles } from "#cli/dev/environment.js";
 import type { ProductionServerHandle } from "#internal/nitro/host/types.js";
 import { EVE_SCHEDULES_DISABLED_ENV } from "#internal/schedules/disabled.js";
+import { WORKSPACE_HOST_ENV_NAMES } from "#internal/workspace/peer-auth.js";
 import {
   BuiltServerPortInUseError,
   readBuiltServerStartFailure,
@@ -53,7 +54,7 @@ function normalizeServerClientUrl(serverUrl: string): string {
   return url.toString();
 }
 
-async function resolveListenPort(input: { host: string; port: number }): Promise<number> {
+export async function resolveListenPort(input: { host: string; port: number }): Promise<number> {
   if (input.port !== 0) {
     return input.port;
   }
@@ -168,7 +169,9 @@ function once(child: ChildProcess, event: "exit"): Promise<void> {
 export async function startProductionServer(
   rootDir: string,
   options: {
+    env?: Readonly<Record<string, string>>;
     host?: string;
+    loadEnvironmentFiles?: boolean;
     port?: number;
     schedules?: boolean;
   } = {},
@@ -182,7 +185,7 @@ export async function startProductionServer(
     );
   }
 
-  await loadDevelopmentEnvironmentFiles(appRoot);
+  if (options.loadEnvironmentFiles !== false) await loadDevelopmentEnvironmentFiles(appRoot);
 
   const host = options.host ?? DEFAULT_PRODUCTION_SERVER_HOST;
   const requestedPort = options.port ?? readEnvironmentPort() ?? DEFAULT_PRODUCTION_SERVER_PORT;
@@ -192,6 +195,7 @@ export async function startProductionServer(
     try {
       return await spawnBuiltServer({
         appRoot,
+        env: options.env,
         host,
         port,
         retryable,
@@ -206,6 +210,7 @@ export async function startProductionServer(
 
 async function spawnBuiltServer(input: {
   readonly appRoot: string;
+  readonly env: Readonly<Record<string, string>> | undefined;
   readonly host: string;
   readonly port: number;
   readonly retryable: boolean;
@@ -224,7 +229,9 @@ async function spawnBuiltServer(input: {
   let startError: unknown;
 
   const env: NodeJS.ProcessEnv = {
+    ...input.env,
     ...process.env,
+    ...workspaceOwnedEnv(input.env),
     HOST: host,
     NITRO_HOST: host,
     NITRO_PORT: String(port),
@@ -310,4 +317,13 @@ async function spawnBuiltServer(input: {
 
     throw error;
   }
+}
+
+function workspaceOwnedEnv(
+  env: Readonly<Record<string, string>> | undefined,
+): Record<string, string> {
+  if (env === undefined) return {};
+  return Object.fromEntries(
+    Object.entries(env).filter(([name]) => WORKSPACE_HOST_ENV_NAMES.has(name)),
+  );
 }

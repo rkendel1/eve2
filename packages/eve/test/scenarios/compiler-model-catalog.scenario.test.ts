@@ -43,6 +43,7 @@ function mockCatalogResponse(
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("compiler model catalog", () => {
@@ -154,7 +155,7 @@ describe("compiler model catalog", () => {
       models: [expect.objectContaining({ slug: "example/primary-model" })],
     });
     expect(result.diagnostics).not.toContainEqual(
-      expect.objectContaining({ code: "compile/model-metadata-unavailable" }),
+      expect.objectContaining({ code: "compile/model-metadata-bundled" }),
     );
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
@@ -488,7 +489,7 @@ describe("compiler model catalog", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
 
     await expect(compileAgent({ startPath: appRoot })).rejects.toThrow(
-      'Cannot compile agent compaction because the primary compaction trigger model "example/missing-model" does not have known AI Gateway context window metadata.',
+      `Cannot compile agent compaction because the primary compaction trigger model "example/missing-model" has no known context window in the AI Gateway model catalog or eve's bundled model metadata. Set modelContextWindowTokens for it.`,
     );
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
@@ -516,11 +517,11 @@ describe("compiler model catalog", () => {
         startPath: appRoot,
       }),
     ).rejects.toThrow(
-      'Cannot compile agent compaction because the primary compaction trigger model "example/missing-model" does not have known AI Gateway context window metadata.',
+      `Cannot compile agent compaction because the primary compaction trigger model "example/missing-model" has no known context window in the AI Gateway model catalog or eve's bundled model metadata. Set modelContextWindowTokens for it.`,
     );
   });
 
-  it("preserves catalog request failures for models without built-in metadata", async () => {
+  it("fails offline for a model the bundled metadata doesn't list", async () => {
     const { agentRoot, appRoot } = await createAppRoot(
       "eve-model-catalog-unavailable-",
       APP_ROOT_OPTIONS,
@@ -543,11 +544,63 @@ describe("compiler model catalog", () => {
         startPath: appRoot,
       }),
     ).rejects.toThrow(
-      'Failed to load AI Gateway model metadata for the primary compaction trigger model "example/uncached-model". catalog offline',
+      `Cannot compile agent compaction because the primary compaction trigger model "example/uncached-model" has no known context window in the AI Gateway model catalog or eve's bundled model metadata. Set modelContextWindowTokens for it.`,
     );
   });
 
-  it("uses authored modelContextWindowTokens and warns when the catalog is unavailable", async () => {
+  it("compiles a direct Anthropic model offline from eve's bundled model metadata", async () => {
+    const { agentRoot, appRoot } = await createAppRoot(
+      "eve-model-catalog-direct-offline-",
+      APP_ROOT_OPTIONS,
+    );
+
+    await writeFile(
+      join(agentRoot, "agent.ts"),
+      [
+        'import { defineAgent } from "eve";',
+        'import { anthropic } from "eve/models/anthropic";',
+        'export default defineAgent({ model: anthropic("claude-sonnet-5") });',
+        "",
+      ].join("\n"),
+    );
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no route to ai-gateway.vercel.sh"));
+
+    const result = await compileAgent({ startPath: appRoot });
+
+    expect(result.manifest.config.model).toMatchObject({ contextWindowTokens: 1_000_000 });
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "compile/model-metadata-bundled", severity: "warning" }),
+    );
+  });
+
+  it("never requests the catalog with EVE_MODEL_CATALOG=bundled", async () => {
+    const { agentRoot, appRoot } = await createAppRoot(
+      "eve-model-catalog-bundled-only-",
+      APP_ROOT_OPTIONS,
+    );
+
+    await writeFile(
+      join(agentRoot, "agent.ts"),
+      [
+        'import { defineAgent } from "eve";',
+        'export default defineAgent({ model: "anthropic/claude-sonnet-5" });',
+        "",
+      ].join("\n"),
+    );
+    vi.stubEnv("EVE_MODEL_CATALOG", "bundled");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const result = await compileAgent({ startPath: appRoot });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.manifest.config.model).toMatchObject({ contextWindowTokens: 1_000_000 });
+    expect(result.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: "compile/model-metadata-bundled" }),
+    );
+  });
+
+  it("uses authored modelContextWindowTokens and warns about bundled metadata when the catalog is unavailable", async () => {
     const { agentRoot, appRoot } = await createAppRoot(
       "eve-model-catalog-authored-window-",
       APP_ROOT_OPTIONS,
@@ -576,11 +629,11 @@ describe("compiler model catalog", () => {
       id: "example/unlisted-model",
     });
     expect(result.diagnostics).toContainEqual(
-      expect.objectContaining({ code: "compile/model-metadata-unavailable", severity: "warning" }),
+      expect.objectContaining({ code: "compile/model-metadata-bundled", severity: "warning" }),
     );
-    await expect(
-      loadModelMetadata(createDiskRuntimeCompiledArtifactsSource(appRoot)),
-    ).resolves.toMatchObject({ fetchedAt: null, models: [] });
+    const metadata = await loadModelMetadata(createDiskRuntimeCompiledArtifactsSource(appRoot));
+    expect(metadata.fetchedAt).toEqual(expect.any(String));
+    expect(metadata.models.length).toBeGreaterThan(100);
   });
 
   it("uses authored modelContextWindowTokens for source-backed models when the catalog is unavailable", async () => {

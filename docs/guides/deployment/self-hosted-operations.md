@@ -32,15 +32,37 @@ Configure each replica the same way, with two differences:
 
 ## Run schedules
 
-`eve start` runs every authored schedule. On a custom HTTP-only host or preset, run Nitro scheduled tasks or invoke the same work from your scheduler.
+`eve start` runs every authored schedule. For schedules your agent creates at runtime, use [`workflowScheduleProvider()`](../../experimental/dynamic-schedules#run-schedules-on-the-workflow-world), which keeps them in the Workflow world. On a custom HTTP-only host or preset, run Nitro scheduled tasks or invoke the same work from your scheduler.
 
 When you run several replicas, start one normally and start the others with `eve start --no-schedules`, or set `EVE_SCHEDULES_DISABLED=1` in their environment. See [`eve start`](../../reference/cli#eve-start).
 
-## Run workspace members
+## Run a workspace
 
-An [agent workspace](../../concepts/project-structure#several-root-agents) needs neither Vercel nor a frontend at runtime. Build each member from its own directory, because a root `eve build` produces a Vercel workspace deployment.
+An [agent workspace](../../concepts/project-structure#several-root-agents) runs on one server without Vercel. Build and start it from the workspace root, outside a Vercel build environment:
 
-For a workspace containing `support` and `research`, run these from the workspace root, outside a Vercel build environment:
+```bash
+npx eve build
+npx eve start --host 0.0.0.0 --port 3000
+```
+
+`eve build` builds every agent under `agents/` as a Node server in its own `.output/`. `eve start` runs each agent as a separate process on `127.0.0.1` and serves them all from one origin:
+
+- `/eve/<name>/v1/*` reaches agent `<name>`, the same public routes a Vercel workspace uses.
+- `/eve/v1/health` lists every agent with its status. It returns 503 when an agent has stopped, and that agent's routes return 503 with `code: "agent_unavailable"`.
+- Agents call each other with [`defineWorkspaceAgent`](../../subagents#workspace-peers) and no transport. Each call carries a short-lived token signed with the workspace secret. Set `EVE_WORKSPACE_SECRET` to a value of at least 32 characters to keep it across restarts; otherwise `eve start` generates one each time.
+- Each agent keeps its own Workflow world under its own `.eve/.workflow-data`, its own environment files, and its own sandbox. Persist each agent's directory.
+
+`eve start --agent <name>` still starts a single agent.
+
+Current limits of a workspace started this way:
+
+- `eve start` does not restart an agent whose process exits. Restart the whole workspace with your process manager.
+- If a delegated agent stops while it works on a task, the caller waits for that task until the agent comes back.
+- Each agent's callback origin is its own `127.0.0.1` address. Features that need a public callback origin, such as connection sign-in and remote agents outside the workspace, need [separately run members](#run-members-separately).
+
+### Run members separately
+
+To run each agent behind its own hostname or process, build and start each member from its own directory:
 
 ```bash
 (cd agents/support && npx eve build)
@@ -68,7 +90,7 @@ research.example.com {
 
 Apply the [authentication, Workflow world, and sandbox configuration](./self-hosting) to each member. With the default local Workflow world, persist each member's own `.eve/.workflow-data` directory.
 
-If agents delegate to one another, configure an explicit [workspace-peer transport](../../subagents#vercel-workspace-peers) with the peer's URL and credentials, because the default transport requires Vercel. Remote agent callbacks must reach a public address. Outside `eve dev`, eve refuses callback hosts that are, or resolve to, loopback, private, link-local, or reserved addresses. So callbacks between services over a private network or `127.0.0.1` don't work. See [How remote dispatch and callbacks work](../remote-agents#how-remote-dispatch-and-callbacks-work) and [Set the public callback origin](./self-hosting#set-the-public-callback-origin).
+If agents delegate to one another, configure an explicit [workspace-peer transport](../../subagents#workspace-peers) with the peer's URL and credentials. Remote agent callbacks must reach a public address. Outside `eve dev`, eve refuses callback hosts that are, or resolve to, loopback, private, link-local, or reserved addresses, unless the exact origin is listed in `EVE_CALLBACK_ALLOWED_ORIGINS`. See [How remote dispatch and callbacks work](../remote-agents#how-remote-dispatch-and-callbacks-work) and [Set the public callback origin](./self-hosting#set-the-public-callback-origin).
 
 ### Add a peer frontend
 

@@ -34,7 +34,22 @@ So under the default policy, completed private and unknown-audience transcripts 
 
 ## Add an OpenTelemetry destination
 
-To send traces to a third-party destination, install `@vercel/otel` for its exporters:
+To send traces to any OpenTelemetry destination, such as a self-hosted collector, use an exporter from the OpenTelemetry SDK:
+
+```bash
+pnpm add @opentelemetry/exporter-trace-otlp-http
+```
+
+```ts title="agent/instrumentation/collector.ts"
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { otelIntegration } from "eve/instrumentation/otel";
+
+export default otelIntegration({
+  traceExporter: new OTLPTraceExporter({ url: "http://otel-collector:4318/v1/traces" }),
+});
+```
+
+The exporter needs no Vercel account. `@vercel/otel` provides equivalent exporters:
 
 ```bash
 pnpm add @vercel/otel
