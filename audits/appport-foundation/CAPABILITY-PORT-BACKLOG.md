@@ -32,12 +32,13 @@ This is derived from [`CAPABILITY-INVENTORY.md`](CAPABILITY-INVENTORY.md). The b
    └─ 2c projects, documents                              │
 3 Research runs (POS) ── needs 2.0                        │
 4 Runtime safety mechanisms (INT) ── independent ─────────┤
-5 Identity linking, then AnywhereAide (EXT) ── needs 2.0  │
-6 voice-agent delegated tools (EXT) ── needs the 2.0 pattern
-7 Contract-verified replacement (CORE) ── needs 4 (pinning)
+5 Identity linking (EXT) ── needs 2.0                     │
+6 AnywhereAide integration (EXT) ── needs 2.0 and 5        │
+7 voice-agent delegated tools (EXT) ── needs the 2.0 pattern
+8 Contract-verified replacement (CORE) ── needs 4 (pinning)
 ```
 
-Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates slices 2, 3 and 5.
+Slices 1 and 4 have no dependencies and can be done at any time. Slice 2.0 gates slices 2, 3, 5 and 6.
 
 ---
 
@@ -177,14 +178,37 @@ Internal mechanisms only. None is model-facing. Each is independent.
 
 **Not built:** the original 4a idea, a guard that cancels identical repeated failing calls. **Deferred:** credential path policy SA-33. It applies only when file tools are enabled, and the destination sets `defaultTools: false`.
 
-## 5. Identity linking, then AnywhereAide (EXT)
+## 5. Identity linking (EXT). **Done:** [IDENTITY-LINKING-REPORT.md](IDENTITY-LINKING-REPORT.md)
 
-|               |                                                                                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Source        | PO-35 (identity linking through Resolver), then PO-41–43 (`@anywhereaide` X intake, reply, publish) and PO-45 (Chrome and iOS clients)                       |
-| Destination   | Link an external handle to a person through Resolver; an eve X channel then maps inbound content to the linked person's delegation                           |
-| Depends on    | 2.0. An X API credential (operational)                                                                                                                       |
-| Must preserve | Content is data, never instructions; shared-audience privacy; per-step authority; once-only delivery (from the `interactions.ts` and `invocations.ts` tests) |
+Personal OS already had the lifecycle (PO-35): a one-time code from the person's session, presented by the surface's authenticated account, confirmed by the person, recorded in Resolver by a separate least-privilege agent, and revocable.
+
+This slice:
+
+- verified it against the 22 criteria;
+- fixed concurrent confirmation creating two owners, with a FeltDB-unique ownership claim;
+- tested the authority boundary, restart and audit;
+- ran 14 mutations against the boundaries.
+
+**Acceptance:**
+
+- [x] An external account resolves to one person only with proof of both sides; names, handles and e-mails are never identity.
+- [x] One external account belongs to one person, also under concurrent confirmation; no silent transfer.
+- [x] A link grants nothing: AuthBoundry grants are unchanged by linking and unlinking, and agents cannot link.
+- [x] Revocation holds before Resolver hears of it; links and revocations survive restart.
+
+**Surfaces:**
+
+- X and Multiplayer: linking is implemented. X is tested against a local X API stand-in, not real X.
+- Chrome and iOS: they sign in as the person, so there is nothing to link.
+
+## 6. AnywhereAide integration (EXT)
+
+|               |                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source        | PO-41–43 (`@anywhereaide` X intake, reply, publish) and PO-45 (Chrome and iOS clients)                                                                        |
+| Destination   | A surface request resolved to its linked person (slice 5), then run by the existing AppPort and AuthBoundry delegation path; no new agent or execution system |
+| Depends on    | 2.0, 5. An X API credential (operational)                                                                                                                     |
+| Must preserve | Content is data, never instructions; shared-audience privacy; per-step authority; once-only delivery (from the `interactions.ts` and `invocations.ts` tests)  |
 
 **Acceptance:**
 
@@ -193,7 +217,7 @@ Internal mechanisms only. None is model-facing. Each is independent.
 - [ ] A post never leaks another person's data.
 - [ ] Repeated delivery produces one reply.
 
-## 6. voice-agent delegated tools (EXT)
+## 7. voice-agent delegated tools (EXT)
 
 OA-voice-03–08, 10 are already published, but bound to a runtime principal. Rebinding them to delegation follows the 2.0 pattern. Realtime phone voice (OA-voice-02) and transfer (OA-voice-09) are integration work in voice-agent, after the delegated tools.
 
@@ -202,7 +226,7 @@ OA-voice-03–08, 10 are already published, but bound to a runtime principal. Re
 - [ ] A booking made by the agent carries the business owner's delegation.
 - [ ] Revoking it stops bookings.
 
-## 7. Contract-verified replacement (CORE)
+## 8. Contract-verified replacement (CORE)
 
 |             |                                                                                                                                                       |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |

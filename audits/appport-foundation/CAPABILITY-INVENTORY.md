@@ -135,7 +135,7 @@ None of the contract tooling is an agent tool.
 - **Loop protection:** no loop or stuck guard. _Slice 4 added stuck-run detection; a repeated-call guard is still absent._
 - **Completion:** no completion gate over recorded outcomes. _Since built in the destination (slice 4)._
 - **Uncertain operations:** no operator resolution of indeterminate operations.
-- **Delegation:** no cross-channel identity linking in eve, and no on-behalf-of identity on FeltKit's `/appport`.
+- **Delegation:** no cross-channel identity linking in eve, and no on-behalf-of identity on FeltKit's `/appport`. _Since: on-behalf-of on `/appport` (slice 2.0); verified identity linking in Personal OS through Resolver, with a unique ownership claim (slice 5). eve itself does not resolve identities._
 
 ## Destination decisions by source
 

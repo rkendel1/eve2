@@ -286,6 +286,7 @@ Paths relative to `personalOS/`. "Pub" = published on `/appport`+`/mcp`; "Tool" 
 - **Effect:** write, external-state (Resolver refs); revocable (revoked refs never resolve again; history kept).
 - **Tests:** `tests/interactions.test.ts` (≈15 linking/Resolver tests: "linking: a code issued in PersonalOS…", "identity security: …", "Resolver: an ambiguous identity … fails closed"), `tests/x.test.ts` "10: after Ada disconnects X…".
 - **Rationale:** an eve channel sender (Slack/Telegram/X) must be mapped to the person whose delegation applies; that requires wiring eve channel identities to Resolver identity links, which neither eve nor the appport-agent does today.
+- **Slice 5:** verified against 22 criteria; a FeltDB-unique ownership claim added in `links:confirm` (concurrent confirmations could make two owners). See [IDENTITY-LINKING-REPORT.md](../IDENTITY-LINKING-REPORT.md).
 
 ### PO-36 Surface interactions (receive/status/cancel) — AnywhereAide — Duplicate
 
