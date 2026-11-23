@@ -1,5 +1,5 @@
 import { createOpenAI } from "#compiled/@ai-sdk/openai/index.js";
-import { createDirectModelFetch } from "#internal/model-auth/transport.js";
+import { createDirectModelFetch, type DirectModelOptions } from "#internal/model-auth/transport.js";
 import type { LanguageModel } from "ai";
 import { DEFAULT_CHATGPT_MODEL_ID, normalizeChatGptModelId } from "#shared/chatgpt-model.js";
 import { MODEL_HELPERS } from "#shared/model-helper.js";
@@ -43,14 +43,21 @@ export function chatgpt(model: string = DEFAULT_CHATGPT_MODEL_ID): Exclude<Langu
   return createCodexSubscriptionModel({ model: slug });
 }
 
-/** Creates a direct OpenAI model. Uses OPENAI_API_KEY, or /login credentials in local development. */
+export type { DirectModelOptions } from "#internal/model-auth/transport.js";
+
+/**
+ * Creates a direct OpenAI model that never routes through AI Gateway. Uses `options.apiKey` when
+ * given; otherwise OPENAI_API_KEY, or /login credentials in local development.
+ */
 export function openai(
   model: string = MODEL_HELPERS.openai.defaultModel,
+  options: DirectModelOptions = {},
 ): Exclude<LanguageModel, string> {
   const id = model.trim().replace(/^openai\//u, "");
   if (!id || id.includes("/")) throw new Error("Expected an OpenAI model ID.");
   return createOpenAI({
     apiKey: "eve-local-credential",
-    fetch: createDirectModelFetch("openai"),
+    ...(options.baseURL !== undefined && { baseURL: options.baseURL }),
+    fetch: createDirectModelFetch("openai", options),
   }).responses(id);
 }

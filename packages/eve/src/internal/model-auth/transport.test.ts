@@ -122,3 +122,22 @@ describe("direct Anthropic key parity between eve dev and eve start", () => {
     await expect(resolveModelApiKey("anthropic")).rejects.toThrow("OS secret store");
   });
 });
+describe("explicit direct-model credentials", () => {
+  it("sends an explicit key without reading the environment or the secret store", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "environment-key");
+    await createDirectModelFetch("anthropic", { apiKey: async () => "explicit-key" })(
+      "https://anthropic-proxy.test/v1/messages",
+      { method: "POST", body: "{}" },
+    );
+    const [url, init] = mocks.fetch.mock.calls.at(-1) ?? [];
+    expect(String(url)).toBe("https://anthropic-proxy.test/v1/messages");
+    expect(new Headers(init?.headers).get("x-api-key")).toBe("explicit-key");
+    expect(mocks.read).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty explicit key", async () => {
+    await expect(
+      createDirectModelFetch("openai", { apiKey: " " })("https://api.openai.com/v1/responses", {}),
+    ).rejects.toThrow("apiKey option is empty");
+  });
+});
