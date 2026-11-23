@@ -15,7 +15,11 @@ import {
 } from "../workspace-root.js";
 import { getSupportedModuleBaseName, matchesSupportedModuleBaseName } from "./module-files.js";
 import { patchPackageJson, type PackageJsonPatch } from "./package-json.js";
-import { CURRENT_DIRECTORY_PROJECT_NAME, resolveEvePackageContract } from "../create/project.js";
+import {
+  CURRENT_DIRECTORY_PROJECT_NAME,
+  formatEveDependencySpecifier,
+  resolveEvePackageContract,
+} from "../create/project.js";
 import {
   WEB_APP_SIGN_IN_WITH_VERCEL_TEMPLATE_FILES,
   WEB_APP_TEMPLATE_FILES,
@@ -211,12 +215,6 @@ async function ensurePackageDependency(
       scripts: [],
     },
   ];
-}
-
-function formatEveDependencySpecifier(versionOrSpecifier: string): string {
-  return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z-.]+)?$/.test(versionOrSpecifier)
-    ? `^${versionOrSpecifier}`
-    : versionOrSpecifier;
 }
 
 async function patchWebPackageJson(
