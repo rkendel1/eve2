@@ -14,11 +14,16 @@ export async function resolveModelApiKey(provider: keyof typeof KEY_ENV): Promis
     isEveDevEnvironment() && process.env[MODEL_CONNECTION_ENV] === provider
       ? process.env.EVE_MODEL_KEY_SOURCE
       : undefined;
-  if (value?.trim() && source !== "secret") return value;
+  const environmentKey = value?.trim() ? value : undefined;
+  if (environmentKey !== undefined && source !== "secret") return environmentKey;
   if (isEveDevEnvironment() && source !== "environment") {
-    const stored = await readModelSecret(modelKeySecretName(provider));
+    const stored = await readModelSecret(modelKeySecretName(provider)).catch((error: unknown) => {
+      if (environmentKey === undefined) throw error;
+      return undefined;
+    });
     if (stored) return stored;
   }
+  if (environmentKey !== undefined) return environmentKey;
   if (source === "secret")
     throw new Error("The selected saved API key is unavailable. Run /login to reconnect.");
   throw new Error(
