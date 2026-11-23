@@ -1,4 +1,3 @@
-import { spawn, type ChildProcess } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -8,10 +7,11 @@ import {
   materializeScenarioApp,
   type ScenarioAppDescriptor,
 } from "#internal/testing/scenario-app.js";
+import { buildAndStartEve, type RunningEveServer } from "#internal/testing/built-server-harness.js";
 
 const SETUP_TIMEOUT_MS = 360_000;
 const TEST_TIMEOUT_MS = 240_000;
-const SERVER_ENV = { EVE_MOCK_AUTHORED_MODELS: "", NODE_ENV: "production" as const };
+const SERVER_ENV = { EVE_MOCK_AUTHORED_MODELS: "", NODE_ENV: "production" };
 
 const UPGRADE_DESCRIPTOR: ScenarioAppDescriptor = {
   files: {
@@ -60,58 +60,7 @@ interface RecordedEvent {
 }
 
 let app: Awaited<ReturnType<typeof materializeScenarioApp>> | undefined;
-interface RunningServer {
-  readonly url: string;
-  stop(): Promise<void>;
-}
-
-let server: RunningServer | undefined;
-
-function runEve(appRoot: string, args: readonly string[]): ChildProcess {
-  return spawn(process.execPath, [join(appRoot, "node_modules", "eve", "bin", "eve.js"), ...args], {
-    cwd: appRoot,
-    env: { ...process.env, ...SERVER_ENV },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-}
-
-async function buildAndStart(appRoot: string): Promise<RunningServer> {
-  const build = runEve(appRoot, ["build"]);
-  let buildOutput = "";
-  build.stdout?.on("data", (chunk: Buffer) => (buildOutput += chunk.toString()));
-  build.stderr?.on("data", (chunk: Buffer) => (buildOutput += chunk.toString()));
-  const code = await new Promise<number | null>((resolve) => build.on("exit", resolve));
-  if (code !== 0) throw new Error(`eve build failed:\n${buildOutput}`);
-
-  const child = runEve(appRoot, ["start", "--host", "127.0.0.1", "--port", "0"]);
-  let output = "";
-  const url = await new Promise<string>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`eve start did not listen:\n${output}`)),
-      120_000,
-    );
-    const read = (chunk: Buffer) => {
-      output += chunk.toString();
-      const match = /http:\/\/127\.0\.0\.1:\d+/u.exec(output);
-      if (match !== null) {
-        clearTimeout(timer);
-        resolve(match[0]);
-      }
-    };
-    child.stdout?.on("data", read);
-    child.stderr?.on("data", read);
-    child.on("exit", () => reject(new Error(`eve start exited:\n${output}`)));
-  });
-  return {
-    url,
-    stop: async () => {
-      if (child.exitCode !== null) return;
-      const exited = new Promise((resolve) => child.on("exit", resolve));
-      child.kill("SIGTERM");
-      await exited;
-    },
-  };
-}
+let server: RunningEveServer | undefined;
 
 async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
   const response = await fetch(new URL(path, server!.url), {
@@ -169,7 +118,7 @@ async function upgradeInstalledEve(appRoot: string): Promise<string> {
 describe("sessions across an eve upgrade", () => {
   beforeAll(async () => {
     app = await materializeScenarioApp(UPGRADE_DESCRIPTOR);
-    server = await buildAndStart(app.appRoot);
+    server = await buildAndStartEve(app.appRoot, SERVER_ENV);
   }, SETUP_TIMEOUT_MS);
 
   afterAll(async () => {
@@ -191,7 +140,7 @@ describe("sessions across an eve upgrade", () => {
 
       await server!.stop();
       const upgradedVersion = await upgradeInstalledEve(app!.appRoot);
-      server = await buildAndStart(app!.appRoot);
+      server = await buildAndStartEve(app!.appRoot, SERVER_ENV);
 
       const second = String((await post("/thread/alice-thread", { message: "second" })).sessionId);
       expect(second).not.toBe(first);
