@@ -75,7 +75,7 @@ A submission may name `repository: { url, ref?, branch? }` on an allowed host. B
 
 ## Use the client
 
-The client needs only `fetch` and runs on Node.js 22, so a service on an older Node.js can drive an eve worker that runs on Node.js 24 in its own process:
+The client needs only `fetch` and runs on Node.js 22, so a service on an older Node.js can drive an eve worker that runs on Node.js 24 in its own process. eve declares Node.js 24, so installing it in a Node.js 22 project prints an engines warning; there, import only `eve/channels/work/client`:
 
 ```ts
 import { createWorkClient } from "eve/channels/work/client";
