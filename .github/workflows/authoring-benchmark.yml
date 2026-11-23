@@ -62,9 +62,9 @@ jobs:
   request:
     name: Resolve benchmark request
     if: >-
-      github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' ||
+      github.repository == 'vercel/eve' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' ||
       (github.event.label.name == 'run-authoring-benchmark' &&
-      github.event.pull_request.head.repo.full_name == github.repository)
+      github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 35
     outputs:

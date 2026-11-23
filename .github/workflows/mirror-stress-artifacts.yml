@@ -39,8 +39,8 @@ jobs:
     name: mirror
     # Release runs on every push to main; only a release PR merge adds a build.
     if: >-
-      github.event_name != 'workflow_run' ||
-      startsWith(github.event.workflow_run.head_commit.message, 'Version Packages')
+      github.repository == 'vercel/eve' && (github.event_name != 'workflow_run' ||
+      startsWith(github.event.workflow_run.head_commit.message, 'Version Packages'))
     # On the job, not the workflow: a skipped run must not take the place of a
     # pending release run.
     concurrency:
