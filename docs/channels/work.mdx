@@ -1,0 +1,102 @@
+---
+title: "Work Channel"
+description: "Run an eve agent as a worker: submit work with an idempotency key, steer, interrupt, or stop it, follow its events from a cursor, and read its result."
+---
+
+The work channel lets another service run an eve agent as a worker. It submits work with an idempotency key, steers it, interrupts or stops it, follows its events from a durable cursor, and reads its result. Each piece of work is one durable eve session that belongs to the principal that submitted it.
+
+Import the channel from `eve/channels/work` and the client from `eve/channels/work/client`.
+
+## Configure the channel
+
+```ts title="agent/channels/work.ts"
+import { jwtHmac } from "eve/channels/auth";
+import { workChannel } from "eve/channels/work";
+
+export default workChannel({
+  auth: jwtHmac({
+    algorithm: "HS256",
+    audiences: ["my-agent"],
+    issuer: "orchestrator",
+    secret: process.env.AGENT_JWT_SECRET!,
+  }),
+  workspace: { repositoryHosts: ["github.com"] },
+  onResult: async (result, ctx) => {
+    await fetch(process.env.RESULTS_URL!, { method: "POST", body: JSON.stringify(result) });
+  },
+});
+```
+
+| Option               | Default        | Meaning                                                                                   |
+| -------------------- | -------------- | ----------------------------------------------------------------------------------------- |
+| `auth`               | required       | Route auth. Anonymous callers are refused.                                                |
+| `route`              | `/eve/v1/work` | Route prefix.                                                                             |
+| `maxObjectiveLength` | `32000`        | Longest objective, in characters.                                                         |
+| `workspace`          | none           | `repositoryHosts`: hosts a submission's repository may name. Without it, none is allowed. |
+| `onResult`           | none           | Runs once per finished attempt, inside the session, with the sandbox's git facts.         |
+
+## Routes
+
+| Route                        | Does                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /eve/v1/work`          | Submits `{ objective, context?, repository? }` with an `Idempotency-Key` header.                                                                 |
+| `GET /:sessionId`            | The work's status.                                                                                                                               |
+| `GET /:sessionId/result`     | The latest finished attempt; `409 work_not_settled` while it is queued or running.                                                               |
+| `GET /:sessionId/events`     | The session's NDJSON stream from `startIndex`, with the [session stream's](../concepts/sessions-runs-and-streaming#reconnect-and-rewind) leases. |
+| `POST /:sessionId/messages`  | Steers the running attempt with `{ message }`, or starts the next one.                                                                           |
+| `POST /:sessionId/interrupt` | Cancels the running attempt; `{ turnId }` limits it to the attempt you observed.                                                                 |
+| `POST /:sessionId/stop`      | Cancels the running attempt and ends the work.                                                                                                   |
+
+A second submission with the same key and the same body returns `200` with `replayed: true` and runs nothing. The same key with a different body returns `409 idempotency_key_reused`. A key stays bound while the work is open: after `stop` or the session timeout, it can start new work. Another principal gets `404` for work it didn't submit.
+
+## Status and results
+
+`GET /:sessionId` returns `version: 1`, the `status` (`queued`, `running`, `awaiting-input`, `completed`, `failed`, `cancelled`, or `ended`), the latest `attempt` (one turn, with its `turnId` and `outcome`), the number of `attempts`, the latest `reply` text, an `error`, the `runner` (agent id, eve version, and build), the `cursor` of the next stream line, and `controls`.
+
+`onResult` receives the same result plus `workspace`, for work that named a repository: the workspace `root`, the checked-out `repository`, and `git` with `branch`, `commit`, `baseCommit`, `dirty`, and `changedFiles` since the base commit. These come from the sandbox, so only `onResult` sees them. It runs at least once per attempt; key on `sessionId` and `turnId`. Call `ctx.getSandbox()` in it to commit or upload the workspace.
+
+## Controls
+
+Every submission and status lists the controls the runtime can perform:
+
+| Control     | Supported | Preempts the model call | Preempts tool calls      |
+| ----------- | --------- | ----------------------- | ------------------------ |
+| `interrupt` | yes       | yes                     | through the abort signal |
+| `stop`      | yes       | yes                     | through the abort signal |
+| `steer`     | yes       | no                      | workflow-tool waits only |
+| `pause`     | no        |                         |                          |
+| `resume`    | no        |                         |                          |
+
+Interrupting aborts the streaming model call and kills sandbox commands. Effects a tool already caused are not undone. eve can't suspend an attempt and continue it from the same point, so there is no pause; interrupt, then send a message to start the next attempt.
+
+## Repositories
+
+A submission may name `repository: { url, ref?, branch? }` on an allowed host. Before the first model call, eve fetches `ref` (default `HEAD`) into the workspace root of the work's sandbox and checks out `branch` when given. URLs carrying credentials are refused. For private repositories, broker credentials through the sandbox's [network policy](../sandbox/vercel#network-policy), so the secret never enters the sandbox. If the checkout fails, the model is told to stop, and `onResult` reports the `error`.
+
+## Use the client
+
+The client needs only `fetch` and runs on Node.js 22, so a service on an older Node.js can drive an eve worker that runs on Node.js 24 in its own process:
+
+```ts
+import { createWorkClient } from "eve/channels/work/client";
+
+const work = createWorkClient({
+  baseUrl: "https://agent.example.com",
+  headers: { authorization: `Bearer ${token}` },
+});
+
+const repository = { url: "https://github.com/acme/app", branch: "fix/test" };
+const { sessionId } = await work.submit(
+  { objective: "Fix the failing test.", repository },
+  { idempotencyKey: "task-42" },
+);
+let cursor = 0;
+for await (const event of work.events(sessionId, { cursor })) {
+  cursor = event.cursor;
+  const facts = (event.line as { facts?: { type: string }[] }).facts ?? [];
+  if (facts.some((fact) => fact.type === "turn.settled")) break;
+}
+const result = await work.result(sessionId);
+```
+
+`events()` yields each stored line of the session stream. It reconnects from the last line read when a lease or connection ends, and stops when the work's session ends; open work keeps streaming, so stop reading once you have what you need. Save `cursor` to resume after a restart. Errors are `WorkClientError` with the API's `status` and `code`.

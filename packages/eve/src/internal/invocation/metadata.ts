@@ -3,11 +3,12 @@ import { createHash } from "node:crypto";
 import { principalIdentity } from "#channel/principal-identity.js";
 import type { RunInput, SessionAuthContext } from "#channel/types.js";
 import {
+  INVOCATION_DIGEST_ATTRIBUTE,
   INVOCATION_OWNER_ATTRIBUTE,
   INVOCATION_TOKEN_ATTRIBUTE,
 } from "#internal/invocation/attributes.js";
 
-export { INVOCATION_OWNER_ATTRIBUTE, INVOCATION_TOKEN_ATTRIBUTE };
+export { INVOCATION_DIGEST_ATTRIBUTE, INVOCATION_OWNER_ATTRIBUTE, INVOCATION_TOKEN_ATTRIBUTE };
 
 type ExternalInvocationMetadata = NonNullable<RunInput["externalInvocation"]>;
 
@@ -22,5 +23,8 @@ export function buildInvocationAttributes(
   return {
     [INVOCATION_OWNER_ATTRIBUTE]: metadata.ownerKey,
     [INVOCATION_TOKEN_ATTRIBUTE]: metadata.continuationToken,
+    ...(metadata.submissionDigest !== undefined && {
+      [INVOCATION_DIGEST_ATTRIBUTE]: metadata.submissionDigest,
+    }),
   };
 }

@@ -1,0 +1,20 @@
+[
+  "WORK_CONTROLS",
+  "WorkAttempt",
+  "WorkAttemptOutcome",
+  "WorkAttemptResult",
+  "WorkChannel",
+  "WorkChannelConfig",
+  "WorkChannelState",
+  "WorkControl",
+  "WorkControlName",
+  "WorkGitState",
+  "WorkRepository",
+  "WorkResult",
+  "WorkResultContext",
+  "WorkState",
+  "WorkStatus",
+  "WorkSubmission",
+  "WorkWorkspace",
+  "workChannel"
+]

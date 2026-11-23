@@ -353,6 +353,7 @@ export interface RunInput {
   readonly externalInvocation?: {
     readonly continuationToken: string;
     readonly ownerKey: string;
+    readonly submissionDigest?: string;
   };
 }
 

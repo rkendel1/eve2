@@ -100,6 +100,10 @@ The agent's reply is kept in the summary as the agent's claim.
 
 Only one eve process may open the work store: FeltDB holds an exclusive lock.
 
+## eve's work channel
+
+`agent/channels/worker.ts` mounts eve's published [work channel](../../docs/channels/work.mdx) (`eve/channels/work`) at `/eve/v1/work`, with the same JWT auth. An orchestrator submits, steers, interrupts, stops and follows work through it with `createWorkClient` from `eve/channels/work/client`, which runs on Node.js 22 and needs only `fetch`. Work submitted there has no FeltDB record, so `appport_invoke` sends only observation capabilities; state-changing capabilities need the FeltDB-backed `POST /work` above, which owns the operation ledger and settlement.
+
 ## Durable operations
 
 Within accepted work, every `appport_invoke` call is a durable operation in the FeltDB work store (`appport_operations`). Each eve call is linked to its operation, or recorded as refused, in `appport_invocations`.

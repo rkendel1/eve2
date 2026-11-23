@@ -490,6 +490,16 @@
       "import": "./dist/src/public/channels/a2a.js",
       "default": "./dist/src/public/channels/a2a.js"
     },
+    "./channels/work": {
+      "types": "./dist/src/public/channels/work.d.ts",
+      "import": "./dist/src/public/channels/work.js",
+      "default": "./dist/src/public/channels/work.js"
+    },
+    "./channels/work/client": {
+      "types": "./dist/src/public/channels/work-client.d.ts",
+      "import": "./dist/src/public/channels/work-client.js",
+      "default": "./dist/src/public/channels/work-client.js"
+    },
     "./channels/slack": {
       "types": "./dist/src/public/channels/slack/index.d.ts",
       "import": "./dist/src/public/channels/slack/index.js",
