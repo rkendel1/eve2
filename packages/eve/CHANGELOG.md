@@ -1,5 +1,57 @@
 # eve
 
+## 1.1.0
+
+### Minor Changes
+
+- 4ba334a: `eve build` no longer needs the AI Gateway model catalog: it falls back to model metadata bundled with eve, and `EVE_MODEL_CATALOG=bundled` skips the request entirely.
+  
+  A direct `anthropic()` or `openai()` model, and any model the bundled metadata lists, compiles offline. A build that fell back warns with `compile/model-metadata-bundled`. A model the bundled metadata doesn't list still needs `modelContextWindowTokens`.
+- 1eb96d5: eve CLI telemetry is now off by default and honors `DO_NOT_TRACK`; run `eve telemetry enable` to opt in.
+  
+  Machines that never changed the setting stop sending CLI usage data to Vercel. A saved `eve telemetry enable` keeps telemetry on.
+- 9e5ae93: `anthropic()` and `openai()` from `eve/models/*` accept `{ apiKey, baseURL }` to configure provider credentials and endpoints explicitly, without the environment key or AI Gateway.
+- e56166c: Add `workflowScheduleProvider()` from `eve/experimental/schedules/workflow`, a durable provider for dynamic schedules that runs on eve's Workflow world, so dynamic schedules work under `eve start` without Vercel.
+  
+  Each schedule is one durable workflow run that sleeps until its next occurrence, so schedules and their state survive restarts. An occurrence that comes due while the server is down runs once when it is back, missed cron occurrences coalesce into the latest one, and a failed occurrence retries before `occurrence.failed` fires without stopping the schedule. Changing a schedule replaces its run.
+- 05f2c46: Add `localFiles()` to `eve/memory/file`, a durable local-disk backend for `fileMemory()` on a self-hosted `eve start` server.
+  
+  Writes are atomic and reject stale versions within one server process. Use one process per directory, and a shared backend for replicas. `fileMemory()` without a backend still requires one outside Vercel and `eve dev`; its error now names `localFiles()`.
+- 90c9e7f: eve now stops a session's sandbox once the session has been idle for 5 minutes, so a short turn no longer pays for a sandbox that runs until the provider's own timeout.
+  
+  Set `idleTimeoutMs` on the sandbox environment to choose the window. `0` stops the sandbox as soon as the session goes idle, and `idleTimeoutMs: false` restores the previous behavior, where only the provider's own timeout stops it. Vercel Sandbox and Docker stop idle sandboxes, and `DefaultSandbox.environment()` takes the option at its top level. eve never starts or resumes a sandbox in order to stop it. Files persist, the next turn that uses the sandbox resumes it, and processes still running in the sandbox end with the stop. That includes a process your `defineSandbox()` definition started, such as a local server: resuming the sandbox doesn't run the definition again, so start it again from the tool that needs it, or set `idleTimeoutMs: false`. A command that the `bash` tool left running ends the same way, and never writes its exit file. On Docker, a session's container now stops after the window instead of running until the eve server stops.
+  
+  A `turn.settled` hook that calls `ctx.getSandbox()` and `stop()` to limit sandbox cost is no longer needed. Remove it, because opening the sandbox to stop it resumes or creates the sandbox on turns that never used it.
+  
+  Custom sandbox providers can implement the new optional `onSessionIdle(ctx, state, { signal })` method to stop compute without starting it. eve aborts `signal` if the call takes longer than 120 seconds. A provider without it behaves as before. eve reserves `idleTimeoutMs`, as it does `prepare`, and a provider's `environment()` doesn't receive it.
+- 4ba334a: Run a whole `agents/` workspace without Vercel: `eve build` at the workspace root builds every agent for Node, and `eve start` serves them together with working peer calls.
+  
+  - `eve start` at a workspace root, without `--agent`, starts every agent and serves each at `/eve/<name>/v1/*` from one origin. `/eve/v1/health` reports each agent, and a stopped agent's routes answer 503.
+  - `defineWorkspaceAgent()` peers work without an explicit transport under `eve start`. Calls carry a short-lived token signed with the workspace secret, `EVE_WORKSPACE_SECRET` or a per-start random one.
+  - `workspacePeers()` from `eve/experimental/workspace` admits those calls. The caller becomes the service principal `eve-workspace:<agent>` and gains no user's authority unless `trustedForwarders` accepts a forwarded principal. The default `agent/channels/eve.ts` policy includes it.
+  - `EVE_CALLBACK_ALLOWED_ORIGINS` lists exact origins that may receive remote-agent callbacks on loopback addresses. `eve start` sets it for workspace agents; private network ranges stay blocked.
+- a534538: Added the work channel, `workChannel` from `eve/channels/work`, and its Node.js 22-compatible client, `createWorkClient` from `eve/channels/work/client`, to run an agent as a worker that services submit idempotent work to, steer, interrupt, stop, follow from a durable cursor, and read structured results from.
+  
+  Each piece of work is one session owned by its submitter. Status and results declare which controls the runtime performs (`pause` and `resume` are reported as unsupported) and identify the attempt and runner. Work can name a repository on an allowlisted host, which eve checks out in the sandbox before the first model call, and `onResult` receives the workspace's branch, commit, and changed files after each attempt.
+
+### Patch Changes
+
+- 443d436: `eve dev` now uses `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` from the environment, as `eve start` does, when `/login` had chosen a saved key that the machine no longer has or whose OS secret store can't be read.
+- 96996c8: eve installed under its published distribution name `@appport/eve` (as `"eve": "npm:@appport/eve@…"`) now resolves, verifies and builds as `eve`.
+- 1eb96d5: `eve init --model openai-api/<id>` and `--model anthropic-api/<id>` now author a direct `openai()` or `anthropic()` model instead of writing the slug as an AI Gateway model string.
+- db0c3a7: `eve init`, `eve add`, and `eve extension init` run from a scoped eve distribution such as `@appport/eve` now install that distribution as `"eve": "npm:@appport/eve@^<version>"` instead of the unrelated `eve` package.
+- 8f522a3: Every published export now has JSDoc, and source comments outside the public API are removed; runtime behavior is unchanged.
+- 05f2c46: `eve start` now reports whether the build's sandbox is usable, and `placeholderAuth()` explains unconfigured auth on self-hosted servers.
+  
+  - `eve start` prints a `sandbox:` line before serving: the provider the build recorded, and for Docker whether the daemon is reachable and has the build's template image.
+  - `placeholderAuth()` now returns its `eve_production_auth_not_configured` 401, with a `Bearer` challenge, on self-hosted production servers as well as Vercel production. Requests were already rejected; the response now names the fix.
+  - `eve init` without a TTY prints the selected model and whether it routes through AI Gateway or calls a provider directly.
+- 0c0275b: Update the bundled Workflow runtime and worlds to the Workflow 5.6.1 release, which stores the local world in one SQLite database.
+  
+  The local world used by `eve dev` and by `eve start` without a configured world now keeps its runs, queue state, and streams in `.eve/.workflow-data/world.db` instead of one JSON file per entity. Each event and the run, step, wait, and hook changes it makes now commit together, so a process killed mid-write no longer leaves a run half-written. Run data written by earlier eve versions is not migrated, so sessions that were in progress before the upgrade cannot resume. The old `runs`, `events`, `steps`, `hooks`, `waits`, `streams`, `snapshots`, and `.locks` directories stay in place unread and can be deleted.
+  
+  `eve start` now uses the local world's own queue authentication and restart recovery. Deliveries to the workflow route must carry the key the world keeps in `.eve/.workflow-data/queue-auth-key`, `eve start` refuses to start with `WORKFLOW_QUEUE_AUTH=off`, and recovery also re-arms the timers of runs that were sleeping. `eve logs` reads the local world without replacing that key, and a store written by a newer eve version now asks you to upgrade eve.
+
 ## 1.0.2
 
 Released 2026-11-17 · [Compare with 1.0.1](https://github.com/vercel/eve/compare/eve%401.0.1...eve%401.0.2)

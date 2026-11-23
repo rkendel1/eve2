@@ -1,5 +1,27 @@
 # @eve/agent-desktop
 
+## 0.2.1
+
+### Patch Changes
+
+- 8f522a3: Every published export now has JSDoc, and source comments outside the public API are removed; runtime behavior is unchanged.
+- Updated dependencies [4ba334a]
+- Updated dependencies [1eb96d5]
+- Updated dependencies [443d436]
+- Updated dependencies [9e5ae93]
+- Updated dependencies [e56166c]
+- Updated dependencies [96996c8]
+- Updated dependencies [1eb96d5]
+- Updated dependencies [db0c3a7]
+- Updated dependencies [05f2c46]
+- Updated dependencies [8f522a3]
+- Updated dependencies [90c9e7f]
+- Updated dependencies [05f2c46]
+- Updated dependencies [4ba334a]
+- Updated dependencies [a534538]
+- Updated dependencies [0c0275b]
+  - eve@1.1.0
+
 ## 0.2.0
 
 Released 2026-11-16 · [Compare with 0.1.0](https://github.com/vercel/eve/compare/%40eve%2Fagent-desktop%400.1.0...%40eve%2Fagent-desktop%400.2.0)

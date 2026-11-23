@@ -1,5 +1,11 @@
 # @vercel/agent-runs
 
+## 1.0.2
+
+### Patch Changes
+
+- 8f522a3: Every published export now has JSDoc, and source comments outside the public API are removed; runtime behavior is unchanged.
+
 ## 1.0.1
 
 Released 2026-11-16 · [Compare with 1.0.0](https://github.com/vercel/eve/compare/%40vercel%2Fagent-runs%401.0.0...%40vercel%2Fagent-runs%401.0.1)
