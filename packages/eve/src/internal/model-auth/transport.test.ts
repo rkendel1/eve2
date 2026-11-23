@@ -86,3 +86,58 @@ it("does not replace a missing environment connection with a stored key", async 
   await expect(resolveModelApiKey("openai")).rejects.toThrow("OPENAI_API_KEY");
   expect(mocks.read).not.toHaveBeenCalled();
 });
+describe("direct Anthropic key parity between eve dev and eve start", () => {
+  const sendWithKey = async () => {
+    await createDirectModelFetch("anthropic")("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      body: "{}",
+    });
+    return new Headers(mocks.fetch.mock.calls.at(-1)?.[1]?.headers).get("x-api-key");
+  };
+
+  it.each([
+    ["has no saved key", () => mocks.read.mockResolvedValue(undefined)],
+    [
+      "can't read the OS secret store",
+      () => mocks.read.mockRejectedValue(new Error("Cannot read the OS secret store.")),
+    ],
+  ])(
+    "sends the server's ANTHROPIC_API_KEY when /login chose a saved key but the machine %s",
+    async (_, store) => {
+      store();
+      vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test-key");
+      vi.stubEnv("EVE_MODEL_CONNECTION", "anthropic");
+      vi.stubEnv("EVE_MODEL_KEY_SOURCE", "secret");
+      expect(await sendWithKey()).toBe("sk-ant-test-key");
+
+      vi.stubEnv("EVE_DEV", "");
+      expect(await sendWithKey()).toBe("sk-ant-test-key");
+    },
+  );
+
+  it("still reports an unreadable secret store when no key is in the environment", async () => {
+    mocks.read.mockRejectedValue(new Error("Cannot read the OS secret store."));
+    vi.stubEnv("EVE_MODEL_CONNECTION", "anthropic");
+    vi.stubEnv("EVE_MODEL_KEY_SOURCE", "secret");
+    await expect(resolveModelApiKey("anthropic")).rejects.toThrow("OS secret store");
+  });
+});
+describe("explicit direct-model credentials", () => {
+  it("sends an explicit key without reading the environment or the secret store", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "environment-key");
+    await createDirectModelFetch("anthropic", { apiKey: async () => "explicit-key" })(
+      "https://anthropic-proxy.test/v1/messages",
+      { method: "POST", body: "{}" },
+    );
+    const [url, init] = mocks.fetch.mock.calls.at(-1) ?? [];
+    expect(String(url)).toBe("https://anthropic-proxy.test/v1/messages");
+    expect(new Headers(init?.headers).get("x-api-key")).toBe("explicit-key");
+    expect(mocks.read).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty explicit key", async () => {
+    await expect(
+      createDirectModelFetch("openai", { apiKey: " " })("https://api.openai.com/v1/responses", {}),
+    ).rejects.toThrow("apiKey option is empty");
+  });
+});

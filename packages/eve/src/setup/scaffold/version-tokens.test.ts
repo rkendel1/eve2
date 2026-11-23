@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { resolveVersionToken } from "./version-tokens.js";
+import { formatEveDependencySpecifier } from "./create/project.js";
+import { eveDistributionSpecifier, resolveVersionToken } from "./version-tokens.js";
 
 const EVE_PACKAGE_JSON_URL = new URL("../../../package.json", import.meta.url);
 
@@ -43,5 +44,35 @@ describe("resolveVersionToken", () => {
     expect(() => resolveVersionToken("somePackageVersion", "__UNKNOWN_VERSION__")).toThrow(
       /unstamped version token \(somePackageVersion=__UNKNOWN_VERSION__\)/,
     );
+  });
+});
+
+describe("eveDistributionSpecifier", () => {
+  it("installs a scoped distribution under the eve name through an npm alias", () => {
+    expect(eveDistributionSpecifier({ name: "@appport/eve", version: "1.4.0" }, "1.4.0")).toBe(
+      "npm:@appport/eve@1.4.0",
+    );
+    expect(
+      formatEveDependencySpecifier(
+        eveDistributionSpecifier({ name: "@appport/eve", version: "1.4.0" }, "1.4.0"),
+      ),
+    ).toBe("npm:@appport/eve@^1.4.0");
+  });
+
+  it("uses the installed distribution's version over a differently stamped one", () => {
+    expect(eveDistributionSpecifier({ name: "@appport/eve", version: "1.4.1" }, "1.4.0")).toBe(
+      "npm:@appport/eve@1.4.1",
+    );
+  });
+
+  it("keeps the plain version for eve and any non-version specifier", () => {
+    expect(eveDistributionSpecifier({ name: "eve", version: "1.4.0" }, "1.4.0")).toBe("1.4.0");
+    expect(
+      eveDistributionSpecifier(
+        { name: "@appport/eve", version: "1.4.0" },
+        "https://pkg.example/eve.tgz",
+      ),
+    ).toBe("https://pkg.example/eve.tgz");
+    expect(formatEveDependencySpecifier("1.4.0")).toBe("^1.4.0");
   });
 });

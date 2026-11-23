@@ -1,7 +1,7 @@
 ---
 issue: https://github.com/vercel/eve/issues/3022
 status: in-progress
-last_updated: "2026-10-05"
+last_updated: "2026-11-23"
 ---
 
 # Sessions across eve upgrades
@@ -111,6 +111,18 @@ export default defineDynamic({
 The public event stream is eve's own versioned protocol, so the new build reads it from storage
 without running old code. Apps that want a summary instead of the raw transcript can pass the
 messages to a model in the same handler.
+
+### Verified across a version boundary
+
+`src/execution/session-upgrade.scenario.test.ts` builds and starts an app, parks a session, then
+upgrades the app's installed eve to a new version, rebuilds, and restarts on the same local World.
+The next channel message retires the parked session and starts a replacement whose
+`session.started` names it as `predecessor` and carries the new `eveVersion`.
+
+Remaining gap: retiring a stranded session ends it, so zero run-data retention (the default outside
+development when tracing doesn't record inputs and outputs) can delete its history before the
+replacement reads it. The test sets `retention: "default"`; keeping a retired predecessor readable
+under zero retention needs retirement to defer deletion, which is a Workflow retention change.
 
 ## 2. Proposal: Postgres World multi-deployment support
 

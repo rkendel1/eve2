@@ -37,7 +37,14 @@ jobs:
 
       - name: Check changed paths
         id: filter
+        env:
+          HAS_CREDENTIALS: ${{ secrets.AI_GATEWAY_API_KEY != '' }}
         run: |
+          if [ "$HAS_CREDENTIALS" != "true" ]; then
+            echo "::warning title=E2E skipped::This repository has no model credentials (AI_GATEWAY_API_KEY), so the e2e jobs skip."
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
             exit 0

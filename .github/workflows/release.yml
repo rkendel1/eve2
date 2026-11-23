@@ -22,6 +22,8 @@ env:
 
 jobs:
   release:
+    # Publishes upstream eve and its images; forks publish with publish-packages.yml.
+    if: github.repository == 'vercel/eve'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -42,6 +42,20 @@ export default defineAgent({
 
 `openai()` from `eve/models/openai` defaults to `gpt-6-luna-fast`. Both helpers accept an optional native provider model ID and read `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`. In local development they can also use credentials saved through `/login`; deployments need the API key in the server environment.
 
+Model ID strings such as `"anthropic/claude-sonnet-5"` route through AI Gateway, as before. The helpers call the provider directly and never use the gateway. To route credentials explicitly, pass options as the second argument: `apiKey` (a string, or a function eve calls before each request) replaces the environment key and `/login` credentials, and `baseURL` points at a proxy or regional endpoint:
+
+```ts title="agent/agent.ts"
+import { defineAgent } from "eve";
+import { anthropic } from "eve/models/anthropic";
+
+export default defineAgent({
+  model: anthropic("claude-sonnet-5", {
+    apiKey: () => process.env.WORKER_ANTHROPIC_KEY ?? "",
+    baseURL: process.env.ANTHROPIC_BASE_URL,
+  }),
+});
+```
+
 For a local ChatGPT subscription, use `chatgpt()` from `eve/models/openai` and sign in with `/login`. It defaults to `gpt-6-luna-fast` and can't run in a deployment.
 
 `/login` can switch a static Gateway string to an eve helper and manage its import, and `/model` changes the selected model and settings immediately. Edit custom provider SDK calls and dynamic expressions by hand. For provider-specific configuration, install an AI SDK provider package and pass its language model.

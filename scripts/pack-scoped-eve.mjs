@@ -14,6 +14,11 @@ const manifest = JSON.parse(await readFile(join(staged, "package.json"), "utf8")
 if (manifest.name !== "eve") {
   throw new Error(`${staged} is not the staged eve package (it names ${manifest.name}).`);
 }
+if (manifest.version !== version) {
+  throw new Error(
+    `The staged eve package is ${manifest.version}, not ${version}. Its dist is stamped with the version it was built as, and a package that declares another version fails at startup. Set packages/eve's version to ${version} (pnpm version-packages), commit, run pnpm --filter eve build, then pack.`,
+  );
+}
 const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const dirty = execFileSync("git", ["status", "--porcelain", "--", "packages/eve"], {
   encoding: "utf8",

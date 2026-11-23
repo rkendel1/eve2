@@ -12,11 +12,33 @@ import { MODEL_CONNECTION_ENV } from "#shared/model-helper.js";
 export { MODEL_CONNECTION_ENV } from "#shared/model-helper.js";
 export { resolveModelApiKey } from "./api-key.js";
 
-export function createDirectModelFetch(provider: "openai" | "anthropic"): typeof fetch {
+/** Explicit provider settings for a direct model, in place of the provider's environment key. */
+export interface DirectModelOptions {
+  /**
+   * The provider API key, or a function eve calls before each request, for example to read a
+   * rotated secret. When set, eve sends it as given and reads neither the environment key nor
+   * `/login` credentials.
+   */
+  readonly apiKey?: string | (() => string | Promise<string>);
+  /** The provider API's base URL, such as a proxy or a regional endpoint. @default the provider's */
+  readonly baseURL?: string;
+}
+
+export function createDirectModelFetch(
+  provider: "openai" | "anthropic",
+  options: DirectModelOptions = {},
+): typeof fetch {
   return async (url, init) => {
     const headers = new Headers(init?.headers);
-    const credential = await readDevelopmentModelCredential(provider, undefined, init?.signal);
-    const key = credential?.token ?? (await resolveModelApiKey(provider));
+    const { apiKey } = options;
+    const key =
+      apiKey === undefined
+        ? ((await readDevelopmentModelCredential(provider, undefined, init?.signal))?.token ??
+          (await resolveModelApiKey(provider)))
+        : typeof apiKey === "string"
+          ? apiKey
+          : await apiKey();
+    if (key.trim().length === 0) throw new Error(`The ${provider} apiKey option is empty.`);
     headers.set(
       provider === "openai" ? "authorization" : "x-api-key",
       provider === "openai" ? `Bearer ${key}` : key,

@@ -46,7 +46,7 @@ permissions:
 
 jobs:
   analyze:
-    if: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && (github.event.action != 'labeled' || github.event.label.name == 'acknowledge-bundle-warning')) }}
+    if: ${{ github.repository == 'vercel/eve' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.fork == false && (github.event.action != 'labeled' || github.event.label.name == 'acknowledge-bundle-warning'))) }}
     permissions:
       contents: read
       issues: write

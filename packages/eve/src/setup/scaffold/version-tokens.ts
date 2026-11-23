@@ -54,6 +54,27 @@ function findEvePackageRoot(): string | undefined {
   }
 }
 
+export function installedEveDistribution(): { name: string; version: string } | undefined {
+  const packageRoot = findEvePackageRoot();
+  if (packageRoot === undefined) return undefined;
+  const packageJson = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as {
+    name?: unknown;
+    version?: unknown;
+  };
+  return typeof packageJson.name === "string" && typeof packageJson.version === "string"
+    ? { name: packageJson.name, version: packageJson.version }
+    : undefined;
+}
+
+export function eveDistributionSpecifier(
+  distribution: { readonly name: string; readonly version: string },
+  version: string,
+): string {
+  return distribution.name === "eve" || !/^\d+\.\d+\.\d+/.test(version)
+    ? version
+    : `npm:${distribution.name}@${distribution.version}`;
+}
+
 function findWorkspaceManifest(packageRoot: string): string | undefined {
   let directory = packageRoot;
   while (true) {

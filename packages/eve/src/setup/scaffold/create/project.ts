@@ -8,7 +8,12 @@ import { MODEL_HELPERS, parseModelHelper } from "../../../shared/model-helper.js
 import { SUPPORTED_AUTHORED_MODULE_FILE_EXTENSIONS } from "../update/module-files.js";
 import { pathExists, writeTextFile } from "../files.js";
 import { blockingCreateInPlaceEntries } from "../create-in-place.js";
-import { DEFAULT_CONNECT_PACKAGE_VERSION, resolveVersionToken } from "../version-tokens.js";
+import {
+  DEFAULT_CONNECT_PACKAGE_VERSION,
+  eveDistributionSpecifier,
+  installedEveDistribution,
+  resolveVersionToken,
+} from "../version-tokens.js";
 import {
   applyPackageManagerWorkspaceConfiguration,
   isPackageManagerWorkspaceMember,
@@ -39,8 +44,13 @@ export const DEFAULT_EVE_PACKAGE_CONTRACT: EvePackageContract = {
 export function resolveEvePackageContract(
   contract: EvePackageContract = DEFAULT_EVE_PACKAGE_CONTRACT,
 ): EvePackageContract {
+  const version = resolveVersionToken("evePackage.version", contract.version);
+  const distribution =
+    contract.version === DEFAULT_EVE_PACKAGE_CONTRACT.version
+      ? installedEveDistribution()
+      : undefined;
   return {
-    version: resolveVersionToken("evePackage.version", contract.version),
+    version: distribution === undefined ? version : eveDistributionSpecifier(distribution, version),
     nodeEngine: resolveVersionToken("evePackage.nodeEngine", contract.nodeEngine),
   };
 }
@@ -122,9 +132,10 @@ function renderTemplate(content: string, ctx: TemplateContext): string {
 }
 
 export function formatEveDependencySpecifier(versionOrSpecifier: string): string {
-  return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z-.]+)?$/.test(versionOrSpecifier)
-    ? `^${versionOrSpecifier}`
-    : versionOrSpecifier;
+  const match = /^(npm:@[^@/]+\/[^@]+@)?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z-.]+)?)$/.exec(
+    versionOrSpecifier,
+  );
+  return match === null ? versionOrSpecifier : `${match[1] ?? ""}^${match[2]}`;
 }
 
 const BASE_AGENT_TEMPLATE = `import { defineAgent } from "eve";
