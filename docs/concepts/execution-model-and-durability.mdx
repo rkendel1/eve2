@@ -132,7 +132,7 @@ The read and the prompt are yours to bound:
 
 - `startIndex: -2000` requests the newest 2,000 stored lines, not 2,000 events. The `signal` limits read time, including for older-history conversion. The example returns `null` when the read throws or times out, so the instruction contributes nothing and the turn continues. A memo that throws fails the turn instead, and eve tries it again at the next model call.
 - Keep the instruction's role `"user"` and label the text as historical data, so text the earlier user wrote never reaches the model as system instructions.
-- `sessions` reads any session ID, including a session that set `experimental.workflow.retention: 0`, until its data is deleted. Skip such sessions if your agent sets zero retention. Pass only the ID eve provides in `ctx.session.predecessor`, never one taken from a request or a model.
+- `sessions` reads any session ID, including a session that set `experimental.workflow.retention: 0`, until its data is deleted. Retiring the stranded session ends it, so zero retention, the default outside development when tracing doesn't record inputs and outputs, can delete its history before the replacement reads it. Set `experimental.workflow.retention: "default"` to keep the predecessor readable. Pass only the ID eve provides in `ctx.session.predecessor`, never one taken from a request or a model.
 
 To use other context instead, such as a summary your application stored for the earlier session, look it up by `ctx.session.predecessor.sessionId`.
 
