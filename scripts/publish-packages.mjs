@@ -2,15 +2,19 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { scopedPackage } from "./scoped-packages.mjs";
 
-const NAME = "@appport/eve";
 const args = process.argv.slice(2);
+const packageFlag = args.indexOf("--package");
+const key = packageFlag >= 0 ? args[packageFlag + 1] : "eve";
+const entry = scopedPackage(key);
+const NAME = entry.name;
 const dryRun = args.includes("--dry-run");
 const versionFlag = args.indexOf("--version");
 const version =
   versionFlag >= 0
     ? args[versionFlag + 1]
-    : JSON.parse(readFileSync("packages/eve/package.json", "utf8")).version;
+    : JSON.parse(readFileSync(join(entry.directory, "package.json"), "utf8")).version;
 if (!version || version.startsWith("-"))
   throw new Error("--version needs a value, e.g. --version 1.0.3.");
 
@@ -37,19 +41,23 @@ const published = (() => {
 })();
 if (published) {
   throw new Error(
-    `${NAME}@${version} is already published. Publish a new version: npm run publish:packages -- --version <next>.`,
+    `${NAME}@${version} is already published. Publish a new version: npm run publish:packages -- --package ${key} --version <next>.`,
   );
 }
 
-process.stdout.write(`▸ build eve (packages/eve)\n`);
-execFileSync("pnpm", ["--filter", "eve", "build"], { stdio: "inherit" });
+process.stdout.write(`▸ build ${entry.workspace} (${entry.directory})\n`);
+execFileSync("pnpm", ["--filter", entry.workspace, "build"], { stdio: "inherit" });
 
 const out = mkdtempSync(join(tmpdir(), "eve-publish-"));
 const npmrc = join(out, ".npmrc");
 try {
   process.stdout.write(`▸ pack ${NAME}@${version}\n`);
-  const packed = JSON.parse(run("node", ["scripts/pack-scoped-eve.mjs", NAME, version, out]));
+  const packed = JSON.parse(
+    run("node", ["scripts/pack-scoped-eve.mjs", NAME, version, out, "--package", key]),
+  );
   process.stdout.write(`  ${packed.tarball}\n  commit ${packed.commit}\n  ${packed.integrity}\n`);
+  process.stdout.write(`▸ clean install and license check\n`);
+  run("node", ["scripts/verify-scoped-package.mjs", packed.tarball, key]);
   writeFileSync(npmrc, `//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}\n`, { mode: 0o600 });
   process.stdout.write(`▸ ${dryRun ? "dry run: " : ""}publish ${NAME}@${version}\n`);
   try {
@@ -79,7 +87,7 @@ try {
   process.stdout.write(
     dryRun
       ? `✓ dry run complete; nothing was published\n`
-      : `✓ published ${NAME}@${version}. Consumers install it as "eve": "npm:${NAME}@${version}".\n`,
+      : `✓ published ${NAME}@${version}.${entry.consumerAlias ? ` Consumers install it as "${entry.consumerAlias}": "npm:${NAME}@${version}".` : ""}\n`,
   );
 } finally {
   rmSync(out, { recursive: true, force: true });

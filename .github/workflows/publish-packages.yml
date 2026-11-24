@@ -1,4 +1,5 @@
-# Publishes this repository's eve framework as @appport/eve (scripts/publish-packages.mjs).
+# Publishes this repository's packages under @appport (scripts/publish-packages.mjs, scripts/scoped-packages.mjs):
+# eve as @appport/eve, the FeltDB World storage as @appport/eve-world-feltdb.
 # Run by hand from the Actions tab. Needs the repository secret NPM_TOKEN: a granular token with
 # read-write access to @appport and "Bypass two-factor authentication", or an Automation token.
 name: Publish packages
@@ -6,8 +7,13 @@ name: Publish packages
 on:
   workflow_dispatch:
     inputs:
+      package:
+        description: "Package to publish"
+        type: choice
+        options: [eve, world-feltdb]
+        default: eve
       version:
-        description: "Version to publish (default: packages/eve's version)"
+        description: "Version to publish (default: the package's version)"
         required: false
       dry_run:
         description: "Pack and check without publishing"
@@ -38,12 +44,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Publish @appport/eve
+      - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
           VERSION: ${{ inputs.version }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          set -- ${VERSION:+--version "$VERSION"}
+          set -- --package "$PACKAGE" ${VERSION:+--version "$VERSION"}
           [ "$DRY_RUN" = "true" ] && set -- "$@" --dry-run
           npm run publish:packages -- "$@"
