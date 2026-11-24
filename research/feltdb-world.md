@@ -460,6 +460,17 @@ yet released.
 
 ### 6.5 Single-process topology and limits
 
+- **The World configures its own FeltDB retention explicitly**, never inheriting a default:
+  `journal: { retainOperations, retainTransactionIdsMs }`, with the transaction-id window much longer than the
+  longest retry the World makes with one id (proposed: 24 hours of store time). At open, the World refuses a FeltDB
+  runtime whose `capabilities().transactionIdRetention` is false, with an error naming the runtime: a move to a FeltDB
+  server must not silently bring back unbounded growth.
+- **No World correctness depends on transaction-id recognition beyond the window.** Every durable transition carries
+  its own precondition (section 3: event slot `requireAbsent`, run head `ifVersion`, token claim `requireAbsent`,
+  message lease `ifVersion`, payload guard), so a replay of any World transaction after its id is forgotten fails its
+  precondition instead of applying twice. Transaction ids are used only to make a retry of a commit with an unknown
+  outcome cheap and exact inside the window.
+
 - One `eve start` process owns one FeltDB directory (`EVE_FELTDB_PATH`), opened with the default exclusive lock. A second
   process on the same directory is refused with `STATE_LOCKED`; the World turns that into a startup error that says
   so.
@@ -475,15 +486,17 @@ yet released.
 
 ### 6.6 Package and versioning
 
-- **Workspace package `@eve/world-feltdb` in `packages/eve-world-feltdb`**, following the repository's convention
-  (`@eve/recall` in `packages/eve-recall`, `@eve/code` in `packages/eve-code`).
+- **Package `@appport/eve-world-feltdb` in `packages/eve-world-feltdb`.** The workspace name is the published name: no
+  rename at publish time, so installed consumers and the workspace resolve one name. Nothing is published under
+  `@eve`, which is upstream's npm scope; this fork publishes under `@appport` (and FeltDB under `@feltdb`). The package
+  ships its own NOTICE, naming what it contains, not the repository's.
 - **Published name:** the fork publishes only under `@appport` (`scripts/publish-packages.mjs:6` packs `eve` as
   `@appport/eve` through `scripts/pack-scoped-eve.mjs`); `@eve` on npm is upstream's scope. The World is published the
-  same way, as `@appport/eve-world-feltdb` (decided). Built: `scripts/scoped-packages.mjs` lists the publishable
+  same gate, as `@appport/eve-world-feltdb` (decided). Built: `scripts/scoped-packages.mjs` lists the publishable
   packages; `pack-scoped-eve.mjs` and `publish-packages.mjs --package <key>` handle both; every publish first passes
   `verify-scoped-package.mjs`: required files present (LICENSE, NOTICE), a clean `npm install` of the tarball in an
   empty project, `gitHead` equal to HEAD, and a smoke round trip. Verified for both packages; nothing was published.
-- **Versioned independently** with its own changesets (`@eve/world-feltdb`, allow-listed in
+- **Versioned independently** with its own changesets (`@appport/eve-world-feltdb`, allow-listed in
   `assert-changeset-publish-packages.mjs`), starting at 0.1.0 (pre-1.0: the whole public surface is Experimental).
 - **Dependencies:** `@workflow/world` as a peer at the major eve pins (which eve's `validate-world.ts` checks), and
   `@feltdb/core` as a peer (`>=0.23.0 <0.25.0` today: the payload stores need 0.23; the World will need the release
@@ -715,16 +728,19 @@ rows remain the long-term platform requirement, as decided; they are not a prere
 8. **Payload store as a second store:** if the content store is not accepted, the World owns a directory's
    consistency. The write order (put, then reference) and the orphan sweep are the whole design; they get crash tests.
 
-## 11. Decisions needed before Phase B
+## 11. Decisions taken (Phase A.2 review) and what remains open
 
-1. **Payload store:** build `inline` and `feltdbContent` and measure both (proposed), and accept the World-owned
-   directory as the fallback if the content store is not.
-2. **`db.compact`:** allow the maintenance pass to call it, behind a capability check (proposed), or ship with an
-   unbounded journal and document it.
-3. **Transaction-identity retention:** raise it as a FeltDB change now (proposed), or accept store rotation as the
-   documented limit.
-4. **Published name:** `@appport/eve-world-feltdb` from workspace `@eve/world-feltdb`, by generalizing
-   `pack-scoped-eve.mjs` (proposed).
+1. **Payload store:** one abstraction, three backends; the FeltDB record backend is the correctness reference, the
+   folder backend the likely production candidate, the content store out of the production path until its backup,
+   restore and durability are proven. Built (6.2).
+2. **Compaction:** allowed behind a capability check, never for correctness. Moot for bounds: the file runtime
+   compacts automatically (6.4).
+3. **Transaction-id retention:** a FeltDB change, not store rotation. Built in FeltDB (rkendel1/flow_db#478, store
+   time, Experimental, unreleased); conditionally accepted pending the contract edge cases (now tested there) and this
+   report's provenance-checked capacity evidence.
+4. **Published name:** `@appport/eve-world-feltdb`, the same name in the workspace.
+5. **Open:** the World implementation (queue, sessions, events, fences, memory) stays on hold until the live and
+   lifetime capacity results in section 7 are accepted.
 
 ## 12. Corrections to `feltkit/docs/EVE-COMPOSITION.md`
 
