@@ -393,28 +393,31 @@ State falls into three classes, each with one authoritative home:
 | Durable evidence  | the event log: one record per event with type, position, correlation, timestamps, writer, payload reference, payload digest and size   | FeltDB records                                          | kept; never deleted silently (6.3)                                                                      |
 | Large payloads    | the bytes of event data, step input/output, hook payloads, stream chunks                                                               | a `PayloadStore` behind the World, addressed by SHA-256 | as long as some record references them                                                                  |
 
-The evidence record carries `{ref, digest, bytes}`, so the log stays interpretable and verifiable even when the bytes
-live elsewhere: a read verifies the digest and fails closed on a mismatch.
+The evidence record carries a `PayloadRef` (`{digest, bytes, store}`), so the log stays interpretable and verifiable
+even when the bytes live elsewhere: every read verifies the digest and size and fails closed on a mismatch.
 
-```ts
-interface PayloadStore {
-  put(bytes: Uint8Array): Promise<PayloadRef>; // durable before it returns
-  get(ref: PayloadRef): Promise<Uint8Array>; // verified against ref.digest
-  release(ref: PayloadRef): Promise<void>; // the last reference went away
-}
-```
+**As built (A.3)** in `packages/eve-world-feltdb/src/payload`: one `PayloadStore` interface (`write`, `read`,
+`verify`, `resolve`, `guard`, `usage`, `list`, `export`, `import`, `remove`) and three backends.
 
-- **Write order:** `put` (durable), then the FeltDB commit that references it. A crash between them leaves an
-  unreferenced payload, never a reference to a missing one. A maintenance sweep releases payloads no record references.
-- **Threshold:** payloads at or below a configured size (default 1 KiB) stay inline in the record; larger ones go to the
-  store. Workflow payloads are opaque bytes (devalue, often zstd); inline bytes are base64.
-- **Implementations** (Phase B builds the first two and measures both):
-  1. `inline`: every payload in the row. Stable FeltDB APIs only. The default for tests and small instances.
-  2. `feltdbContent`: FeltDB's content store (`storeContent`, `acquireContent`, `releaseContent`): file runtime only,
-     **Experimental** (`FDB/docs/reference/public-api.md:505-506`). Evaluated, not depended on.
-  3. A World-owned content-addressed directory (write, fsync file and directory, then reference) is the fallback if the
-     content store is not accepted. It adds a second store whose consistency the World owns, which is why it is not
-     the first choice.
+- **Every backend indexes each payload with one FeltDB record**, `eve_payloads/<digest>`, committed only after the bytes
+  are durable. The record that references a payload commits together with the payload's `guard`, an `ifVersion`
+  precondition on that index record. So a committed reference names bytes that were durable when it committed, and a
+  payload removed between `write` and the referencing commit makes that commit fail instead of dangle.
+- **Removal** deletes the index record first, then the bytes. Writes and removals of one digest are serialized in the
+  process (single-process topology, 6.5).
+- **Crash windows:** between durable bytes and the index commit, a crash leaves unindexed bytes (the folder backend
+  lists them; the content store cannot be listed); between the index commit and the referencing commit, an orphan that
+  `findOrphanedPayloads` finds by reference and age. Neither leaves a dangling reference.
+
+| Backend                 | Bytes                                       | Commits per new payload | FeltDB APIs                  | Status                      |
+| ----------------------- | ------------------------------------------- | ----------------------- | ---------------------------- | --------------------------- |
+| `feltdbRecordPayloads`  | base64 in the index record (in memory)      | 1                       | Stable                       | reference implementation    |
+| `feltdbContentPayloads` | FeltDB content store, `<state>/content/`    | 2 (index + ref count)   | content store (Experimental) | candidate, under evaluation |
+| `folderPayloads`        | `<root>/<2 hex>/<digest>`, eve-owned folder | 1                       | Stable                       | fallback, recommended now   |
+
+The content store is not made the production option: its durability per write is proven (fsync, rename, directory
+fsync), and a copy of the stopped directory restores it (tested), but it has no listing (unindexed bytes after a crash
+cannot be found), it costs one more commit per payload for its own reference count, and it is Experimental.
 
 ### 6.3 Retention, archival and capacity limits
 
@@ -437,18 +440,23 @@ interface PayloadStore {
 
 ### 6.4 Experimental API dependencies
 
-| API                                                                                                               | Status       | Used for                                     | If absent or removed                                                                          |
-| ----------------------------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `createFeltDB`, collections, `db.transaction` with `requireAbsent`/`ifVersion`, bounded `db.query`, `db.snapshot` | Stable       | every correctness decision, reads, backup    | n/a                                                                                           |
-| `db.onCommit`                                                                                                     | Experimental | waking queue claimers and stream tails early | polling (default 250 ms); correctness unchanged                                               |
-| `access: 'exclusive'` (file lock)                                                                                 | Experimental | refusing a second process on one directory   | the default behavior of `createFeltDB({ path })`; the World sets nothing                      |
-| `db.compact`, `db.journalStatus`                                                                                  | Experimental | bounding the journal and reopen time         | the journal grows without bound and every reopen replays it (7.2); status reported as unknown |
-| `storeContent` / `acquireContent` / `releaseContent`                                                              | Experimental | `feltdbContent` payload store only           | `inline` or the World-owned directory                                                         |
-| read-basis fences, Durable Work, record expiry, agent state                                                       | Experimental | **not used**                                 | n/a                                                                                           |
+| API                                                                                                               | Status       | Used for                                                | If absent or removed                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createFeltDB`, collections, `db.transaction` with `requireAbsent`/`ifVersion`, bounded `db.query`, `db.snapshot` | Stable       | every correctness decision, reads, backup               | n/a                                                                                                                                           |
+| `db.onCommit`                                                                                                     | Experimental | waking queue claimers and stream tails early            | polling (default 250 ms); correctness unchanged                                                                                               |
+| `access: 'exclusive'` (file lock)                                                                                 | Experimental | refusing a second process on one directory              | the default behavior of `createFeltDB({ path })`; the World sets nothing                                                                      |
+| `db.compact`, `db.journalStatus`                                                                                  | Experimental | status reporting; an explicit compaction in maintenance | not needed for bounds: the file runtime compacts automatically by default (8 MiB journal and the snapshot's size); status reported as unknown |
+| `journal.retainOperations`                                                                                        | Experimental | bounding the in-memory operation history                | the history keeps a copy of every value ever written; memory grows with every write                                                           |
+| `journal.retainTransactionIdsMs` (FeltDB, unreleased, A.3)                                                        | Experimental | bounding transaction ids (lifetime growth)              | ids grow without bound, ~250 B of heap and ~160 B of snapshot per commit (7.5)                                                                |
+| `storeContent` / `acquireContent` / `releaseContent`                                                              | Experimental | `feltdbContent` payload store only                      | `inline` or the World-owned directory                                                                                                         |
+| read-basis fences, Durable Work, record expiry, agent state                                                       | Experimental | **not used**                                            | n/a                                                                                                                                           |
 
-`db.compact` is the one Experimental API an operator will want in production: without it a long-lived file store's
-journal and reopen time grow with every commit ever made. The World calls it only from the maintenance pass, behind a
-capability check, and reports when it is unavailable. This needs a decision (section 11).
+Correction to Phase A.2: the file runtime **does** compact on its own by default (a timer after the commit that made it
+due); the A.2 benchmark never yielded to the event loop, so its timer never ran. Explicit `db.compact` is therefore not
+needed for bounded journals, and the World calls it only behind a capability check, never for correctness. The two
+retention options are what an operator needs for a long-lived instance: without them, operation history and transaction
+ids grow with every commit (measured, 7.5). Both are Experimental; transaction-id retention is in FeltDB's branch, not
+yet released.
 
 ### 6.5 Single-process topology and limits
 
@@ -471,12 +479,15 @@ capability check, and reports when it is unavailable. This needs a decision (sec
   (`@eve/recall` in `packages/eve-recall`, `@eve/code` in `packages/eve-code`).
 - **Published name:** the fork publishes only under `@appport` (`scripts/publish-packages.mjs:6` packs `eve` as
   `@appport/eve` through `scripts/pack-scoped-eve.mjs`); `@eve` on npm is upstream's scope. The World is published the
-  same way, as `@appport/eve-world-feltdb`, by generalizing the existing pack-scoped step rather than adding a new
-  mechanism. Decision needed (section 11).
-- **Versioned independently** with its own changesets, starting at 0.1.0 (pre-1.0: the whole public surface is
-  Experimental).
+  same way, as `@appport/eve-world-feltdb` (decided). Built: `scripts/scoped-packages.mjs` lists the publishable
+  packages; `pack-scoped-eve.mjs` and `publish-packages.mjs --package <key>` handle both; every publish first passes
+  `verify-scoped-package.mjs`: required files present (LICENSE, NOTICE), a clean `npm install` of the tarball in an
+  empty project, `gitHead` equal to HEAD, and a smoke round trip. Verified for both packages; nothing was published.
+- **Versioned independently** with its own changesets (`@eve/world-feltdb`, allow-listed in
+  `assert-changeset-publish-packages.mjs`), starting at 0.1.0 (pre-1.0: the whole public surface is Experimental).
 - **Dependencies:** `@workflow/world` as a peer at the major eve pins (which eve's `validate-world.ts` checks), and
-  `@feltdb/core` as a peer (`>=0.23 <0.24` until FeltDB 1.0). No dependency on `eve` or FeltKit; `eve` gains no
+  `@feltdb/core` as a peer (`>=0.23.0 <0.25.0` today: the payload stores need 0.23; the World will need the release
+  that carries transaction-id retention). No dependency on `eve` or FeltKit; `eve` gains no
   dependency; FeltDB does not know the package exists.
 - **Narrow public API:**
   - `createWorld()`: the no-argument factory eve calls, configured from `EVE_FELTDB_PATH` (and `EVE_FELTDB_URL` /
