@@ -29,6 +29,7 @@ The default eve channel serves these routes:
 - `POST /eve/v1/session/:sessionId/cancel` (cancel the in-flight turn)
 - `POST /eve/v1/session/:sessionId/clear` (clear the session's model history)
 - `POST /eve/v1/session/:sessionId/compact` (compact the session's context)
+- `POST /eve/v1/session/:sessionId/resume` (let a turn the agent's `control` holds ask it again)
 - `POST /eve/v1/session/:sessionId/end` (retire the session)
 - `GET /eve/v1/session/:sessionId/stream` (stream events as NDJSON)
 
@@ -168,6 +169,10 @@ Post to `/eve/v1/session/:sessionId/clear` to cancel a running turn and every wo
 ### Compact context
 
 Post to `/eve/v1/session/:sessionId/compact` to summarize context without sending a user message. The operation waits for a running turn to finish and reports its result on the stream. See [Compact, clear, and end](../concepts/sessions-runs-and-streaming#compact-clear-and-end).
+
+### Resume a held turn
+
+Post `{}` to `/eve/v1/session/:sessionId/resume`, with the same auth as `cancel`, to let a turn the agent's [`control`](../agent-config#agent-control) holds ask it again. With no held turn, resume changes nothing; its delivery settles `ignored`.
 
 <a id="reset-a-session" />
 

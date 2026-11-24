@@ -390,6 +390,52 @@ A cancelled agent task ends and sends no further reply. Usage the cancelled run
 reported up to that point still counts against the parent when its usage report
 or final outcome arrives.
 
+## Agent control
+
+`control` lets a host pause, resume, and steer a running session. eve calls
+`control.checkpoint()` before each model step (`boundary: "model"`) and before a
+step's tool calls start (`boundary: "tools"`):
+
+```ts title="agent/agent.ts"
+import { defineAgent } from "eve";
+import { hostControl } from "./host-control";
+
+export default defineAgent({ model: "anthropic/claude-opus-5.5", control: hostControl() });
+```
+
+```ts
+interface AgentControl {
+  checkpoint(input: { sessionId: string; turnId: string; boundary: "model" | "tools" }): Promise<{
+    proceed: boolean;
+    reason?: string;
+    instructions: ReadonlyArray<{ instructionId: string; text: string; from: string }>;
+  }>;
+  acknowledge(input: {
+    sessionId: string;
+    instructionId: string;
+    outcome: "incorporated" | "conflict";
+    note: string;
+  }): Promise<void>;
+}
+```
+
+- `proceed: false` holds the turn: the step doesn't start, and the stream records
+  `turn.held` with the `boundary` and `reason`. A held turn waits durably, across
+  restarts, for `POST /eve/v1/session/:sessionId/resume` (`session.resume()` in
+  TypeScript), then asks `checkpoint` again. eve also asks once more right after
+  recording the hold, so a resume the host applied first isn't lost. A `resume`
+  with nothing held changes nothing.
+- At the `tools` boundary, a held step's calls stay pending and each runs once
+  after the turn goes on.
+- `cancel` ends a held turn as cancelled, and `end` ends the session.
+- A `checkpoint` that throws holds the turn, with the reason
+  `"The agent's control checkpoint failed."`.
+- A model checkpoint's `instructions` reach that step's model input as user
+  messages, `Update from <from>: <text>`, recorded on the stream as consumed
+  deliveries. Each reaches the model once. After the step succeeds, eve calls
+  `acknowledge` once per instruction with `outcome: "incorporated"`; when it
+  fails, eve doesn't, so the host delivers it again.
+
 ## Workflow world
 
 The Workflow world is the backend that stores and runs sessions, so they survive restarts and redeploys. Omit
