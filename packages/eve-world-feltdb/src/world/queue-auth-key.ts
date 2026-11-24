@@ -25,7 +25,7 @@ interface KeyFileState {
   loggedWriteFailure: boolean;
 }
 const keyFiles = () =>
-  globalSingleton("@workflow/world-local//queueAuthKeyFiles", 1, () => ({
+  globalSingleton("@appport/eve-world-feltdb//queueAuthKeyFiles", 1, () => ({
     byDir: new Map<string, KeyFileState>(),
   }));
 function stateFor(dir: string): KeyFileState {
@@ -71,7 +71,7 @@ function logWriteFailure(state: KeyFileState, dir: string, error: unknown) {
   if (state.loggedWriteFailure) return;
   state.loggedWriteFailure = true;
   console.error(
-    `[world-local] Could not write the queue auth key to ${path.join(dir, QUEUE_AUTH_KEY_FILE)}; ` +
+    `[world-feltdb] Could not write the queue auth key to ${path.join(dir, QUEUE_AUTH_KEY_FILE)}; ` +
       "this app's own deliveries still authenticate, but the CLI, the web UI and " +
       "other processes of the app cannot until it can be written.",
     { error: String(error) },

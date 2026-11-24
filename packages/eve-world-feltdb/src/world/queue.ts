@@ -468,7 +468,7 @@ export function createQueue(
         }
         if (!semaphore.tryAcquire()) {
           debugLog(
-            `[world-local]: concurrency limit (${WORKFLOW_LOCAL_QUEUE_CONCURRENCY}) reached, waiting for queue to free up`,
+            `[world-feltdb]: concurrency limit (${WORKFLOW_LOCAL_QUEUE_CONCURRENCY}) reached, waiting for queue to free up`,
           );
           await semaphore.acquire();
         }
@@ -577,7 +577,7 @@ export function createQueue(
             }
             if (isDetachedArrayBufferQueueError(err)) throw err;
             console.error(
-              `[world-local] Queue delivery failed at the transport (loop ${loop + 1}), retrying`,
+              `[world-feltdb] Queue delivery failed at the transport (loop ${loop + 1}), retrying`,
               {
                 queueName,
                 messageId,
@@ -650,14 +650,14 @@ export function createQueue(
             ) {
               keyRotations++;
               debugLog(
-                "[world-local]: delivery refused as unauthenticated; the queue auth key changed, retrying with it",
+                "[world-feltdb]: delivery refused as unauthenticated; the queue auth key changed, retrying with it",
               );
               continue;
             }
             authRefusals++;
             if (authRefusals < MAX_QUEUE_AUTH_REFUSALS) {
               debugLog(
-                `[world-local]: delivery refused as unauthenticated (${authRefusals}/${MAX_QUEUE_AUTH_REFUSALS}), retrying`,
+                `[world-feltdb]: delivery refused as unauthenticated (${authRefusals}/${MAX_QUEUE_AUTH_REFUSALS}), retrying`,
               );
               await setTimeout(localRetryDelayMs(authRefusals), undefined, {
                 signal: closeSignal,
@@ -666,7 +666,7 @@ export function createQueue(
             }
             logAuthRefusal((refusedSinceLastLog) => {
               console.error(
-                `[world-local] Queue delivery refused by the app as unauthenticated ${MAX_QUEUE_AUTH_REFUSALS} times; giving up the message`,
+                `[world-feltdb] Queue delivery refused by the app as unauthenticated ${MAX_QUEUE_AUTH_REFUSALS} times; giving up the message`,
                 {
                   queueName,
                   messageId,
@@ -681,7 +681,7 @@ export function createQueue(
             return;
           }
           console.error(
-            `[world-local] Queue message failed (attempt ${delivery}, HTTP ${response.status})`,
+            `[world-feltdb] Queue message failed (attempt ${delivery}, HTTP ${response.status})`,
             {
               queueName,
               messageId,
@@ -710,7 +710,7 @@ export function createQueue(
         }
         finish();
         console.error(
-          `[world-local] Queue message exhausted safety limit (${MAX_LOCAL_SAFETY_LIMIT} attempts)`,
+          `[world-feltdb] Queue message exhausted safety limit (${MAX_LOCAL_SAFETY_LIMIT} attempts)`,
           {
             queueName,
             messageId,

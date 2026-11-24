@@ -10,7 +10,7 @@ export function purgesUserDataOnFinish(attributes: Record<string, string> | unde
   const retention = readRunRetention(attributes);
   if (retention.unsupported) {
     console.warn(
-      `[world-local] Ignoring unrecognized ${RETENTION_ATTRIBUTE} value ` +
+      `[world-feltdb] Ignoring unrecognized ${RETENTION_ATTRIBUTE} value ` +
         `${JSON.stringify(retention.raw)}; keeping the run's data.`,
     );
   }

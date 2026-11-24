@@ -929,6 +929,9 @@ importers:
 
   e2e/fixtures/agent-basic-runtime:
     dependencies:
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../../../packages/eve-world-feltdb
       '@eve-e2e/config':
         specifier: workspace:*
         version: link:../e2e-config
@@ -973,6 +976,9 @@ importers:
 
   e2e/fixtures/agent-cancellation:
     dependencies:
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../../../packages/eve-world-feltdb
       '@eve-e2e/config':
         specifier: workspace:*
         version: link:../e2e-config
@@ -1187,6 +1193,9 @@ importers:
 
   e2e/fixtures/agent-memory:
     dependencies:
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../../../packages/eve-world-feltdb
       '@eve-e2e/config':
         specifier: workspace:*
         version: link:../e2e-config
@@ -1404,6 +1413,9 @@ importers:
 
   e2e/fixtures/agent-session-timeout:
     dependencies:
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../../../packages/eve-world-feltdb
       '@eve-e2e/config':
         specifier: workspace:*
         version: link:../e2e-config
@@ -1599,6 +1611,9 @@ importers:
 
   e2e/fixtures/agent-tools-hitl:
     dependencies:
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../../../packages/eve-world-feltdb
       '@eve-e2e/config':
         specifier: workspace:*
         version: link:../e2e-config
@@ -1665,6 +1680,9 @@ importers:
 
   e2e/fixtures/agent-workflow-stress:
     dependencies:
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../../../packages/eve-world-feltdb
       '@eve-e2e/config':
         specifier: workspace:*
         version: link:../e2e-config

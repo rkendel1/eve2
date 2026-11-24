@@ -82,7 +82,7 @@ function getHookRetentionLimitMs(): number {
   return days * DAY_MS;
 }
 function startHookLog(message: string, detail: Record<string, string>): void {
-  debugLog(`[world-local] start Hook: ${message}`, detail);
+  debugLog(`[world-feltdb] start Hook: ${message}`, detail);
 }
 function startHookRejected(message: string, reason: StartHookRejectionReason): WorkflowWorldError {
   return new WorkflowWorldError(message, {
