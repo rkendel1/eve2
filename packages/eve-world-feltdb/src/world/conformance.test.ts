@@ -2,14 +2,12 @@ import { createFeltDB } from "@feltdb/core";
 import { IN_BAND_SEQ_AT_RUN_CREATION, type Storage } from "@workflow/world";
 import { atomicStartHookConformance } from "@workflow/world/test-support/atomic-start-hook-conformance.js";
 import { inBandFenceConformance } from "@workflow/world/test-support/in-band-fence-conformance.js";
-import { monotonicFactory } from "ulid";
+import { ulid } from "ulid";
 import { vi } from "vitest";
 import { feltdbRecordPayloads } from "../payload/record-store.js";
 import { WorldDatabase } from "./database.js";
 import { createStorage } from "./storage.js";
 import { FELTDB_WORLD_CAPABILITIES } from "./world.js";
-
-const ulid = monotonicFactory();
 
 function freshStorage() {
   const db = createFeltDB({ memory: true, namespace: `conformance-${crypto.randomUUID()}` });
