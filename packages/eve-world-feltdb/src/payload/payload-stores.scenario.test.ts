@@ -288,3 +288,31 @@ describe.each(BACKENDS)("%s payload store under SIGKILL", (backend) => {
     expect((await store.usage()).payloads).toBe(referenced.size);
   });
 });
+
+describe.each(BACKENDS)("%s payload store, killed between payload and event", (backend) => {
+  it("leaves an orphan the sweep finds, never an event without its payload", async () => {
+    const dir = scratch();
+    const file = join(packageRoot, `.hang-child-${backend}-${process.pid}.mjs`);
+    writeFileSync(
+      file,
+      childScript(backend).replace(
+        /for \(let i = start;[\s\S]*$/,
+        `const ref = await store.write(new TextEncoder().encode("written, then the process dies"));
+console.log("ack " + start);
+await new Promise(() => {});
+`,
+      ),
+    );
+    directories.push(file);
+    await runUntilKilled(file, dir, 0, 0);
+
+    const { db, store } = open(backend, dir);
+    const events = await db.query({ collection: "test_events", limit: 10 });
+    expect(events.records).toHaveLength(0);
+    const orphans = await findOrphanedPayloads(store, () => false, { graceMs: 0 });
+    expect(orphans).toHaveLength(1);
+    expect(await store.verify(orphans[0]!.ref)).toBe("ok");
+    expect(await store.remove(orphans[0]!.ref)).toBe(true);
+    expect(await store.usage()).toEqual({ payloads: 0, bytes: 0 });
+  });
+});
