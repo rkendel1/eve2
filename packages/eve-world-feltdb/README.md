@@ -64,3 +64,20 @@ Three backends implement it:
   digest and writes it. A copy of the stopped FeltDB and payload directories restores both.
 - One store instance per process and database: writes and removals of a digest are serialized in-process. Several
   processes on one store are not supported.
+
+## Capacity benchmark
+
+`bench/capacity.mjs` measures the storage cost of a simulated World turn shaped like what eve 1.1 writes per turn
+(7 events of about 1.9 KB, 2 step deliveries through a record queue, 76 stream chunks flushed in 8 batches; random,
+incompressible payloads; 10 turns per session; the store's clock advances 2 s per turn):
+
+```sh
+pnpm --filter @eve/world-feltdb build
+FELTDB_CORE=/path/to/flow_db/packages/core/dist/index.js \
+  node --expose-gc packages/eve-world-feltdb/bench/capacity.mjs --backend folder --turns 5000 [--archive] [--retain-ids-forever]
+```
+
+`--backend` is `feltdb-record`, `feltdb-content` or `folder`. `--archive` deletes each session's records and payloads 20
+sessions after it ends, so what remains is lifetime growth. Transaction ids are retained for 10 minutes
+(`--retain-ids-ms`) unless `--retain-ids-forever`; `FELTDB_CORE` must name a FeltDB build with
+`journal.retainTransactionIdsMs` for that. It prints one JSON sample per tenth of the run and a summary.
