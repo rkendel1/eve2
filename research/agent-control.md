@@ -1,6 +1,6 @@
 ---
 issue: https://github.com/rkendel1/eve2/issues
-status: proposed
+status: implemented
 last_updated: "2026-11-24"
 ---
 
@@ -31,8 +31,8 @@ export default defineAgent({ model, control: feltkitControl() });
 
 ```ts
 interface AgentControl {
-  /** Before each model step. `proceed: false` holds the turn durably until `resume` is sent to the session. */
-  checkpoint(input: { sessionId: string; turnId: string }): Promise<{
+  /** Before each model step and before a step's tool calls start. `proceed: false` holds the turn durably until `resume` is sent to the session. */
+  checkpoint(input: { sessionId: string; turnId: string; boundary: "model" | "tools" }): Promise<{
     proceed: boolean;
     reason?: string;
     /** Updates to take into account now, oldest first; added to the model's input before the step. */
@@ -58,13 +58,18 @@ person ──signal/submit/withdraw/pause/resume/interrupt/stop──▶ FeltKit
                                                                   │  interrupt ─▶ eve cancel   stop ─▶ eve end
                                                                   │  resume    ─▶ eve resume
 eve turn ──before each model step──▶ control.checkpoint ──────────┘
-   proceed: false  ─▶ the step returns held: { kind: "control" }; the session pauses durably (turn.paused, awaiting control)
+   proceed: false  ─▶ the step returns held: { kind: "control" }; the session pauses durably (turn.held)
    instructions    ─▶ appended to the step's input as updates from their senders; acknowledged after the step
 FeltKit capability tools (actions) ─▶ refused at the bridge while paused/interrupted or an update is pending
 ```
 
-- **Boundaries** are the model step (in `runStages`, before `runModelStep`) and every capability call (FeltKit's
+- **Boundaries** are the model step (in `runStages`, before `runModelStep`), the start of a step's tool calls
+  (`boundary: "tools"`; held calls stay pending and run once after release), and every capability call (FeltKit's
   bridge, which already performs them). A signaled update never blocks.
+- **Hold**: `proceed: false`, or a `checkpoint` that throws, records `turn.held` (`{ turnId, boundary, reason }`) and
+  pauses the turn durably (`TurnPause { on: "control" }`), never as an interaction wait. eve asks once more right
+  after recording the hold, so a `resume` the host applied first isn't lost; after that it waits for `resume`. A
+  `resume` with nothing held settles `ignored`.
 - **Pause**: no new step or action starts; a model call or action already running finishes and is recorded
   (`pausing` until then). **Interrupt**: pause, and FeltKit cancels the running turn (`cancel`); a dispatched action
   finishes and its outcome is recorded. **Stop**: terminal; FeltKit ends the session (`end`); open updates are
