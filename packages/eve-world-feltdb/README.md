@@ -16,6 +16,20 @@ Published as `@appport/eve-world-feltdb`, the same name it has in this workspace
 
 It does not depend on `eve` or FeltKit, and FeltDB does not depend on it.
 
+## Memory
+
+An agent on this World keeps its `fileMemory` documents in FeltDB too:
+
+```ts
+import { feltdbWorldMemory } from "@appport/eve-world-feltdb";
+import { fileMemory } from "eve/memory/file";
+
+const provider = fileMemory({ backend: feltdbWorldMemory() });
+```
+
+`feltdbWorldMemory()` opens `<EVE_FELTDB_PATH>/memory` once per process, with the World's transaction-id retention. A
+write is conditional on the version it read (`MemoryDocumentConflictError` otherwise), as eve's memory contract requires.
+
 ## Payload storage
 
 Large values (event data, step input and output, stream chunks) live behind a `PayloadStore`. An authoritative record

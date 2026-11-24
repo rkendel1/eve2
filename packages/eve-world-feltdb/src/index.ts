@@ -2,6 +2,7 @@ export {
   FeltDBMemoryConflictError,
   type FeltDBMemoryDocument,
   feltdbMemory,
+  feltdbWorldMemory,
   MEMORY_COLLECTION,
   type MemoryDatabase,
 } from "./memory/feltdb-memory.js";
