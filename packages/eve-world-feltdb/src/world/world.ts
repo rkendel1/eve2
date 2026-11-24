@@ -14,8 +14,10 @@ import { QueueRecords } from "./queue-records.js";
 import { createStorage } from "./storage.js";
 import { createStreamer } from "./streamer.js";
 
+/** How long the World asks FeltDB to recognize a committed transaction id, in store time: 24 hours. */
 export const DEFAULT_TRANSACTION_ID_RETENTION_MS = 24 * 60 * 60 * 1000;
 
+/** The Workflow World capabilities this World declares. */
 export const FELTDB_WORLD_CAPABILITIES = {
   hookRetention: { active: true },
   atomicStartHook: { active: true },
@@ -26,8 +28,10 @@ export const FELTDB_WORLD_CAPABILITIES = {
   inBandFence: true,
 } satisfies WorldCapabilities;
 
+/** Where `createWorld()` keeps payload bytes (`EVE_FELTDB_PAYLOADS`). */
 export type PayloadBackend = "folder" | "feltdb-record" | "feltdb-content";
 
+/** Options for {@link createFeltDBWorld}, for a host that opens the FeltDB database itself. */
 export interface FeltDBWorldOptions {
   db: StateFirstDB;
   dataDir: string;
@@ -38,6 +42,7 @@ export interface FeltDBWorldOptions {
   config?: Partial<Config>;
 }
 
+/** eve's Workflow World on FeltDB, with the in-process delivery hooks eve registers and its FeltDB settings. */
 export type FeltDBWorld = World & {
   registerHandler(prefix: QueuePrefix, handler: DirectHandler): void;
   registerRoute(prefix: QueuePrefix, path: string): void;
@@ -48,10 +53,16 @@ export type FeltDBWorld = World & {
   };
 };
 
+/** The World cannot run on the database or configuration it was given; the message says what to change. */
 export class FeltDBWorldConfigurationError extends Error {
   override readonly name = "FeltDBWorldConfigurationError";
 }
 
+/**
+ * Refuses a FeltDB database that does not bound transaction ids with exactly `retainMs`: a
+ * runtime without `transactionIdRetention` (a FeltDB server, the browser) or one opened with
+ * another window.
+ */
 export async function requireTransactionIdRetention(
   db: StateFirstDB,
   retainMs: number,
@@ -69,6 +80,11 @@ export async function requireTransactionIdRetention(
   }
 }
 
+/**
+ * A World over a FeltDB database the caller opened (with `journal.retainTransactionIdsMs`),
+ * keeping its payloads and queue key under `dataDir`. `start()` checks the retention, then resumes
+ * every persisted queue message and re-enqueues active runs.
+ */
 export function createFeltDBWorld(options: FeltDBWorldOptions): FeltDBWorld {
   const retainMs = options.transactionIdRetentionMs ?? DEFAULT_TRANSACTION_ID_RETENTION_MS;
   const payloads =
@@ -155,6 +171,13 @@ function payloadsFor(backend: string, db: StateFirstDB, dataDir: string): Payloa
   );
 }
 
+/**
+ * The factory eve calls (`experimental.workflow.world`), configured from the environment:
+ * `EVE_FELTDB_PATH` (required: the directory for FeltDB state, payloads and the queue key),
+ * `EVE_FELTDB_PAYLOADS` (`folder`, the default, `feltdb-record` or `feltdb-content`) and
+ * `EVE_FELTDB_TRANSACTION_ID_RETENTION_MS` (default 24 hours). It opens FeltDB's Node file
+ * runtime exclusively: one process per directory.
+ */
 export function createWorld(): FeltDBWorld {
   const dataDir = process.env.EVE_FELTDB_PATH;
   if (!dataDir) {

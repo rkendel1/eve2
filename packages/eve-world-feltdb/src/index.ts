@@ -26,3 +26,14 @@ export type {
   PayloadUsage,
   StoredPayload,
 } from "./payload/types.js";
+export {
+  createFeltDBWorld,
+  createWorld,
+  DEFAULT_TRANSACTION_ID_RETENTION_MS,
+  FELTDB_WORLD_CAPABILITIES,
+  type FeltDBWorld,
+  FeltDBWorldConfigurationError,
+  type FeltDBWorldOptions,
+  type PayloadBackend,
+  requireTransactionIdRetention,
+} from "./world/world.js";
