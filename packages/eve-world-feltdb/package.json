@@ -1,0 +1,61 @@
+{
+  "name": "@appport/eve-world-feltdb",
+  "version": "0.0.0",
+  "description": "eve's Workflow World on FeltDB: durable runs, events, queue, hooks, streams and payloads with no SQL database",
+  "keywords": [
+    "eve",
+    "feltdb",
+    "workflow-world"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rkendel1/eve2.git",
+    "directory": "packages/eve-world-feltdb"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "NOTICE",
+    "UPSTREAM.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('../../LICENSE','LICENSE')\"",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:scenario": "vitest run --config vitest.scenario.config.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@workflow/errors": "5.1.3",
+    "@workflow/utils": "5.1.1",
+    "@workflow/world": "5.2.2",
+    "async-sema": "3.1.1",
+    "ulid": "~3.0.2",
+    "undici": "7.30.2",
+    "zod": "~4.6.7"
+  },
+  "devDependencies": {
+    "@feltdb/core": "0.25.0",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@feltdb/core": ">=0.25.0 <0.26.0"
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}
