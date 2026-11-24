@@ -16,12 +16,13 @@ export const SCOPED_PACKAGES = {
       import { createFeltDB } from "@feltdb/core";
       import { feltdbRecordPayloads } from "@appport/eve-world-feltdb";
       const db = createFeltDB({ memory: true, namespace: "smoke" });
+      if (db.capabilities().transactionIdRetention !== true) throw new Error("installed @feltdb/core lacks transaction-id retention");
       const store = feltdbRecordPayloads({ db });
       const ref = await store.write(new TextEncoder().encode("clean install"));
       if (new TextDecoder().decode(await store.read(ref)) !== "clean install") throw new Error("round trip failed");
       console.log(JSON.stringify({ ok: true, ref }));
     `,
-    smokeDependencies: { "@feltdb/core": "0.23.0" },
+    smokeDependencies: { "@feltdb/core": "0.25.0" },
   },
 };
 

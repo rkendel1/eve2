@@ -55,17 +55,38 @@ function treeDigest(root) {
   return { files: files.length, sha256: hash.digest("hex") };
 }
 
+function installedIntegrity(version) {
+  try {
+    const lock = readFileSync(join(here, "../../../pnpm-lock.yaml"), "utf8");
+    const entry = lock.indexOf(`'@feltdb/core@${version}':`);
+    return entry < 0 ? null : (/integrity: ([^}\s]+)/.exec(lock.slice(entry))?.[1] ?? null);
+  } catch {
+    return null;
+  }
+}
+
 function provenance() {
   const feltdbDist = dirname(feltdbEntry);
-  const feltdbSource = resolve(feltdbDist, "..");
-  const feltdbPackage = JSON.parse(readFileSync(join(feltdbSource, "package.json"), "utf8"));
+  const feltdbRoot = resolve(feltdbDist, "..");
+  const feltdbPackage = JSON.parse(readFileSync(join(feltdbRoot, "package.json"), "utf8"));
+  const installed = feltdbRoot.includes(`${join("node_modules", "@feltdb", "core")}`);
+  let identity = null;
+  try {
+    identity = JSON.parse(readFileSync(join(feltdbDist, "build-identity.json"), "utf8"));
+  } catch {
+    identity = null;
+  }
   const probe = createFeltDB({ memory: true, namespace: `probe-${process.pid}` });
   return {
     feltdb: {
       package: `${feltdbPackage.name}@${feltdbPackage.version}`,
+      source: installed ? "installed from npm" : "local build",
+      integrity: installed ? installedIntegrity(feltdbPackage.version) : null,
       entry: feltdbEntry,
-      commit: git(feltdbSource, ["rev-parse", "HEAD"]),
-      dirty: git(feltdbSource, ["status", "--porcelain", "--", "src"]) !== "",
+      commit: installed ? (identity?.git?.sha1 ?? null) : git(feltdbRoot, ["rev-parse", "HEAD"]),
+      dirty: installed
+        ? identity?.git?.dirty !== false
+        : git(feltdbRoot, ["status", "--porcelain", "--", "src"]) !== "",
       dist: treeDigest(feltdbDist),
       transactionIdRetention: probe.capabilities().transactionIdRetention === true,
     },
@@ -253,6 +274,7 @@ async function workload(root) {
       ...memory(),
     }),
   );
+  setInterval(() => {}, 1 << 30);
   await new Promise(() => {});
 }
 
