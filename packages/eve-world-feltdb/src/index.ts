@@ -1,3 +1,10 @@
+export {
+  FeltDBMemoryConflictError,
+  type FeltDBMemoryDocument,
+  feltdbMemory,
+  MEMORY_COLLECTION,
+  type MemoryDatabase,
+} from "./memory/feltdb-memory.js";
 export { feltdbContentPayloads } from "./payload/content-store.js";
 export { PayloadIntegrityError, PayloadMissingError } from "./payload/errors.js";
 export { folderPayloads, type FolderPayloadStore } from "./payload/folder-store.js";

@@ -13,6 +13,7 @@ export const COLLECTIONS = {
   hookResumes: "wf_hook_resumes",
   startHookRejections: "wf_start_hook_rejections",
   streamChunks: "wf_stream_chunks",
+  streams: "wf_streams",
   snapshots: "wf_snapshots",
   messages: "wf_messages",
   messageKeys: "wf_message_keys",
@@ -44,6 +45,7 @@ const INDEXES: Array<{ collection: CollectionName; name: string; fields: string[
   { collection: COLLECTIONS.hookTokens, name: "tokens_by_run", fields: ["runId", "token"] },
   { collection: COLLECTIONS.streamChunks, name: "chunks_by_name", fields: ["name", "idx"] },
   { collection: COLLECTIONS.streamChunks, name: "chunks_by_run", fields: ["runId", "name", "idx"] },
+  { collection: COLLECTIONS.streams, name: "streams_by_run", fields: ["runId", "name"] },
   {
     collection: COLLECTIONS.messages,
     name: "messages_by_visibility",
@@ -207,16 +209,24 @@ export interface WorldDatabaseOptions {
   inlineDocBytes?: number;
 }
 
+const locks = new WeakMap<object, { tail: Promise<unknown> }>();
+
 export class WorldDatabase {
   readonly db: StateFirstDB;
   readonly payloads: PayloadStore;
   readonly inlineDocBytes: number;
-  #tail: Promise<unknown> = Promise.resolve();
+  readonly #lock: { tail: Promise<unknown> };
 
   constructor(options: WorldDatabaseOptions) {
     this.db = options.db;
     this.payloads = options.payloads;
     this.inlineDocBytes = options.inlineDocBytes ?? 1024;
+    let lock = locks.get(this.db);
+    if (!lock) {
+      lock = { tail: Promise.resolve() };
+      locks.set(this.db, lock);
+    }
+    this.#lock = lock;
     for (const index of INDEXES) {
       const collection = this.db.collection(index.collection);
       if (collection.listIndexes().some((existing) => existing.name === index.name)) continue;
@@ -280,8 +290,8 @@ export class WorldDatabase {
   }
 
   async exclusive<T>(body: () => Promise<T>): Promise<T> {
-    const run = this.#tail.then(body, body);
-    this.#tail = run.catch(() => undefined);
+    const run = this.#lock.tail.then(body, body);
+    this.#lock.tail = run.catch(() => undefined);
     return run;
   }
 

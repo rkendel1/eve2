@@ -2315,9 +2315,18 @@ importers:
       '@workflow/world':
         specifier: 5.2.2
         version: 5.2.2
+      async-sema:
+        specifier: 3.1.1
+        version: 3.1.1
       ulid:
         specifier: ~3.0.2
         version: 3.0.2
+      undici:
+        specifier: 7.30.2
+        version: 7.30.2
+      zod:
+        specifier: ~4.6.7
+        version: 4.6.7
     devDependencies:
       '@feltdb/core':
         specifier: 0.25.0

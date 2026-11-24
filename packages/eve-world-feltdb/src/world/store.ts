@@ -7,6 +7,7 @@ import type { Event, Hook, PaginatedResponse, Step, Wait, WorkflowRun } from "@w
 import { eventIdToSlot, slotToEventId } from "@workflow/world";
 import { decode, encode } from "./codec.js";
 import {
+  type CollectionName,
   COLLECTIONS,
   type FeltRecord,
   joinKey,
@@ -16,6 +17,10 @@ import {
 } from "./database.js";
 
 const EVENT_READ_BATCH = 64;
+
+type Where = Array<{ field: string } & Record<string, unknown>>;
+
+type OrderBy = Array<{ field: string; direction: "asc" | "desc" }>;
 
 export interface RunRow {
   run: WorkflowRun;
@@ -57,16 +62,22 @@ export class Store {
     return new Store(this.database, this.tag, unit);
   }
 
-  #writer(): Unit {
-    if (!this.unit) throw new Error("a World write must run inside a transaction");
+  get #active(): Unit | undefined {
     return this.unit;
+  }
+
+  #writer(): Unit {
+    const unit = this.#active;
+    if (!unit) throw new Error("a World write must run inside a transaction");
+    return unit;
   }
 
   async #get(
     collection: (typeof COLLECTIONS)[keyof typeof COLLECTIONS],
     id: string,
   ): Promise<FeltRecord | null> {
-    return this.unit ? this.unit.get(collection, id) : this.database.read(collection, id);
+    const unit = this.#active;
+    return unit ? unit.get(collection, id) : this.database.read(collection, id);
   }
 
   async #doc<T>(record: FeltRecord, field: "doc" | "envelope" | "data" = "doc"): Promise<T> {
@@ -173,8 +184,9 @@ export class Store {
     )) {
       if (record.eventType === eventType) return this.#doc<Event>(record);
     }
-    if (this.unit) {
-      for (const staged of this.unit.stagedIn(COLLECTIONS.events)) {
+    const unit = this.#active;
+    if (unit) {
+      for (const staged of unit.stagedIn(COLLECTIONS.events)) {
         const value = staged.value;
         if (
           value &&
@@ -202,32 +214,20 @@ export class Store {
     const sortOrder = options.sortOrder ?? "asc";
     const limit = Math.max(1, options.limit ?? 20);
     const after = parseEventCursor(options.cursor);
-    const fetch = async (from: number | null, take: number) => {
-      const where: Array<{ field: string } & Record<string, unknown>> = [
-        { field: "runId", eq: runId },
-      ];
-      if (options.correlationId !== undefined)
-        where.push({ field: "correlationId", eq: options.correlationId });
-      if (from !== null)
-        where.push(sortOrder === "asc" ? { field: "seq", gt: from } : { field: "seq", lt: from });
-      const page = await this.database.query(COLLECTIONS.events, where, {
-        orderBy: [{ field: "seq", direction: sortOrder }],
-        limit: take,
-      });
-      return page.records;
-    };
+    const fetch = (from: number | null, take: number) =>
+      this.#eventRecords(runId, options.correlationId, from, sortOrder, take);
     const page = (data: Event[], hasMore: boolean) => {
       const last = data.at(-1);
       return { data, cursor: last ? eventCursor(last.eventId) : null, hasMore };
     };
     const { maxBytes } = options;
     if (maxBytes === undefined) {
-      const rows = await fetch(after, Math.min(limit + 1, 1000));
+      const rows = await fetch(after, limit + 1);
       const hasMore = rows.length > limit;
       const kept = hasMore ? rows.slice(0, limit) : rows;
       return page(await Promise.all(kept.map((row) => this.#doc<Event>(row))), hasMore);
     }
-    return this.database.snapshot(async () => {
+    return this.#consistent(async () => {
       const data: Event[] = [];
       let bytes = 0;
       let from = after;
@@ -246,6 +246,89 @@ export class Store {
         if (rows.length < take) return page(data, false);
       }
     });
+  }
+
+  async #consistent<T>(body: () => Promise<T>): Promise<T> {
+    return this.#active ? body() : this.database.snapshot(body);
+  }
+
+  async #take(
+    collection: CollectionName,
+    where: Where,
+    orderBy: OrderBy,
+    take: number,
+  ): Promise<FeltRecord[]> {
+    const records: FeltRecord[] = [];
+    const limit = Math.min(Math.max(1, take), 1000);
+    let cursor: string | undefined;
+    while (records.length < take) {
+      const page = await this.database.query(collection, where, { orderBy, limit, cursor });
+      records.push(...page.records);
+      if (page.exhausted || !page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    return records.slice(0, take);
+  }
+
+  #overlay(
+    collection: CollectionName,
+    records: FeltRecord[],
+    matches: (value: Record<string, unknown>) => boolean,
+  ): FeltRecord[] {
+    const unit = this.#active;
+    if (!unit) return records;
+    const staged = unit.stagedIn(collection);
+    if (staged.length === 0) return records;
+    const byId = new Map(records.map((record) => [String(record.id), record]));
+    for (const { id, value } of staged) {
+      if (value === null || !matches(value)) byId.delete(id);
+      else byId.set(id, { ...value, id });
+    }
+    return [...byId.values()];
+  }
+
+  async #eventRecords(
+    runId: string,
+    correlationId: string | undefined,
+    from: number | null,
+    sortOrder: "asc" | "desc",
+    take: number,
+  ): Promise<FeltRecord[]> {
+    const where: Where = [{ field: "runId", eq: runId }];
+    if (correlationId !== undefined) where.push({ field: "correlationId", eq: correlationId });
+    if (from !== null)
+      where.push(sortOrder === "asc" ? { field: "seq", gt: from } : { field: "seq", lt: from });
+    const staged = this.#active?.stagedIn(COLLECTIONS.events).length ?? 0;
+    const records = await this.#take(
+      COLLECTIONS.events,
+      where,
+      [{ field: "seq", direction: sortOrder }],
+      take + staged,
+    );
+    if (staged === 0) return records.slice(0, take);
+    const direction = sortOrder === "asc" ? 1 : -1;
+    return this.#overlay(COLLECTIONS.events, records, (value) => {
+      if (value.runId !== runId) return false;
+      if (correlationId !== undefined && value.correlationId !== correlationId) return false;
+      const seq = Number(value.seq);
+      return from === null || (sortOrder === "asc" ? seq > from : seq < from);
+    })
+      .sort((a, b) => direction * (Number(a.seq) - Number(b.seq)))
+      .slice(0, take);
+  }
+
+  async eventsOfRun(runId: string): Promise<Event[]> {
+    const records: FeltRecord[] = [];
+    for await (const record of this.database.scan(
+      COLLECTIONS.events,
+      [{ field: "runId", eq: runId }],
+      [{ field: "seq", direction: "asc" }],
+    )) {
+      records.push(record);
+    }
+    const merged = this.#overlay(COLLECTIONS.events, records, (value) => value.runId === runId);
+    merged.sort((a, b) => Number(a.seq) - Number(b.seq));
+    return Promise.all(merged.map((record) => this.#doc<Event>(record)));
   }
 
   async eventsBetween(runId: string, afterSeq: number, beforeSeq: number): Promise<Event[]> {
@@ -294,7 +377,7 @@ export class Store {
     ])) {
       records.push(record);
     }
-    return records;
+    return this.#overlay(COLLECTIONS.steps, records, (value) => value.runId === runId);
   }
 
   async stepFrom(record: FeltRecord): Promise<Step> {
@@ -347,8 +430,9 @@ export class Store {
     ])) {
       ids.add(String(record.hookId));
     }
-    if (this.unit) {
-      for (const staged of this.unit.stagedIn(COLLECTIONS.hooks)) {
+    const unit = this.#active;
+    if (unit) {
+      for (const staged of unit.stagedIn(COLLECTIONS.hooks)) {
         if (staged.value?.runId === runId) ids.add(String(staged.value.hookId));
       }
     }
@@ -368,6 +452,155 @@ export class Store {
 
   deleteHook(hookId: string): void {
     this.#writer().delete(COLLECTIONS.hooks, keyPart(hookId));
+  }
+
+  async rewriteHook(hook: Hook): Promise<void> {
+    const current = await this.#get(COLLECTIONS.hooks, keyPart(hook.hookId));
+    if (!current) return;
+    this.#writer().set(COLLECTIONS.hooks, keyPart(hook.hookId), {
+      ...stripDoc(current),
+      doc: encode(hook),
+    });
+  }
+
+  async purgeRunStreams(runId: string): Promise<void> {
+    const writer = this.#writer();
+    const streams = new Map<string, string | null>();
+    const heads: FeltRecord[] = [];
+    for await (const record of this.database.scan(COLLECTIONS.streams, [
+      { field: "runId", eq: runId },
+    ])) {
+      heads.push(record);
+    }
+    for (const head of this.#overlay(COLLECTIONS.streams, heads, (value) => value.runId === runId))
+      streams.set(String(head.name), (head.tag as string | null | undefined) ?? null);
+    const records: FeltRecord[] = [];
+    for await (const record of this.database.scan(COLLECTIONS.streamChunks, [
+      { field: "runId", eq: runId },
+    ])) {
+      records.push(record);
+    }
+    for (const chunk of this.#overlay(
+      COLLECTIONS.streamChunks,
+      records,
+      (value) => value.runId === runId,
+    )) {
+      if (!streams.has(String(chunk.name)))
+        streams.set(String(chunk.name), (chunk.tag as string | null | undefined) ?? null);
+      await writer.get(COLLECTIONS.streamChunks, String(chunk.id));
+      writer.delete(COLLECTIONS.streamChunks, String(chunk.id));
+    }
+    for (const [name, tag] of streams) {
+      const marker = joinKey(name, 1);
+      await writer.get(COLLECTIONS.streamChunks, marker);
+      writer.set(COLLECTIONS.streamChunks, marker, { name, idx: 1, runId, tag, eof: true });
+      await writer.get(COLLECTIONS.streams, keyPart(name));
+      writer.set(COLLECTIONS.streams, keyPart(name), { name, runId, tag, idx: 1, eof: true });
+    }
+  }
+
+  async pageRuns(options: {
+    ownTagOnly: boolean;
+    workflowName?: string;
+    statuses?: string[];
+    cursor?: string;
+    sortOrder: "asc" | "desc";
+    limit: number;
+  }): Promise<{ data: WorkflowRun[]; hasMore: boolean }> {
+    const where: Where = [];
+    if (options.ownTagOnly) where.push({ field: "tag", eq: this.tag ?? null });
+    if (options.workflowName) where.push({ field: "workflowName", eq: options.workflowName });
+    if (options.statuses) where.push({ field: "status", in: options.statuses });
+    return this.#entityPage(COLLECTIONS.runs, "runId", where, options);
+  }
+
+  async pageSteps(options: {
+    runId: string;
+    cursor?: string;
+    sortOrder: "asc" | "desc";
+    limit: number;
+  }): Promise<{ data: Step[]; hasMore: boolean }> {
+    return this.#entityPage(
+      COLLECTIONS.steps,
+      "stepId",
+      [{ field: "runId", eq: options.runId }],
+      options,
+    );
+  }
+
+  async *hooksInOrder(options: {
+    runId?: string;
+    cursor?: string;
+    sortOrder: "asc" | "desc";
+  }): AsyncIterable<Hook> {
+    const where: Where = options.runId ? [{ field: "runId", eq: options.runId }] : [];
+    for await (const record of this.#afterEntityCursor(
+      COLLECTIONS.hooks,
+      "hookId",
+      where,
+      options.cursor,
+      options.sortOrder,
+    )) {
+      yield await this.#doc<Hook>(record);
+    }
+  }
+
+  async #entityPage<T>(
+    collection: CollectionName,
+    idField: string,
+    where: Where,
+    options: { cursor?: string; sortOrder: "asc" | "desc"; limit: number },
+  ): Promise<{ data: T[]; hasMore: boolean }> {
+    return this.#consistent(async () => {
+      const records: FeltRecord[] = [];
+      for await (const record of this.#afterEntityCursor(
+        collection,
+        idField,
+        where,
+        options.cursor,
+        options.sortOrder,
+      )) {
+        records.push(record);
+        if (records.length > options.limit) break;
+      }
+      const hasMore = records.length > options.limit;
+      const kept = hasMore ? records.slice(0, options.limit) : records;
+      return {
+        data: await Promise.all(kept.map((record) => this.#doc<T>(record))),
+        hasMore,
+      };
+    });
+  }
+
+  async *#afterEntityCursor(
+    collection: CollectionName,
+    idField: string,
+    where: Where,
+    cursor: string | undefined,
+    sortOrder: "asc" | "desc",
+  ): AsyncIterable<FeltRecord> {
+    const orderBy: OrderBy = [
+      { field: "createdAt", direction: sortOrder },
+      { field: idField, direction: sortOrder },
+    ];
+    const op = sortOrder === "asc" ? "gt" : "lt";
+    const parsed = parseEntityCursor(cursor);
+    if (!parsed) {
+      yield* this.database.scan(collection, where, orderBy);
+      return;
+    }
+    if (parsed.id !== null) {
+      yield* this.database.scan(
+        collection,
+        [...where, { field: "createdAt", eq: parsed.timeMs }, { field: idField, [op]: parsed.id }],
+        orderBy,
+      );
+    }
+    yield* this.database.scan(
+      collection,
+      [...where, { field: "createdAt", [op]: parsed.timeMs }],
+      orderBy,
+    );
   }
 
   async getDisposal(
