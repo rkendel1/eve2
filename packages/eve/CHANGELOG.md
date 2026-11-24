@@ -1,5 +1,11 @@
 # eve
 
+## 1.1.1
+
+### Patch Changes
+
+- a88c765: The packaged tarball now always carries the license of eve's own vendored tracing package, however the workspace was built.
+
 ## 1.1.0
 
 ### Minor Changes
