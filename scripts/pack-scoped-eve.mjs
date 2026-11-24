@@ -35,7 +35,9 @@ if (dirty) throw new Error(`${entry.directory} has uncommitted changes; pack a c
 const work = await mkdtemp(join(tmpdir(), "eve-scoped-"));
 try {
   const files =
-    entry.staged === entry.directory ? ["package.json", ...(manifest.files ?? [])] : null;
+    entry.staged === entry.directory
+      ? ["package.json", "LICENSE", ...(manifest.files ?? [])]
+      : null;
   if (files) {
     for (const file of files) await cp(join(staged, file), join(work, file), { recursive: true });
   } else {
