@@ -1,10 +1,10 @@
 ---
-issue: "none: EVE on FeltDB milestone, Phase A (no tracking issue yet)"
+issue: "none: EVE on FeltDB milestone, Phase A and A.2 (no tracking issue yet)"
 status: proposed
 last_updated: "2026-11-24"
 ---
 
-# A FeltDB Workflow World for eve (Phase A: contract and design review)
+# A FeltDB Workflow World for eve (Phase A.2: contract, design and capacity review)
 
 Goal: eve runs its complete lifecycle on FeltDB, with no FeltKit, through a Workflow **World** implemented over
 FeltDB's supported public API, beside the existing Postgres World (which stays the reference). This document maps
@@ -15,10 +15,10 @@ Sources (checked at the commits below; `W` = `@workflow/world@5.2.2/dist`, `PG` 
 `CORE` = `@workflow/core@5.6.1/dist` (the version eve pins, `packages/eve/package.json:698`), `FDB` = `flow_db`
 repository, eve paths relative to `packages/eve`):
 
-| Repository       | Commit                               | Note                                                                         |
-| ---------------- | ------------------------------------ | ---------------------------------------------------------------------------- |
-| eve2             | `ab46131` (main; contains `a88c765`) | `eve` 1.1.0 = published `@appport/eve` 1.1.0, plus an unreleased license fix |
-| flow_db (FeltDB) | `bc6343a3` (main)                    | `@feltdb/core` 0.23.0 = published                                            |
+| Repository       | Commit                               | Note                                                                                                                 |
+| ---------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| eve2             | `ab46131` (main; contains `a88c765`) | `eve` 1.1.0 = published `@appport/eve` 1.1.0, plus an unreleased license fix; resolves `@workflow/world-local` 5.4.1 |
+| flow_db (FeltDB) | `bc6343a3` (main)                    | `@feltdb/core` 0.23.0 = published                                                                                    |
 
 ## 1. What eve requires of a World
 
@@ -67,21 +67,22 @@ World (`src/public/schedules/providers/workflow.ts:224-233`). Nothing else on th
 
 ## 2. FeltDB as a substrate: what it guarantees (verified)
 
-| Property                                          | FeltDB 0.23                                                                                                                                                                                      | Source                                                                         |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| Atomic multi-record, multi-collection transaction | yes, one journal record                                                                                                                                                                          | `FDB/packages/core/src/file-db.ts:1277-1353`                                   |
-| Reads inside a transaction                        | **none**: the callback only stages writes; no snapshot isolation, no read tracking                                                                                                               | `FDB/public-docs/guarantees.md:104-115`                                        |
-| Commit-time validation                            | only explicit predicates: `requireAbsent`, `ifVersion`, `expectedEpoch`, `expectedLeaseId`, experimental read-basis fences                                                                       | `FDB/packages/core/src/embedded-transaction.ts:421-497`                        |
-| Versioning                                        | a guarded write stores N+1; **an unguarded write stores `__version` verbatim** and delete+recreate restarts at 1 (ABA)                                                                           | `FDB/docs/architecture/transaction-version-contract.md:66-73,188-192`          |
-| Conflict                                          | `ConditionalConflictError`, `PRECONDITION_FAILED`, with the failed predicate                                                                                                                     | `FDB/docs/reference/public-api.md:251-267`                                     |
-| Idempotent transaction ids                        | same id and payload returns the original result; a different payload is `IDEMPOTENCY_CONFLICT`; embedded runtimes do not keep ids without bound                                                  | `FDB/public-docs/guarantees.md:118-155`; `public-api.md:157-160`               |
-| Durability (file runtime)                         | each commit fdatasynced before acknowledgement (no group commit); SIGKILL tested; power loss **unproven**                                                                                        | `FDB/docs/reference/durability.md:48-49,198-206`                               |
-| Multiple processes                                | file runtime is exclusive by default (`STATE_LOCKED`); `access:'shared'` is Experimental, polls a lock for up to about 5 s and then throws an untyped `Error`; multi-host needs the server       | `FDB/packages/core/src/file-db.ts:1186-1271`                                   |
-| Queries                                           | bounded `db.query` (where, orderBy, limit 1-1000, keyset cursor); ordered compound indexes on embedded runtimes; **the server has equality indexes only**                                        | `FDB/docs/reference/bounded-authority-query.md:56-64,155-158`                  |
-| Change notification                               | `db.onCommit` (Experimental): in-process only on embedded runtimes; at-most-once over SSE on the server; no durable cursor                                                                       | `FDB/packages/core/src/embedded-features.ts:258-316`; `http-db.ts:1324-1415`   |
-| Queue or work primitive                           | `db.workloads` (Durable Work): Experimental, **server only**, no claim-next                                                                                                                      | `FDB/packages/core/src/workload.ts:51-63`                                      |
-| **Residency**                                     | **every runtime holds all rows in process memory** (file runtime `this.state.rows`; Rust authority `rows: HashMap`) plus a journal and checkpoints                                               | `FDB/packages/core/src/file-db.ts:603-632`; `FDB/crates/feltdb/src/lib.rs:698` |
-| API status                                        | Stable: `createFeltDB`, collections, transactions, CAS, bounded `db.query`, `db.snapshot`. Experimental: `onCommit`, expiry, file ownership (`access`), Durable Work, content store, agent state | `FDB/docs/reference/public-api.md:486-519`                                     |
+| Property                                          | FeltDB 0.23                                                                                                                                                                                      | Source                                                                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Atomic multi-record, multi-collection transaction | yes, one journal record                                                                                                                                                                          | `FDB/packages/core/src/file-db.ts:1277-1353`                                                                  |
+| Reads inside a transaction                        | **none**: the callback only stages writes; no snapshot isolation, no read tracking                                                                                                               | `FDB/public-docs/guarantees.md:104-115`                                                                       |
+| Commit-time validation                            | only explicit predicates: `requireAbsent`, `ifVersion`, `expectedEpoch`, `expectedLeaseId`, experimental read-basis fences                                                                       | `FDB/packages/core/src/embedded-transaction.ts:421-497`                                                       |
+| Versioning                                        | a guarded write stores N+1; **an unguarded write stores `__version` verbatim** and delete+recreate restarts at 1 (ABA)                                                                           | `FDB/docs/architecture/transaction-version-contract.md:66-73,188-192`                                         |
+| Conflict                                          | `ConditionalConflictError`, `PRECONDITION_FAILED`, with the failed predicate                                                                                                                     | `FDB/docs/reference/public-api.md:251-267`                                                                    |
+| Idempotent transaction ids                        | same id and payload returns the original result; a different payload is `IDEMPOTENCY_CONFLICT`. **Committed transaction ids are never removed**, not even by `compact` (measured in section 7.2) | `FDB/public-docs/guarantees.md:118-155`; `FDB/docs/reference/embedded-state-lifecycle.md:140`                 |
+| Record ids                                        | `^[A-Za-z0-9._-]{1,128}$` for collection names and ids: `:` and arbitrary user strings (hook tokens, idempotency keys) must be encoded, by SHA-256 hex or base64url                              | `FDB/packages/core/src/embedded-transaction.ts:99` (measured: `wf_events/run:1` is refused `INVALID_REQUEST`) |
+| Durability (file runtime)                         | each commit fdatasynced before acknowledgement (no group commit); SIGKILL tested; power loss **unproven**                                                                                        | `FDB/docs/reference/durability.md:48-49,198-206`                                                              |
+| Multiple processes                                | file runtime is exclusive by default (`STATE_LOCKED`); `access:'shared'` is Experimental, polls a lock for up to about 5 s and then throws an untyped `Error`; multi-host needs the server       | `FDB/packages/core/src/file-db.ts:1186-1271`                                                                  |
+| Queries                                           | bounded `db.query` (where, orderBy, limit 1-1000, keyset cursor); ordered compound indexes on embedded runtimes; **the server has equality indexes only**                                        | `FDB/docs/reference/bounded-authority-query.md:56-64,155-158`                                                 |
+| Change notification                               | `db.onCommit` (Experimental): in-process only on embedded runtimes; at-most-once over SSE on the server; no durable cursor                                                                       | `FDB/packages/core/src/embedded-features.ts:258-316`; `http-db.ts:1324-1415`                                  |
+| Queue or work primitive                           | `db.workloads` (Durable Work): Experimental, **server only**, no claim-next                                                                                                                      | `FDB/packages/core/src/workload.ts:51-63`                                                                     |
+| **Residency**                                     | **every runtime holds all rows in process memory** (file runtime `this.state.rows`; Rust authority `rows: HashMap`) plus a journal and checkpoints                                               | `FDB/packages/core/src/file-db.ts:603-632`; `FDB/crates/feltdb/src/lib.rs:698`                                |
+| API status                                        | Stable: `createFeltDB`, collections, transactions, CAS, bounded `db.query`, `db.snapshot`. Experimental: `onCommit`, expiry, file ownership (`access`), Durable Work, content store, agent state | `FDB/docs/reference/public-api.md:486-519`                                                                    |
 
 What this means for the World: every World decision has to be expressible as predicates on records **keyed by what
 must be unique**. Postgres can lock a row and read inside the transaction; FeltDB cannot. Section 3 shows each
@@ -120,7 +121,7 @@ duplicates (`W/interfaces.d.ts:259-285`).
 2. Decide in code.
 3. Commit one transaction:
    - the run head with `ifVersion` (`seq+1`, plus `seqInBand+1` if in-band);
-   - the event `wf_events/<runId>:<slot>` with `requireAbsent`;
+   - the event `wf_events/<runId>.<slot>` with `requireAbsent`;
    - the view records with `ifVersion` or `requireAbsent`.
 4. On `PRECONDITION_FAILED` on the head, re-read and retry. For an in-band write, if `seqInBand` changed, throw
    `InBandSupersededError` and assign nothing.
@@ -160,15 +161,15 @@ the one transaction above. Postgres's per-event-type transactions (`PG/storage.j
 | `run_created`       | head (`requireAbsent`), start-hook admission record `wf_admissions/<runId>` (`requireAbsent`, which makes atomic start-hook admission one commit), first event |
 | `run_started`       | head guarded transition                                                                                                                                        |
 | terminal run events | head, then deletion of waits and of hooks whose retention ended, each delete guarded by `ifVersion`                                                            |
-| `step_*`            | `wf_steps/<runId>:<stepId>` (`requireAbsent` on create; `ifVersion` on transitions)                                                                            |
-| `wait_*`            | `wf_waits/<runId>:<correlationId>`                                                                                                                             |
-| `hook_created`      | `wf_hooks/<hookId>` plus token claim `wf_hook_tokens/<token>` (`requireAbsent`: global token uniqueness)                                                       |
-| `hook_received`     | resume record `wf_hook_resumes/<runId>:<resumeId>` (`requireAbsent`: dedupe), under the run head                                                               |
+| `step_*`            | `wf_steps/<runId>.<stepId>` (`requireAbsent` on create; `ifVersion` on transitions)                                                                            |
+| `wait_*`            | `wf_waits/<runId>.<correlationId>`                                                                                                                             |
+| `hook_created`      | `wf_hooks/<hookId>` plus token claim `wf_hook_tokens/<sha256(token)>` (`requireAbsent`: global token uniqueness)                                               |
+| `hook_received`     | resume record `wf_hook_resumes/<runId>.<resumeId>` (`requireAbsent`: dedupe), under the run head                                                               |
 | `hook_disposed`     | delete hook and token claim (`ifVersion`)                                                                                                                      |
 | force claim         | victim's `hook_disposed`, delete victim hook, move the token claim (`ifVersion`), claimer's hook: one transaction over two run heads                           |
 
 Entity uniqueness, which Postgres enforces with a partial unique index (`PG/schema.js:146,156`), becomes
-`wf_entities/<runId>:<correlationId>:<type>` with `requireAbsent`.
+`wf_entities/<runId>.<correlationId>.<type>` with `requireAbsent`.
 
 **Compatibility: exact.** Every Postgres uniqueness constraint has a record keyed by its columns.
 
@@ -220,7 +221,7 @@ wins), duplicate `hook_received` with the same `resumeId` (one event), and a for
 serve; the gap is recorded in section 8. Records:
 
 - `wf_messages/<messageId>`: `{queue, payload, runId?, visibleAt, deliveryCount, offset, state: ready|leased, leaseOwner, leaseUntil, createdAt, retainUntil}`
-- `wf_message_keys/<queue>:<idempotencyKey>`: `requireAbsent` gives the dedupe; the record is deleted when its message is acknowledged
+- `wf_message_keys/<sha256(queue, idempotencyKey)>`: `requireAbsent` gives the dedupe; the record is deleted when its message is acknowledged
 - `wf_run_delivery/<runId>`: the per-run orchestrator lease
 
 Operations:
@@ -275,10 +276,10 @@ processes is not guaranteed**: a late-committing lower id is dropped from a live
 **FeltDB.**
 
 - A stream head `wf_streams/<streamId>`, which counts chunks.
-- Chunks `wf_chunks/<streamId>:<index>`, written with the head `ifVersion` and the chunk `requireAbsent`, so indexes are
+- Chunks `wf_chunks/<streamId>.<index>`, written with the head `ifVersion` and the chunk `requireAbsent`, so indexes are
   gap-free and totally ordered across writers.
 - Live tails are woken by `onCommit` plus polling.
-- Bytes are base64 in the record, or in FeltDB's content store (see section 7).
+- Chunk bytes go through the payload boundary (section 6.2); live chunks are batched into one commit per flush, not one per chunk (section 7.2).
 
 **Compatibility: exact**, with a stronger order than Postgres.
 
@@ -367,75 +368,284 @@ What is exactly-once is each **durable decision**: an event position, a hook cla
 
 ## 6. Design
 
-**Package.** `@appport/eve-world-feltdb` in the eve2 monorepo (`packages/eve-world-feltdb`).
+### 6.1 Contract map summary (final for Phase B)
 
-- Dependencies: `@feltdb/core` (public API), and `@workflow/world` as a peer at eve's pinned major, which also passes
-  eve's compatibility check.
-- It does not depend on `eve` or FeltKit. eve itself gains no runtime dependency.
-- Entry points:
-  - `createWorld()` (env: `FELTDB_PATH` for the embedded file runtime, or `FELTDB_URL` + `FELTDB_TOKEN` for a server)
-  - `createFeltDBWorld({ db })` for a caller that owns the database
-  - `feltdbMemory({ db })` for `fileMemory({ backend })`
+Sections 3 and 4 are the contract map. Phase A.2 changes it in three places only:
 
-**Collections.**
+- **Record ids.** FeltDB accepts `[A-Za-z0-9._-]{1,128}`. Composite keys join their parts with `.`; any part that is
+  caller-chosen (hook tokens, idempotency keys, memory keys) or could break the pattern or the length is replaced by its
+  SHA-256 hex, and the original value is stored in the record.
+- **Payloads** (event data, step input and output, hook payloads, stream chunks) cross a payload boundary (6.2)
+  instead of always living in the row.
+- **Stream chunks** are committed in batches (one commit per flush of `writeMulti` or of a short write window), because
+  every commit leaves a transaction id that is never removed (7.2).
 
-- Runs: `wf_runs`, `wf_events`, `wf_steps`, `wf_waits`, `wf_admissions`
-- Hooks: `wf_hooks`, `wf_hook_tokens`, `wf_hook_resumes`
-- Uniqueness: `wf_entities`
-- Streams: `wf_streams`, `wf_chunks`
-- Queue: `wf_messages`, `wf_message_keys`, `wf_run_delivery`
-- Memory: `eve_memory`
+Every World operation remains a guarded FeltDB transaction over records keyed by what must be unique; no decision
+reads inside a transaction; nothing depends on an Experimental API for correctness (6.4).
 
-Every write is guarded. **Supported surface only:** Stable APIs (`createFeltDB`, collections, `db.transaction` with
-predicates, `db.query`). Three Experimental APIs are used with a fallback and named in the docs:
+### 6.2 Storage architecture and the payload boundary
 
-- `db.onCommit`: wake-ups, with polling;
-- `access:'exclusive'`: the default anyway;
-- possibly the content store (section 7).
+State falls into three classes, each with one authoritative home:
 
-**Starting point.** The event state machine follows world-local's (`@workflow/world-local`, about 5.8k lines,
-Apache-2.0) and world-postgres's per-event transactions, adapted to predicates. The source is credited, not
-re-invented. Estimated size: storage and events 2-3k lines, queue 1-1.5k, streams 0.3k, memory 0.1k, plus tests.
+| Class             | What                                                                                                                                   | Home                                                    | Lifetime                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Operational state | run heads, step/wait/hook views, token claims, resume and admission records, queue messages and leases, stream heads, memory documents | FeltDB records                                          | changes in place; removed only by the state machine (acknowledged message, disposed hook, terminal run) |
+| Durable evidence  | the event log: one record per event with type, position, correlation, timestamps, writer, payload reference, payload digest and size   | FeltDB records                                          | kept; never deleted silently (6.3)                                                                      |
+| Large payloads    | the bytes of event data, step input/output, hook payloads, stream chunks                                                               | a `PayloadStore` behind the World, addressed by SHA-256 | as long as some record references them                                                                  |
 
-## 7. Design review: findings that need a decision before implementation
+The evidence record carries `{ref, digest, bytes}`, so the log stays interpretable and verifiable even when the bytes
+live elsewhere: a read verifies the digest and fails closed on a mismatch.
 
-1. **FeltDB holds the whole dataset in memory, in every runtime.** This is the largest risk.
-   - The file runtime keeps every row in process memory (`FDB/packages/core/src/file-db.ts:603-632`), and so does the
-     Rust server (`FDB/crates/feltdb/src/lib.rs:698`).
-   - A World is append-only: every event, step, hook and **every streamed chunk of model output** stays a row until
-     deleted. Postgres keeps them on disk.
-   - On FeltDB the working set is everything retained, and a long-lived eve session is one run whose log grows with
-     every turn.
-   - Mitigations, which need decisions:
-     - (a) Retention: delete terminal runs' events, steps and streams after a configurable window.
-     - (b) Put chunk and payload bytes in FeltDB's content store, which is file-backed, keeping only references in rows.
-       It is Experimental and file/server only.
-     - (c) Fix it in FeltDB with disk-resident rows, the right long-term answer and a FeltDB project.
-     - Without (b) or (c), FeltDB World capacity is bounded by RAM, and that must be documented as a hard limit.
-2. **Multi-process and multi-host.**
-   - The embedded file runtime is single-process; `shared` access is Experimental.
-   - Several eve processes need a FeltDB server, where **queries have equality indexes only**: the queue's
-     `visibleAt <= now` claim and ordered lists scan.
-   - Proposal: the milestone targets the embedded file runtime (one `eve start` process, like world-local but with a
-     durable queue), with the server supported for correctness and documented capacity. Ordered server indexes are a
-     FeltDB gap.
-3. **No group commit.** Every queue claim, acknowledgement and event is its own fdatasync. Postgres batches. Expect
-   lower throughput per process; the benchmark will measure it rather than guess.
-4. **Package home.** A World depends on Workflow, not on eve. It could live in eve2 (proposed: eve pins and tests
-   Worlds) or in flow_db as `@feltdb/workflow-world`. That must not make FeltDB depend on eve, and it doesn't.
-5. **Durable Work is unusable as the queue** (server-only, no claim-next, Experimental). The World therefore carries
-   its own queue, about 1k lines. Generalizing it into FeltDB later would mean adding claim-next to Durable Work and
-   embedded support. This is recorded as a FeltDB gap, not built now.
-6. **Spec churn.** eve pins Workflow versions (`validate-world.ts:27-51`); the World must move with every Workflow
-   upgrade. The fence and start-hook conformance suites run in CI to catch it.
-7. **The Postgres reference is not flawless.** Its 4-hour stale locks, missing `retentionSeconds`, and cross-process
-   stream order mean "the same behavioral tests against both" will show Postgres failing some of the crash scenarios
-   (for example a SIGKILL during a step delivery recovers only after `jobLockStaleSeconds`). Those results will be
-   reported as Postgres limits, not loosened for either World.
+```ts
+interface PayloadStore {
+  put(bytes: Uint8Array): Promise<PayloadRef>; // durable before it returns
+  get(ref: PayloadRef): Promise<Uint8Array>; // verified against ref.digest
+  release(ref: PayloadRef): Promise<void>; // the last reference went away
+}
+```
+
+- **Write order:** `put` (durable), then the FeltDB commit that references it. A crash between them leaves an
+  unreferenced payload, never a reference to a missing one. A maintenance sweep releases payloads no record references.
+- **Threshold:** payloads at or below a configured size (default 1 KiB) stay inline in the record; larger ones go to the
+  store. Workflow payloads are opaque bytes (devalue, often zstd); inline bytes are base64.
+- **Implementations** (Phase B builds the first two and measures both):
+  1. `inline`: every payload in the row. Stable FeltDB APIs only. The default for tests and small instances.
+  2. `feltdbContent`: FeltDB's content store (`storeContent`, `acquireContent`, `releaseContent`): file runtime only,
+     **Experimental** (`FDB/docs/reference/public-api.md:505-506`). Evaluated, not depended on.
+  3. A World-owned content-addressed directory (write, fsync file and directory, then reference) is the fallback if the
+     content store is not accepted. It adds a second store whose consistency the World owns, which is why it is not
+     the first choice.
+
+### 6.3 Retention, archival and capacity limits
+
+- **Default: nothing is deleted.** Completed runs, their events and their payloads are kept.
+- **Retention is opt-in and explicit:** `retention: { terminalRunsAfter: '30d', archive: sink }`. A run is eligible only
+  when it is terminal and older than the window. The maintenance pass exports it (events, views, streams, payloads) to
+  the archive sink, verifies the export's digest, and only then deletes its operational records and evidence in guarded
+  transactions, leaving a tombstone `wf_archived/<runId>` with `{archivedAt, sink, location, digest, counts}`. A run
+  that is not archived is not deleted. Reads of an archived run return a typed `RUN_ARCHIVED` error naming the location.
+- **The first sink** writes one JSON Lines file per run to a directory (fsynced). Other sinks implement the same
+  interface.
+- **Capacity limits are explicit:** `limits: { maxResidentBytes, maxRuns }`. The World tracks its retained bytes (a
+  counter record updated in the same transactions). Over the limit, `start` of a new run is refused with a typed
+  `CAPACITY_EXCEEDED` (HTTP 507 at eve's session route) that names the limit; running sessions continue. Nothing is
+  evicted to make room. `world.status()` reports resident bytes, records, transaction ids, journal size and the last
+  compaction, so an operator sees the limit coming.
+- **Active sessions are not retainable.** An eve session is one long-lived run (`workflowEntry`, plus a
+  `sessionTimeoutWorkflow` run); retention only ever reaches terminal runs. A long active session's growth is bounded
+  only by the payload strategy (7.3).
+
+### 6.4 Experimental API dependencies
+
+| API                                                                                                               | Status       | Used for                                     | If absent or removed                                                                          |
+| ----------------------------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `createFeltDB`, collections, `db.transaction` with `requireAbsent`/`ifVersion`, bounded `db.query`, `db.snapshot` | Stable       | every correctness decision, reads, backup    | n/a                                                                                           |
+| `db.onCommit`                                                                                                     | Experimental | waking queue claimers and stream tails early | polling (default 250 ms); correctness unchanged                                               |
+| `access: 'exclusive'` (file lock)                                                                                 | Experimental | refusing a second process on one directory   | the default behavior of `createFeltDB({ path })`; the World sets nothing                      |
+| `db.compact`, `db.journalStatus`                                                                                  | Experimental | bounding the journal and reopen time         | the journal grows without bound and every reopen replays it (7.2); status reported as unknown |
+| `storeContent` / `acquireContent` / `releaseContent`                                                              | Experimental | `feltdbContent` payload store only           | `inline` or the World-owned directory                                                         |
+| read-basis fences, Durable Work, record expiry, agent state                                                       | Experimental | **not used**                                 | n/a                                                                                           |
+
+`db.compact` is the one Experimental API an operator will want in production: without it a long-lived file store's
+journal and reopen time grow with every commit ever made. The World calls it only from the maintenance pass, behind a
+capability check, and reports when it is unavailable. This needs a decision (section 11).
+
+### 6.5 Single-process topology and limits
+
+- One `eve start` process owns one FeltDB directory (`EVE_FELTDB_PATH`), opened with the default exclusive lock. A second
+  process on the same directory is refused with `STATE_LOCKED`; the World turns that into a startup error that says
+  so.
+- The queue, its claim loop, leases and the maintenance pass run in that process; eve delivers in-process through
+  `registerHandler`. Leases still exist and are still checked: they are what makes a restarted process take over work
+  a killed one held.
+- **Not supported and not advertised:** several processes on one directory (`access: 'shared'`), several hosts, or a
+  FeltDB server in production. The server path (`EVE_FELTDB_URL`) is kept for the correctness matrix only, documented
+  as such.
+- **Restart** costs the FeltDB reopen time, which grows with retained state (7.2), then `reenqueueActiveRuns`.
+- **Backup:** `db.snapshot()` (Stable), or a copy of the directory while stopped. Restore is opening the copy.
+- **High availability:** none. A supervisor restarts the process; durable state makes the restart correct, not instant.
+
+### 6.6 Package and versioning
+
+- **Workspace package `@eve/world-feltdb` in `packages/eve-world-feltdb`**, following the repository's convention
+  (`@eve/recall` in `packages/eve-recall`, `@eve/code` in `packages/eve-code`).
+- **Published name:** the fork publishes only under `@appport` (`scripts/publish-packages.mjs:6` packs `eve` as
+  `@appport/eve` through `scripts/pack-scoped-eve.mjs`); `@eve` on npm is upstream's scope. The World is published the
+  same way, as `@appport/eve-world-feltdb`, by generalizing the existing pack-scoped step rather than adding a new
+  mechanism. Decision needed (section 11).
+- **Versioned independently** with its own changesets, starting at 0.1.0 (pre-1.0: the whole public surface is
+  Experimental).
+- **Dependencies:** `@workflow/world` as a peer at the major eve pins (which eve's `validate-world.ts` checks), and
+  `@feltdb/core` as a peer (`>=0.23 <0.24` until FeltDB 1.0). No dependency on `eve` or FeltKit; `eve` gains no
+  dependency; FeltDB does not know the package exists.
+- **Narrow public API:**
+  - `createWorld()`: the no-argument factory eve calls, configured from `EVE_FELTDB_PATH` (and `EVE_FELTDB_URL` /
+    `EVE_FELTDB_TOKEN` for the correctness matrix);
+  - `createFeltDBWorld({ db, payloads?, retention?, limits? })` for a host that owns the database;
+  - `feltdbMemory({ db })`, a `MemoryDocumentBackend` for `fileMemory({ backend })`;
+  - the `PayloadStore` and archive sink interfaces, and the typed errors.
+
+### 6.7 Upstream adaptation plan
+
+- **Source:** `@workflow/world-local` 5.4.1 (Apache-2.0, `github.com/vercel/workflow`, `packages/world-local`): about
+  5.8k lines, of which the event state machine (`storage/events-storage.js`, 1.1k) and the queue (`queue.js`, 1.05k) are
+  the parts adapted. World-postgres 5.3.0 is read for its per-event transaction boundaries only.
+- **Attribution:** files derived from world-local keep the Apache-2.0 header with upstream's copyright and a
+  `Modified by` notice; the package ships upstream's `LICENSE` and a `NOTICE` naming the source version and commit.
+  (A license header is one of the comment kinds `AGENTS.md` allows in `packages/`.)
+- **Recorded changes,** in `packages/eve-world-feltdb/UPSTREAM.md`: SQLite statements replaced by guarded FeltDB
+  transactions; the in-memory queue replaced by the durable record queue (3.4); `queueLost: false` on recovery;
+  payload boundary; id encoding; retention and limits.
+- **No Postgres assumption carries over:** there is no row lock, no `max(id)+1` retry, no read inside a transaction, no
+  `LISTEN/NOTIFY`. Every rule in section 3 is re-derived from predicates, and verified independently (section 9), not
+  by matching upstream's output.
+- **Tracking upstream:** a Workflow upgrade in eve re-runs the conformance suites against this World in CI; the
+  `UPSTREAM.md` diff list is reviewed against the new world-local.
+
+## 7. Capacity and growth model
+
+Everything below is labeled **Measured** (run on the setup stated) or **Estimate** (arithmetic from measured inputs
+and stated assumptions). No estimate has been run.
+
+### 7.1 What eve writes per turn (Measured)
+
+Setup: a production build (`eve build`, `eve start`) of a small agent, default World (`@workflow/world-local` 5.4.1,
+SQLite), `@workflow/core` 5.6.1, real model `openai/gpt-4.1-mini` through the AI Gateway, one tool call per turn
+returning about 1 KB of JSON. Two sessions: one of 10 turns (one turn failed on a gateway 429 rate limit), one of 2.
+Bytes are `length()` of the stored columns.
+
+| Per turn (10-turn session)                                             | Count       | Bytes                                                     |
+| ---------------------------------------------------------------------- | ----------- | --------------------------------------------------------- |
+| Events (`step_started`, `step_completed`, `attr_set`, `hook_received`) | 7.4         | 13.2 KB (per-turn range 11.5-14.3 KB; first turn 16.3 KB) |
+| Step view documents (duplicate the step's input and output)            | 2.1         | 10.3 KB                                                   |
+| Stream chunks (the session's output stream)                            | 76          | 16.1 KB (about 210 B each, max 1.7 KB)                    |
+| Hook tokens, resumes                                                   | ~1          | ~0.2 KB                                                   |
+| **Total written**                                                      | ~87 records | **~40 KB**                                                |
+
+Per session, once: a `workflowEntry` run, a `sessionTimeoutWorkflow` run, 2 hooks, 1 wait: about 9 KB.
+
+**Growth per turn is flat** even though the model's input grew to 13,321 tokens by turn 10: Workflow 5.6 stores
+step state as references and deltas against earlier versions in the run's own log (`StateRefV1`,
+`CORE/serialization/state-refs.d.ts`), compressed. A session's stored size is linear in its turns, not quadratic.
+
+Two consequences:
+
+- The step view duplicates payload already in `step_completed`. In FeltDB the step record stores a reference to the
+  event's payload, not a second copy: about 10 KB per turn less, with the same `steps.get` result.
+- Stream chunks are the largest class by count; committed one per chunk they would also be the largest source of
+  transaction ids (7.2).
+
+### 7.2 What FeltDB costs (Measured)
+
+Setup: `@feltdb/core` 0.23.0 Node file runtime, Node 26.13.1, 4 vCPU, 16 GB RAM, container local disk. A synthetic
+World-shaped load (scratch benchmark, not committed): per turn, one commit of 7 events (1.8 KB) + 1 step (2.5 KB) +
+the run head (2 KB), and 8 commits of 10 chunks (210 B): 33.9 KB of payload and 9 commits per turn, close to 7.1's
+volume. Heap is `heapUsed` after a forced GC; baseline 11 MB heap, 79 MB RSS.
+
+**Strategy A, every payload in rows:**
+
+| Turns retained | Records | Payload | Journal (uncompacted) | Snapshot (compacted) | Compact | Reopen | Heap after reopen | RSS after reopen |
+| -------------- | ------- | ------- | --------------------- | -------------------- | ------- | ------ | ----------------- | ---------------- |
+| 200            | 17.8k   | 6.8 MB  | 22.7 MB               | n/a                  | n/a     | 0.12 s | 71 MB             | 234 MB           |
+| 2,000          | 178k    | 68 MB   | 228 MB                | 84 MB                | 0.5 s   | 1.27 s | 281 MB            | 516 MB           |
+| 6,000          | 534k    | 203 MB  | 686 MB                | 250 MB               | 1.4 s   | 3.72 s | 787 MB            | 1,247 MB         |
+
+- Linear: about **130 KB of heap, 42 KB of snapshot and 114 KB of uncompacted journal per retained turn**, and
+  **0.62 ms of reopen per retained turn**. Heap is about 3.8x the raw payload.
+- Before compaction the operation history is also in memory: heap was 802 MB at 6,000 turns while writing.
+- Commit latency (each one fdatasynced): turn commit p50 1.8-2.0 ms, p95 3.2-3.8 ms, p99 5.7-9 ms; chunk commit p50
+  1.2-1.4 ms. It did not degrade with size.
+
+**Strategy B, compact rows, payloads outside** (same shape, row payload scaled to 12%, about 4 KB per turn of
+references, digests and small inline values; no chunk rows; 1 commit per turn):
+
+| Turns retained | Records | Snapshot | Reopen | Heap after reopen | Commit p50 / p95 |
+| -------------- | ------- | -------- | ------ | ----------------- | ---------------- |
+| 2,000          | 18k     | 6.6 MB   | 73 ms  | 39 MB (+28 MB)    | 1.24 / 1.9 ms    |
+
+About **14 KB of heap per retained turn and 0.04 ms of reopen**. The payload store's own cost (files, fsyncs) was not
+measured: that is Phase B (section 9).
+
+**Transaction ids are retained forever.** 50,000 commits, each overwriting the same single record, then
+`compact({ retainOperations: 100 })`: the snapshot is 7.56 MB (about **150 B per commit**), and heap after reopen grew
+by 28 MB (about **560 B per commit**), reopen 44 ms. This matches FeltDB's documentation ("retention never removes
+current state, committed transaction ids or their identities", `embedded-state-lifecycle.md:140`). Deleting records
+does not reclaim it: every commit a World ever makes stays resident.
+
+Two further observations:
+
+- **The journal is not bounded by default.** With no retention configured, `journalStatus()` reported all 17,800
+  operations kept and `retainOperations: null`, and the snapshot was never written (277 bytes) until `compact` ran. The
+  public API reference says a never-replicated store keeps its newest 4,096 operations
+  (`FDB/docs/reference/public-api.md:217-218`); the measured behavior differs. Reported as a FeltDB documentation or
+  behavior defect.
+- **Compaction leaves the previous journal on disk** until the next compaction (228 MB beside an 84 MB snapshot at
+  2,000 turns). Peak disk is about snapshot + previous journal.
+
+### 7.3 Model (Estimate)
+
+Inputs: 7.1 (eve's write volume), 7.2 (FeltDB's cost per retained turn and per commit). Assumptions, stated because
+they move the result: **commits per turn** in the real World are 15-30 with batched chunks (7.4 events, about 2 step
+deliveries with publish, claim and acknowledgement each, plus chunk flushes), and **76+ if chunks are committed one by
+one**; the resident cost of a commit is 560 B (Measured).
+
+Per turn, resident heap:
+
+| Strategy                                           | Retained-state heap              | Transaction ids (never reclaimed)     | Reopen per retained turn |
+| -------------------------------------------------- | -------------------------------- | ------------------------------------- | ------------------------ |
+| A. Every payload in rows                           | ~130 KB (Measured shape)         | 8-17 KB (batched), 43+ KB (unbatched) | ~0.62 ms                 |
+| B. Compact rows, payloads behind `PayloadStore`    | ~14 KB (Measured shape)          | same                                  | ~0.04 ms + ids           |
+| C. B plus archival of terminal runs after a window | ~14 KB x turns inside the window | same, for every turn ever             | window-bounded + ids     |
+
+Per eve deployment (one process), illustrative workloads:
+
+| Workload                              | Turns/day | A: heap/day | B: heap/day (batched ids) | C, 30-day window: steady heap  | Reopen after 30 days (A / B) |
+| ------------------------------------- | --------- | ----------- | ------------------------- | ------------------------------ | ---------------------------- |
+| Personal agent: 20 sessions x 5 turns | 100       | 13 MB       | 2.2-3.1 MB                | ~42 MB + 0.8-1.7 MB/day of ids | 1.9 s / 0.1 s + ids          |
+| Team agent: 200 sessions x 10 turns   | 2,000     | 260 MB      | 45-62 MB                  | ~840 MB + 16-34 MB/day of ids  | 37 s / 2.4 s + ids           |
+| Busy agent: 2,000 sessions x 10 turns | 20,000    | 2.6 GB      | 440-620 MB                | 8.4 GB + 160-340 MB/day of ids | not practical / 24 s + ids   |
+
+Long sessions: one 1,000-turn session holds ~130 MB (A) or ~14 MB plus ids (B) for as long as it is active; no
+retention applies to it.
+
+**Maximum practical embedded instance (Estimate).** Taking 1 GB of FeltDB heap as the working ceiling for one Node
+process (it leaves room for eve, the model SDKs and compaction, which serializes the whole snapshot at once) and a
+restart budget of about 10 s:
+
+- A: about **7,500 retained turns** (1 GB) and about 16,000 turns for 10 s of reopen. Days, not months, for a team agent.
+- B: about **32,000-45,000 retained turns** with batched ids, limited by heap before reopen time.
+- C: the window is bounded, but transaction ids are not: with batching, 1 GB of ids is reached after roughly 60,000-120,000
+  turns in the instance's lifetime, whatever is archived. **No strategy is steady-state on FeltDB 0.23** without a
+  FeltDB change (transaction-identity retention) or a periodic rotation of the store, which would itself be an
+  archival operation.
+
+Disk is not the limit in any case: under 1 GB for the in-memory ceilings above, plus the payload store (about 30 KB per
+turn in B, Estimate).
+
+### 7.4 Stable and Experimental, per strategy
+
+| Strategy | Correctness depends on                         | Operations want (Experimental)                                                                                     |
+| -------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A        | Stable only                                    | `db.compact` (journal and reopen time)                                                                             |
+| B        | Stable, plus the chosen payload store          | `db.compact`; the content store if `feltdbContent` is chosen                                                       |
+| C        | Stable, the payload store and the archive sink | `db.compact`; the content store if chosen. Without transaction-identity retention in FeltDB, C is not steady-state |
+
+**Recommendation:** build A and B behind the `PayloadStore` interface in Phase B (A is `inline`, which costs nothing
+extra), make B the documented production configuration once measured, and add C's archival when a FeltDB
+transaction-identity retention policy exists or when an operator needs it, whichever comes first. Disk-resident FeltDB
+rows remain the long-term platform requirement, as decided; they are not a prerequisite.
 
 ## 8. FeltDB gaps found
 
-- **Rows are memory-resident** in every runtime.
+- **Rows are memory-resident** in every runtime (decided: longer-term platform requirement).
+- **Committed transaction ids are never removed** and cost about 560 B of heap each (Measured). For a long-lived
+  embedded store this is unbounded growth independent of retention. Proposed FeltDB change: a retention window for
+  transaction identities (for example, ids older than N days or beyond the newest N), with idempotent retry guaranteed
+  only within it.
+- **The journal is unbounded by default** on the file runtime, contrary to the documented 4,096-operation default
+  (Measured).
+- **`db.compact` is Experimental** yet is the only way to bound journal size and reopen time.
+- **Compaction keeps the previous journal** until the next compaction (Measured; may be intentional, undocumented).
 - **The server has no ordered or range indexes.**
 - **Durable Work** has no claim-next and is server-only.
 - **`onCommit`** has no durable cursor and is in-process only on embedded runtimes.
@@ -444,21 +654,70 @@ re-invented. Estimated size: storage and events 2-3k lines, queue 1-1.5k, stream
   (`FDB/packages/core/src/embedded-transaction.ts:442`).
 - **Documentation conflict:** agent state's runtime validation differs between `agent-state.md` and `guarantees.md`.
 
-## 9. Verification plan (Phases B-C)
+## 9. Test and benchmark plan (Phases B-C)
 
-- **Conformance:** Workflow's `inBandFenceConformance` and `atomicStartHookConformance` against the FeltDB World. Run
-  against Postgres too where a database is available; they are partial suites and are reported as partial.
-- **Behavioral matrix:** one suite, run against both Worlds, for every row of section 3 and every scenario in the
-  milestone brief. Real SIGKILL of a child process and a fresh process on the same storage. Postgres runs in a local
-  `postgres:18` container, as eve's CI job does (`.github/workflows/e2e-postgres.yml:75-147`).
-- **eve e2e matrix:** add `{ "name": "feltdb", "package": "@appport/eve-world-feltdb" }` to `e2e/matrix.json`, next
-  to `postgres`. The mock-model eval suite then runs on both.
-- **Standalone example:** `examples/feltdb-world`. An eve agent on `FELTDB_PATH`, `eve start`, work submitted, memory
-  saved, process killed, restarted, work finished. It uses no FeltKit.
+**Correctness.**
 
-## 10. Corrections to `feltkit/docs/EVE-COMPOSITION.md`
+- Workflow's `inBandFenceConformance` and `atomicStartHookConformance` against the FeltDB World, and against Postgres
+  where a database is available. They are partial suites and are reported as partial.
+- One behavioral suite run against both Worlds for every row of section 3: concurrent appends (positions 1..N, no
+  gaps), stale `expectedSeqInBand`, token races, resume dedupe, force claim racing a resume, queue lease and
+  redelivery, handoff, dedupe window, delayed delivery across restart, `retentionSeconds`, stream ordering and tails.
+- Crash tests with a real `SIGKILL` of a child process and a fresh process on the same directory: mid-append, while a
+  message is leased, during acknowledgement, between `PayloadStore.put` and the commit (orphan, no dangling reference),
+  during archival (the run is either fully present or archived with a verified export), during compaction.
+- Payload integrity: a corrupted payload file is refused on read, never returned.
+- Capacity limits: `CAPACITY_EXCEEDED` on new runs at the limit; running sessions unaffected; nothing evicted.
+- `feltdbMemory` against the memory provider's existing backend tests.
+- eve's e2e matrix: `{ "name": "feltdb", "package": "@appport/eve-world-feltdb" }` next to `postgres` in
+  `e2e/matrix.json`, so the mock-model eval suite runs on both.
+- Standalone example `examples/feltdb-world`: an agent on `EVE_FELTDB_PATH`, work submitted, memory saved, process
+  killed, restarted, work finished. No FeltKit.
+
+**Benchmarks** (committed, reproducible, run on Node 26, numbers stated with their setup):
+
+- Per turn: records, bytes and commits written by the real World under the 7.1 workload (replacing 7.3's commit
+  assumption with a measurement).
+- Heap, RSS, disk, reopen and compaction time against retained turns, for `inline`, `feltdbContent` and (if built) the
+  directory store, to 10,000 turns.
+- Cold replay of a long session (restart, then the next turn): eve reads the whole run log on a cold delivery and only
+  the tail when warm (`CORE/runtime/spec9/delivery.js:902-925`); with payloads outside, a cold replay reads every
+  payload of the session.
+- Queue throughput and latency per process (claim, acknowledgement) with fdatasync per commit, against world-local and
+  Postgres on the same machine.
+- Restart-to-first-delivery time against retained size.
+
+## 10. Remaining architectural risks
+
+1. **Unbounded transaction-id residency** (8). Without a FeltDB change, every embedded instance eventually needs a
+   restart into a fresh store. This is the risk that most limits a long-lived single-process deployment.
+2. **Memory residency** of rows: bounded by the payload strategy, not removed. Documented ceilings, not hidden.
+3. **`db.compact` is Experimental** but operationally necessary; if it changes shape, the maintenance pass changes with
+   it.
+4. **Cold replay cost** of long sessions under strategy B is unmeasured; it could make restarts of long sessions slow
+   even when reopen is fast.
+5. **Commit rate.** Each commit is one fdatasync (about 1-4 ms here; disk-dependent). A busy agent's queue and stream
+   traffic is serialized through one process; the benchmark will show the ceiling.
+6. **Spec churn:** the World tracks every Workflow upgrade eve takes; the conformance suites in CI are the guard.
+7. **The Postgres reference has its own crash gaps** (4-hour stale locks, no `retentionSeconds`, cross-process stream
+   order); the matrix will report them as Postgres limits, not loosen either World.
+8. **Payload store as a second store:** if the content store is not accepted, the World owns a directory's
+   consistency. The write order (put, then reference) and the orphan sweep are the whole design; they get crash tests.
+
+## 11. Decisions needed before Phase B
+
+1. **Payload store:** build `inline` and `feltdbContent` and measure both (proposed), and accept the World-owned
+   directory as the fallback if the content store is not.
+2. **`db.compact`:** allow the maintenance pass to call it, behind a capability check (proposed), or ship with an
+   unbounded journal and document it.
+3. **Transaction-identity retention:** raise it as a FeltDB change now (proposed), or accept store rotation as the
+   documented limit.
+4. **Published name:** `@appport/eve-world-feltdb` from workspace `@eve/world-feltdb`, by generalizing
+   `pack-scoped-eve.mjs` (proposed).
+
+## 12. Corrections to `feltkit/docs/EVE-COMPOSITION.md`
 
 - **The commit listener** is Experimental and in-process only on embedded runtimes (at-most-once on a server), not a
   general wake-up mechanism. The queue polls, and uses the listener only to wake early.
 - **eve also hard-requires `atomicStartHook`,** not only `inBandFence`.
-- **Missing finding:** the memory residency above.
+- **Missing findings:** memory residency, transaction-id residency and the capacity ceilings of section 7.
