@@ -1,8 +1,17 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire, isBuiltin } from "node:module";
-import { dirname, isAbsolute, join, parse, posix, relative } from "node:path";
+import { dirname, isAbsolute, join, parse, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildWithRolldown } from "../rolldown.mjs";
@@ -510,13 +519,26 @@ export async function findPackageJson(packageName, packageRoot, packageJsonName 
   throw new Error(`Could not find package.json for "${packageName}".`);
 }
 
+const monorepoRoot = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
+
 async function copyLicense(sourceRoot, destinationRoot) {
   const entries = await readdir(sourceRoot);
   const licenseFileName = entries.find((entry) => /^licen[cs]e(?:\..*)?$/i.test(entry));
-  if (!licenseFileName) {
+  if (licenseFileName) {
+    await copyFile(join(sourceRoot, licenseFileName), join(destinationRoot, licenseFileName));
     return;
   }
-  await copyFile(join(sourceRoot, licenseFileName), join(destinationRoot, licenseFileName));
+  if (await isUnbuiltWorkspacePackage(sourceRoot)) {
+    await copyFile(join(monorepoRoot, "LICENSE"), join(destinationRoot, "LICENSE"));
+  }
+}
+
+async function isUnbuiltWorkspacePackage(sourceRoot) {
+  const realSource = await realpath(sourceRoot);
+  return (
+    realSource.startsWith(`${monorepoRoot}${sep}packages${sep}`) &&
+    !realSource.includes(`${sep}node_modules${sep}`)
+  );
 }
 
 async function prepareCompiledModule({ module, compiledRoot, packageRoot }) {
