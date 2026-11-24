@@ -1,0 +1,6 @@
+@appport/eve-world-feltdb
+Copyright 2026 Vercel, Inc. and contributors
+
+Part of eve (https://github.com/rkendel1/eve2), licensed under the Apache
+License, Version 2.0. This package bundles no third-party code. It uses
+@feltdb/core as a peer dependency, installed and licensed separately.

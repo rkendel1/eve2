@@ -1,7 +1,7 @@
 {
-  "name": "@eve/world-feltdb",
+  "name": "@appport/eve-world-feltdb",
   "version": "0.0.0",
-  "description": "FeltDB storage for eve's Workflow World: durable payload storage with verified references (the World itself is not implemented yet)",
+  "description": "FeltDB storage for eve's Workflow World: durable, verified payload storage (the World itself is not implemented yet)",
   "keywords": [
     "eve",
     "feltdb",
@@ -31,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node ../../scripts/copy-package-license.mjs .",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('../../LICENSE','LICENSE')\"",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:scenario": "vitest run --config vitest.scenario.config.ts",
     "typecheck": "tsc -p tsconfig.json"

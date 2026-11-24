@@ -7,7 +7,7 @@ const allowedPublicPackages = new Set([
   "@eve/agent-desktop",
   "@eve/agent-browser",
   "@eve/recall",
-  "@eve/world-feltdb",
+  "@appport/eve-world-feltdb",
 ]);
 const workspaceRoots = ["apps", "packages"];
 

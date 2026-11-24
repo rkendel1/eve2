@@ -3,7 +3,8 @@
 FeltDB storage for eve's Workflow World. **Status: payload storage only.** The World itself (queue, sessions, events,
 fences, memory) is not implemented yet; see [`research/feltdb-world.md`](../../research/feltdb-world.md).
 
-Published as `@appport/eve-world-feltdb` (workspace name `@eve/world-feltdb`), versioned independently of `eve`.
+Published as `@appport/eve-world-feltdb`, the same name it has in this workspace, and versioned independently of
+`eve`. Nothing is published under `@eve`, which is upstream's npm scope.
 
 ## Compatibility
 
@@ -72,12 +73,20 @@ Three backends implement it:
 incompressible payloads; 10 turns per session; the store's clock advances 2 s per turn):
 
 ```sh
-pnpm --filter @eve/world-feltdb build
+pnpm --filter @appport/eve-world-feltdb build
 FELTDB_CORE=/path/to/flow_db/packages/core/dist/index.js \
   node --expose-gc packages/eve-world-feltdb/bench/capacity.mjs --backend folder --turns 5000 [--archive] [--retain-ids-forever]
 ```
 
 `--backend` is `feltdb-record`, `feltdb-content` or `folder`. `--archive` deletes each session's records and payloads 20
-sessions after it ends, so what remains is lifetime growth. Transaction ids are retained for 10 minutes
-(`--retain-ids-ms`) unless `--retain-ids-forever`; `FELTDB_CORE` must name a FeltDB build with
-`journal.retainTransactionIdsMs` for that. It prints one JSON sample per tenth of the run and a summary.
+sessions after it ends, so what remains is lifetime growth. Transaction ids are retained for 10 minutes of store time
+(`--retain-ids-ms`) unless `--retain-ids-forever`.
+
+The benchmark first prints its provenance: the FeltDB build (package version, git commit, whether its `src` is dirty,
+a SHA-256 of its `dist`, and whether it has transaction-id retention) and this package's commit. It refuses a FeltDB
+build without retention, and uncommitted source on either side unless `--allow-dirty`. `FELTDB_CORE` names that
+build's `dist/index.js` (default: the installed `@feltdb/core`).
+
+The workload runs in a child process that is killed with `SIGKILL` once it has written everything; the parent then
+measures crash recovery (opening the killed store), a clean reopen, a backup (a copy of the stopped directories) and a
+restore that verifies every referenced payload in both copies.

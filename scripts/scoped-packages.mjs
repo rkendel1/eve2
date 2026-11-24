@@ -8,7 +8,7 @@ export const SCOPED_PACKAGES = {
   },
   "world-feltdb": {
     name: "@appport/eve-world-feltdb",
-    workspace: "@eve/world-feltdb",
+    workspace: "@appport/eve-world-feltdb",
     directory: "packages/eve-world-feltdb",
     staged: "packages/eve-world-feltdb",
     requiredFiles: ["LICENSE", "NOTICE", "README.md", "dist/index.js", "dist/index.d.ts"],
