@@ -14,7 +14,11 @@ import type { SandboxState } from "#sandbox/state.js";
 import type { JsonObject } from "#shared/json.js";
 import type { TokenUsage } from "#shared/token-usage.js";
 import type { Principal } from "#protocol/session-events/envelope.js";
-import type { SessionUsageLimit } from "#shared/agent-definition.js";
+import type {
+  AgentControl,
+  AgentControlBoundary,
+  SessionUsageLimit,
+} from "#shared/agent-definition.js";
 import type { HarnessToolDefinition } from "#harness/execute-tool.js";
 import type { HarnessModelMessage } from "#harness/messages.js";
 import type { SessionInstrumentation } from "#instrumentation/runtime.js";
@@ -111,7 +115,13 @@ export interface StepResult {
 
 export type TurnHold =
   | { readonly kind: "tasks"; readonly taskIds: readonly string[] }
-  | { readonly kind: "request" };
+  | { readonly kind: "request" }
+  | ({ readonly kind: "control" } & ControlHold);
+
+export interface ControlHold {
+  readonly boundary: AgentControlBoundary;
+  readonly reason?: string;
+}
 
 export type StepFn = (session: HarnessSession, input?: HarnessStepInput) => Promise<StepResult>;
 
@@ -151,6 +161,7 @@ export type HandleEventFn = (
 ) => Promise<void>;
 
 export interface KernelConfig {
+  readonly agentControl?: AgentControl;
   readonly steeringSignal?: AbortSignal;
   readonly abortSignal?: AbortSignal;
   readonly capabilities?: SessionCapabilities;

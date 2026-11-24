@@ -73,6 +73,8 @@ export interface ChannelSource<TState = undefined> {
   compact(options?: SessionControlOptions): Promise<Delivery>;
   /** Cancels a running turn and every working task, then clears model-message history in place. */
   clear(options?: SessionControlOptions): Promise<Delivery>;
+  /** Lets a turn the agent's `control` holds ask it again, without creating a session. */
+  resume(options?: SessionControlOptions): Promise<Delivery>;
   /** Retires the current owner without creating a replacement. */
   end(options?: { readonly reason?: string } & SessionControlOptions): Promise<Delivery>;
 }
@@ -143,6 +145,9 @@ export function createChannelOperations<TState = undefined>(input: {
         },
         async clear(options) {
           return await bound.clear(options);
+        },
+        async resume(options) {
+          return await bound.resume(options);
         },
         async end(options) {
           return await bound.end(options);

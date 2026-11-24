@@ -8,6 +8,7 @@ import {
   createEveSessionClearRoutePath,
   createEveSessionCompactRoutePath,
   createEveSessionEndRoutePath,
+  createEveSessionResumeRoutePath,
   createEveSessionRoutePath,
 } from "#protocol/routes.js";
 
@@ -16,6 +17,7 @@ const paths = {
   clear: createEveSessionClearRoutePath,
   compact: createEveSessionCompactRoutePath,
   end: createEveSessionEndRoutePath,
+  resume: createEveSessionResumeRoutePath,
 };
 
 export async function prewarmClientSession(input: {

@@ -84,6 +84,7 @@ export async function compileAgentConfig(
 
   const compiledConfig: {
     approval?: boolean;
+    control?: boolean;
     build?: CompiledAgentDefinition["build"];
     compaction: {
       model?: CompiledRuntimeModelReference;
@@ -113,6 +114,10 @@ export async function compileAgentConfig(
 
   if (definition.approval !== undefined) {
     compiledConfig.approval = true;
+  }
+
+  if (definition.control !== undefined) {
+    compiledConfig.control = true;
   }
 
   let dynamicModel: CompiledAgentDefinition["dynamicModel"] | undefined;

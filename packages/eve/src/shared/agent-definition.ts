@@ -321,9 +321,61 @@ export interface AgentWorkflowDefinition {
  */
 export type AgentToolExposure = boolean | "deferred";
 
+/** Where eve asks an {@link AgentControl} whether to start new work. */
+export type AgentControlBoundary = "model" | "tools";
+
+/** An update from a person, delivered to the agent at a checkpoint. */
+export interface AgentControlInstruction {
+  /** The host's id for the update. eve acknowledges it by this id. */
+  readonly instructionId: string;
+  /** What the person said. */
+  readonly text: string;
+  /** Who sent it, as the model should read it. */
+  readonly from: string;
+}
+
+/** What a checkpoint decided: whether to start the work, and the updates to take into account. */
+export interface AgentControlCheckpoint {
+  /** `false` holds the turn durably until the session receives `resume`. */
+  readonly proceed: boolean;
+  /** Why the turn is held, recorded on the session's `turn.held` fact. */
+  readonly reason?: string;
+  /** Updates to give the model, oldest first, as user messages before its next step. */
+  readonly instructions: ReadonlyArray<AgentControlInstruction>;
+}
+
+/**
+ * Lets a host pause, resume, and steer a running session at execution boundaries. eve calls
+ * `checkpoint` before each model step (`boundary: "model"`) and before a step's tool calls start
+ * (`boundary: "tools"`). When it answers `proceed: false`, or throws, the turn holds durably,
+ * across restarts, until the session receives a `resume` command; eve then asks again. Instructions
+ * a model checkpoint returns reach that model step once, and eve calls `acknowledge` for each after
+ * the step succeeds.
+ *
+ * ```ts
+ * export default defineAgent({ model, control: hostControl() });
+ * ```
+ */
+export interface AgentControl {
+  /** Asks whether to start the work at this boundary; called again after each `resume`. */
+  checkpoint(input: {
+    readonly sessionId: string;
+    readonly turnId: string;
+    readonly boundary: AgentControlBoundary;
+  }): Promise<AgentControlCheckpoint>;
+  /** Reports what the agent made of a delivered update, after the model step that took it. */
+  acknowledge(input: {
+    readonly sessionId: string;
+    readonly instructionId: string;
+    readonly outcome: "incorporated" | "conflict";
+    readonly note: string;
+  }): Promise<void>;
+}
+
 export type InternalAgentDefinition = {
   name: string;
   approval?: boolean;
+  control?: boolean;
   description?: string;
   build?: AgentBuildDefinition;
   compaction?: InternalAgentCompactionDefinition;
@@ -375,6 +427,11 @@ type PublicAgentDefinitionBase = {
    * ```
    */
   readonly approval?: ApprovalPolicy;
+  /**
+   * Lets a host hold this agent's turns at model and tool boundaries and deliver people's updates.
+   * See {@link AgentControl}.
+   */
+  readonly control?: AgentControl;
   readonly build?: AgentBuildDefinition;
   readonly compaction?: PublicAgentCompactionDefinition;
   /**

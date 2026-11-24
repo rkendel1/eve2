@@ -148,6 +148,7 @@ export const FACT_CATALOG: { readonly [TType in Fact["type"]]: FactDescriptor } 
   "session.started": { family: "session", idField: "", role: "introduces" },
   "task.ended": { family: "task", idField: "taskId", role: "terminal" },
   "task.started": { family: "task", idField: "taskId", role: "introduces" },
+  "turn.held": { family: "turn", idField: "turnId", role: "updates" },
   "turn.paused": { family: "turn", idField: "turnId", role: "updates" },
   "turn.settled": { family: "turn", idField: "turnId", role: "terminal" },
   "turn.started": { family: "turn", idField: "turnId", role: "introduces" },

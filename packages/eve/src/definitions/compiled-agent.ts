@@ -70,6 +70,7 @@ function compiledSettings(bundle: CompiledBundle): SessionAgentSettings {
     retention: config?.experimental?.workflow?.retention,
     sessionTimeoutMs: config?.limits?.sessionTimeoutMs,
     sessionUsage: () => resolveSessionUsageLimit(bundle),
+    control: config?.control,
   });
 }
 

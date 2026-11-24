@@ -65,7 +65,13 @@ import {
 } from "#harness/hitl/sign-ins.js";
 import { forwardedFrom, type Relay, type WorkflowAskRoute } from "#harness/hitl/relays.js";
 import type { StoppedCall } from "#harness/inline-tool-authorization.js";
-import type { ApprovedCall, SuspendedStep, TurnState } from "./state.js";
+import type {
+  ApprovedCall,
+  HeldCalls,
+  StepCoordinates,
+  SuspendedStep,
+  TurnState,
+} from "./state.js";
 import { activeTurnId, answeredCallIds, turnPosition, type SessionView } from "./view.js";
 import {
   isComplete,
@@ -257,6 +263,60 @@ export function suspendStep(
   step: Pick<SuspendedStep, "endsTurn" | "event" | "messages" | "tasks">,
 ): Transition {
   return transition({ events: [], turn: suspend(view.turn, { ...step, requests: [] }) });
+}
+
+export function holdCalls(
+  view: SessionView,
+  input: {
+    readonly calls: HeldCalls;
+    readonly event: StepCoordinates;
+    readonly responseMessages: readonly ModelMessage[];
+  },
+): Transition {
+  const { sequence, stepIndex, turnId } = input.event;
+  return transition({
+    events: [],
+    turn: suspend(view.turn, {
+      event: { sequence, stepIndex, turnId },
+      held: input.calls,
+      messages: input.responseMessages,
+      requests: [],
+      tasks: [],
+    }),
+  });
+}
+
+export function holdTurn(
+  view: SessionView,
+  hold: { readonly boundary: "model" | "tools"; readonly reason?: string; readonly turnId: string },
+): Transition {
+  return unchanged(view, [fact("turn.held", hold)]);
+}
+
+export function deliverUpdates(
+  view: SessionView,
+  input: {
+    readonly turnId: string;
+    readonly updates: readonly { readonly deliveryId: string; readonly text: string }[];
+  },
+): Transition {
+  return unchanged(
+    view,
+    input.updates.flatMap(({ deliveryId, text }) => [
+      fact("delivery.admitted", { deliveryId, source: { control: "instruction" } }),
+      consumed({ deliveryId, parts: [{ kind: "text", text }] }, input.turnId),
+    ]),
+  );
+}
+
+export function releaseHeldCalls(view: SessionView): Transition {
+  return transition({
+    events: [],
+    turn: {
+      ...view.turn,
+      suspended: view.turn.suspended.filter((step) => step.held === undefined),
+    },
+  });
 }
 
 export function withoutApproved(step: SuspendedStep, callIds: ReadonlySet<string>): SuspendedStep {

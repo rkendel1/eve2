@@ -55,6 +55,7 @@ interface CreateExecutionNodeStepInput {
   readonly agent: RuntimeAgentIdentity;
   readonly node: ResolvedRuntimeAgentNode;
   readonly sessionUsageLimit?: KernelConfig["sessionUsageLimit"];
+  readonly agentControl?: KernelConfig["agentControl"];
 }
 
 export function createExecutionNodeStep(input: CreateExecutionNodeStepInput): StepFn {
@@ -63,6 +64,7 @@ export function createExecutionNodeStep(input: CreateExecutionNodeStepInput): St
   const instrumentation = input.instrumentation;
   const sessionInstrumentation = instrumentation?.prepareExecution();
   const step = createKernel({
+    agentControl: input.agentControl,
     steeringSignal: input.steeringSignal,
     abortSignal: input.abortSignal,
     capabilities: input.capabilities,

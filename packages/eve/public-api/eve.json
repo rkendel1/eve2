@@ -1,6 +1,10 @@
 [
   "AgentBuildDefinition",
   "AgentCompactionDefinition",
+  "AgentControl",
+  "AgentControlBoundary",
+  "AgentControlCheckpoint",
+  "AgentControlInstruction",
   "AgentDefinition",
   "AgentExperimentalDefinition",
   "AgentLimitsDefinition",

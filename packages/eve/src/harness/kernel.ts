@@ -36,6 +36,11 @@ import {
 import { createStep, failTurnForEffect, openTurn, type Step } from "#harness/step/context.js";
 import { prepareTurnInput, settleRuntimeWork } from "#harness/step/intake.js";
 import { settleTurn } from "#harness/step/after-model.js";
+import {
+  acknowledgeInstructions,
+  passModelBoundary,
+  passToolsBoundary,
+} from "#harness/step/control.js";
 import { workingTaskIds } from "#execution/tasks/model-step.js";
 import type {
   HarnessSession,
@@ -154,10 +159,24 @@ export function createKernel(config: KernelConfig): StepFn {
       }
       return settleTurn(step, { stepOutput: null });
     }
-    return runModelStep(step, {
-      generation,
-      turn,
-    });
+    const requeue = async () => {
+      if (turn.messages.length === 0) return;
+      const prepared = answered.input && { ...answered.input, message: turn.message };
+      await step.apply(queueInput(step.view(), turnInputOnly(prepared)));
+    };
+    const released = await passToolsBoundary(step);
+    if (released !== undefined) {
+      await requeue();
+      return { ...released, session: step.session };
+    }
+    const gate = await passModelBoundary(step, turn);
+    if ("held" in gate) {
+      await requeue();
+      return { ...gate.held, session: step.session };
+    }
+    const result = await runModelStep(step, { generation, turn: gate.turn });
+    await acknowledgeInstructions(step, gate);
+    return result;
   }
 
   return runStep;

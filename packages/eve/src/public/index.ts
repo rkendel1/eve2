@@ -1,5 +1,9 @@
 export {
   type AgentCompactionDefinition,
+  type AgentControl,
+  type AgentControlBoundary,
+  type AgentControlCheckpoint,
+  type AgentControlInstruction,
   type AgentDefinition,
   type AgentExperimentalDefinition,
   type AgentLimitsDefinition,

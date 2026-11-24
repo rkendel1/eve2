@@ -15,6 +15,10 @@ import { defineDynamic as defineDynamicBase } from "#dynamic/definition.js";
 const DEFINED_AGENT: unique symbol = Symbol.for("eve.defined-agent");
 
 export type {
+  AgentControl,
+  AgentControlBoundary,
+  AgentControlCheckpoint,
+  AgentControlInstruction,
   AgentModelOptionsDefinition,
   AgentReasoningDefinition,
   AgentBuildDefinition,

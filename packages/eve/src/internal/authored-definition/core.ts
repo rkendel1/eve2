@@ -53,6 +53,7 @@ export function normalizeAgentDefinition(
       "approval",
       "build",
       "compaction",
+      "control",
       "defaultTools",
       "description",
       "experimental",
@@ -128,7 +129,22 @@ export function normalizeAgentDefinition(
     definition.approval = normalizeAgentApproval(record.approval, message);
   }
 
+  if (record.control !== undefined) {
+    definition.control = normalizeAgentControl(record.control, message);
+  }
+
   return definition as Readonly<NormalizedAgentDefinition>;
+}
+
+function normalizeAgentControl(
+  value: unknown,
+  message: string,
+): NonNullable<NormalizedAgentDefinition["control"]> {
+  const record = expectObjectRecord(value, `${message} The "control" field must be an object.`);
+  for (const key of ["checkpoint", "acknowledge"]) {
+    expectFunction(record[key], `${message} "control.${key}" must be a function.`);
+  }
+  return value as NonNullable<NormalizedAgentDefinition["control"]>;
 }
 
 function normalizeAgentModel(value: unknown, message: string): NormalizedAgentDefinition["model"] {

@@ -623,6 +623,7 @@ async function runSessionStepBody(
         agent,
         node: effectiveNode,
         sessionUsageLimit,
+        agentControl: agent.settings.control,
         setAttributes: async (attributes) => {
           const previous = pendingAttributes.usage ?? pendingAttributes.title;
           pendingAttributes.usage = (async () => {

@@ -180,6 +180,7 @@ export class SessionExecution {
   ): Promise<TurnOutcome> {
     let nextStepInput: TurnStepPayload | undefined = delivery;
     let bindCaller = turn.caller;
+    let heldByControl = false;
 
     while (true) {
       const { cursor } = this.input;
@@ -213,6 +214,8 @@ export class SessionExecution {
 
       const stepAdmission = this.input.queue.nextAdmission;
       const settles = result.action === "parked" && result.settled !== undefined;
+      const controlHeld = result.action === "paused" && result.on === "control";
+      if (controlHeld) turn.holdForControl();
       await turn.admitBoundary(settles);
       const ending = result.action === "done";
       await this.handleBoundaryMessages(
@@ -239,15 +242,42 @@ export class SessionExecution {
         case "parked":
           return { kind: "park", settled: result.settled };
         case "paused": {
+          if (result.on === "control") {
+            const recheck = !heldByControl;
+            heldByControl = true;
+            const released = await this.awaitResume(turn, recheck);
+            if (released === "cancelled") return await this.finishCancelledTurn(turn);
+            nextStepInput = released;
+            continue;
+          }
+          heldByControl = false;
           const resumed = await this.resume(turn, result, stepAdmission);
           if (resumed === "cancelled") return await this.finishCancelledTurn(turn);
           nextStepInput = resumed;
           continue;
         }
         case "continue":
+          heldByControl = false;
           nextStepInput = await this.withSteering(turn, {});
           continue;
       }
+    }
+  }
+
+  private async awaitResume(
+    turn: ActiveTurn,
+    recheck: boolean,
+  ): Promise<TurnStepPayload | undefined | "cancelled"> {
+    while (true) {
+      const resumes = turn.takeResumes();
+      if (recheck || resumes.length > 0) {
+        await turn.settleResumes(resumes, "applied");
+        return await this.withSteering(turn, {});
+      }
+      turn.holdForControl();
+      const next = await turn.nextRuntimeEvent([]);
+      if (next === "cancelled") return next;
+      if (next.kind === "workflow") await this.handleWorkflowMessage(next.message, turn);
     }
   }
 

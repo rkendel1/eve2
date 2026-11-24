@@ -25,6 +25,18 @@ export interface TurnPausedData {
   readonly awaiting: readonly { readonly interactionId: string }[];
 }
 
+/**
+ * The turn holds before new work because the agent's `control` didn't let it start: a model step
+ * (`boundary: "model"`) or the tool calls of the step that just finished (`"tools"`). Nobody is
+ * asked anything; the turn goes on after the session receives `resume` and control lets it, which
+ * its next model run or call shows.
+ */
+export interface TurnHeldData {
+  readonly turnId: string;
+  readonly boundary: "model" | "tools";
+  readonly reason?: string;
+}
+
 /** How a turn ended, as recorded on `turn.settled`. */
 export type TurnOutcome = "completed" | "failed" | "cancelled";
 
@@ -44,10 +56,22 @@ export type TurnStarted = Envelope<"turn.started", TurnStartedData>;
 export type TurnSettled = Envelope<"turn.settled", TurnSettledData>;
 /** The fact recording that a turn waits on interactions. */
 export type TurnPaused = Envelope<"turn.paused", TurnPausedData>;
+/** The fact recording that the agent's control holds a turn. */
+export type TurnHeld = Envelope<"turn.held", TurnHeldData>;
 /** Any fact in the `turn` family. */
-export type TurnFact = TurnStarted | TurnPaused | TurnSettled;
+export type TurnFact = TurnStarted | TurnPaused | TurnHeld | TurnSettled;
 
 export const turnSchemas = {
+  "turn.held": envelopeOf(
+    "turn.held",
+    conforming<TurnHeldData>()(
+      z.object({
+        boundary: z.enum(["model", "tools"]),
+        reason: z.string().optional(),
+        turnId: id,
+      }),
+    ),
+  ),
   "turn.paused": envelopeOf(
     "turn.paused",
     conforming<TurnPausedData>()(

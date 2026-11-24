@@ -40,6 +40,10 @@ export function resolveSessionStepResult(
   if (stepResult.held?.kind === "tasks") {
     return { action: "paused", ...pausedOnTasks(stepResult.held.taskIds), ...values };
   }
+  if (stepResult.held?.kind === "control") {
+    const { kind: _kind, ...hold } = stepResult.held;
+    return { action: "paused", on: "control", ...hold, ...values };
+  }
   if (stepResult.held?.kind === "request") {
     const projection = storedProjection(stepResult.session.state);
     return { action: "paused", ...pausedOnInteraction(stepResult.session, projection), ...values };

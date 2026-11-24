@@ -4,6 +4,7 @@ import type { SessionView } from "#protocol/session-projection/tables.js";
 
 export function stepDisagreement(result: DurableStepResult, view: SessionView): string | undefined {
   if (result.action === "done" || result.action === "cancelled") return undefined;
+  if (result.action === "paused" && result.on === "control") return undefined;
   const turnId = activeTurn(view)?.turnId;
   const tables = turnId === undefined ? "no-turn" : (waiting(view, turnId)?.on ?? "session");
   const step =

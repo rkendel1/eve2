@@ -34,6 +34,7 @@ import type {
 } from "#shared/source-ref.js";
 import type { NamedSkillDefinition } from "#shared/skill-definition.js";
 import type {
+  AgentControl,
   AgentLimitsDefinition,
   InternalAgentDefinition,
   AgentToolExposure,
@@ -194,9 +195,10 @@ export type ResolvedDynamicSubagentDefinition = ResolvedDynamicSource;
 
 type ResolvedAgentDefinitionBase = Omit<
   InternalAgentDefinition,
-  "approval" | "build" | "limits" | "model" | "source"
+  "approval" | "build" | "control" | "limits" | "model" | "source"
 > & {
   approval?: ApprovalPolicy;
+  control?: AgentControl;
   limits?: AgentLimitsDefinition;
   source?: Readonly<NonNullable<InternalAgentDefinition["source"]>>;
 };
