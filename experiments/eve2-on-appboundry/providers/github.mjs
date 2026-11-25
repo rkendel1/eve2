@@ -234,21 +234,23 @@ const changes = [
       if (faults.failNextPublish) { faults.failNextPublish = false; throw new AppPortError("UNAVAILABLE", "Injected: publish failed before reaching GitHub."); }
       const open = await gh("GET", `/repos/${w.repository}/pulls?state=all&head=${w.repository.split("/")[0]}:${encodeURIComponent(branch)}`);
       if (open.length) return pr(open[0]);
+      // The branch is pushed with git (through the environment's git proxy); the pull request is opened with the API.
       await exec(["git", "add", "-A", "--", ".", ":!node_modules"], w.dir, 30_000);
-      const files = (await exec(["git", "diff", "--cached", "--name-status"], w.dir, 30_000)).output.split("\n").filter(Boolean).map((l) => l.split("\t"));
-      if (!files.length) throw new AppPortError("INVALID_INPUT", "Nothing changed in the working copy.");
-      const base = await gh("GET", `/repos/${w.repository}/git/commits/${w.sha}`);
-      const tree = [];
-      for (const [status, path] of files) {
-        if (status.startsWith("D")) { tree.push({ path, mode: "100644", type: "blob", sha: null }); continue; }
-        const blob = await gh("POST", `/repos/${w.repository}/git/blobs`, { content: readFileSync(join(w.dir, path)).toString("base64"), encoding: "base64" });
-        tree.push({ path, mode: "100644", type: "blob", sha: blob.sha });
+      const staged = (await exec(["git", "diff", "--cached", "--name-only"], w.dir, 30_000)).output.split("\n").filter(Boolean);
+      const head = (await exec(["git", "rev-parse", "HEAD"], w.dir, 10_000)).output.trim();
+      // A retry after the commit (or the push) already happened reuses that commit.
+      if (!staged.length && head === w.sha) throw new AppPortError("INVALID_INPUT", "Nothing changed in the working copy.");
+      const committed = !staged.length ? { exitCode: 0, output: "" } : await exec(["git", "-c", "user.name=Eve2", "-c", "user.email=eve2@users.noreply.github.com", "-c", "commit.gpgsign=false", "commit", "-q", "-m", message], w.dir, 60_000);
+      if (committed.exitCode !== 0) throw new AppPortError("UNAVAILABLE", `Commit failed: ${committed.output.slice(-300)}`);
+      const commitSha = (await exec(["git", "rev-parse", "HEAD"], w.dir, 10_000)).output.trim();
+      const pushed = await exec(["git", "push", "origin", `HEAD:refs/heads/${branch}`], w.dir, 120_000);
+      if (pushed.exitCode !== 0) {
+        log("changes.push.refused", { branch, output: pushed.output.slice(-400) });
+        throw new AppPortError("FORBIDDEN", `Pushing ${branch} was refused: ${pushed.output.trim().split("\n").slice(-2).join(" ")}`);
       }
-      const newTree = await gh("POST", `/repos/${w.repository}/git/trees`, { base_tree: base.tree.sha, tree });
-      const commit = await gh("POST", `/repos/${w.repository}/git/commits`, { message, tree: newTree.sha, parents: [w.sha] });
-      await gh("POST", `/repos/${w.repository}/git/refs`, { ref: `refs/heads/${branch}`, sha: commit.sha });
+      log("changes.pushed", { branch, commit: commitSha, files: staged.length });
       const created = await gh("POST", `/repos/${w.repository}/pulls`, { title, body: body + FOOTER, head: branch, base: w.base, draft: false });
-      log("changes.published", { number: created.number, branch, commit: commit.sha });
+      log("changes.published", { number: created.number, branch, commit: commitSha });
       return pr(created);
     },
   }),
