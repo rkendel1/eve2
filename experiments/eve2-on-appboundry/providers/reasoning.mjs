@@ -75,7 +75,6 @@ const decide = defineCapability({
     const response = await client.beta.messages.create({
       model: MODEL,
       max_tokens: 16000,
-      cache_control: { type: "ephemeral" },
       output_config: { effort: process.env.DECIDE_EFFORT ?? "high", format: { type: "json_schema", schema: DECIDE_SCHEMA } },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
@@ -83,7 +82,8 @@ const decide = defineCapability({
       // The history only grows: one block per observation keeps every earlier block a cacheable prefix of the next call.
       messages: [{ role: "user", content: [
         { type: "text", text: `Actions:\n${JSON.stringify(actions, null, 1)}\n\nResult shape when finishing:\n${resultShape}\n\nWhat you have done and observed so far, oldest first:` },
-        ...(observations ? observations.split(/\n\n(?=#\d+ )/) : ["(nothing yet)"]).map((text) => ({ type: "text", text })),
+        // The breakpoint goes on the newest observation, not on the objective after it (which changes every call).
+        ...(observations ? observations.split(/\n\n(?=#\d+ )/) : ["(nothing yet)"]).map((text, i, all) => ({ type: "text", text, ...(i === all.length - 1 ? { cache_control: { type: "ephemeral" } } : {}) })),
         { type: "text", text: `Objective:\n${objective}` },
       ] }],
     });
