@@ -1,0 +1,12 @@
+{
+  "name": "eve2",
+  "private": true,
+  "type": "module",
+  "description": "Eve2: an integration operator built with FeltKit and run as an AppBoundry artifact. Its only reach outside its own state is AppPort capabilities the host binds.",
+  "scripts": {
+    "build": "feltkit build --target appboundry"
+  },
+  "dependencies": {
+    "@feltdb/feltkit": "file:../../../../feltkit/packages/sdk"
+  }
+}
