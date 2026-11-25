@@ -10,6 +10,17 @@ import { log, serve } from "./serve.mjs";
 const MODEL = process.env.REASONING_MODEL ?? "claude-opus-5-5";
 const EFFORT = process.env.REASONING_EFFORT ?? "medium";
 const client = new Anthropic({ apiKey: process.env.BENCH_API_KEY ?? process.env.ANTHROPIC_API_KEY });
+if (!process.env.BENCH_API_KEY && !process.env.ANTHROPIC_API_KEY) log("reasoning.unconfigured", { message: "No BENCH_API_KEY or ANTHROPIC_API_KEY: every call will be refused as provider.UNAVAILABLE." });
+
+/** A failure of the model call itself, logged with its cause and reported as a protocol error (never a silent INTERNAL). */
+function modelFailure(error) {
+  if (error instanceof AppPortError) return error;
+  const status = error?.status;
+  log("model.error", { status: status ?? null, type: error?.name, message: String(error?.message ?? error).slice(0, 300) });
+  if (status === 429) return new AppPortError("RATE_LIMITED", "The model provider is rate limiting; try again later.");
+  if (status === 400) return new AppPortError("INVALID_INPUT", `The model rejected the request: ${String(error?.message ?? "").slice(0, 200)}`);
+  return new AppPortError("provider.UNAVAILABLE", `The model could not be reached (${status ?? error?.name ?? "error"}).`);
+}
 const totals = { calls: 0, inputTokens: 0, outputTokens: 0 };
 
 const interpret = defineCapability({
@@ -28,7 +39,7 @@ const interpret = defineCapability({
       fallbacks: "default",
       system: instructions,
       messages: [{ role: "user", content: context ? `${request}\n\n${context}` : request }],
-    });
+    }).catch((e) => { throw modelFailure(e); });
     const usage = {
       provider: "anthropic", requested: MODEL, served: response.model, effort: EFFORT, stopReason: response.stop_reason,
       inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens,
@@ -86,7 +97,7 @@ const decide = defineCapability({
         ...(observations ? observations.split(/\n\n(?=#\d+ )/) : ["(nothing yet)"]).map((text, i, all) => ({ type: "text", text, ...(i === all.length - 1 ? { cache_control: { type: "ephemeral" } } : {}) })),
         { type: "text", text: `Objective:\n${objective}` },
       ] }],
-    });
+    }).catch((e) => { throw modelFailure(e); });
     const usage = {
       provider: "anthropic", requested: MODEL, served: response.model, stopReason: response.stop_reason,
       inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens,
