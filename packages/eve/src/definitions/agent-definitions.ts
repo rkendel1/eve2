@@ -1,6 +1,7 @@
 import type { RuntimeModelReference } from "#runtime/agent/bootstrap.js";
 import type { SessionAgentSettings } from "#runtime/sessions/session-agent.js";
 import type {
+  AgentControl,
   AgentReasoningDefinition,
   AgentWorkflowRetentionDefinition,
   SessionUsageLimit,
@@ -61,6 +62,7 @@ export interface AgentSettingsFields {
   readonly modelCallsPerStep?: number;
   readonly reasoning?: AgentReasoningDefinition;
   readonly retention?: AgentWorkflowRetentionDefinition;
+  readonly control?: AgentControl;
 }
 
 export function settingsOf(fields: AgentSettingsFields): SessionAgentSettings {
@@ -80,6 +82,7 @@ export function settingsOf(fields: AgentSettingsFields): SessionAgentSettings {
     modelCallsPerStep: fields.modelCallsPerStep,
     reasoning: fields.reasoning,
     retention: fields.retention,
+    ...(fields.control !== undefined && { control: fields.control }),
   };
 }
 

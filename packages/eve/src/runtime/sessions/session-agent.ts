@@ -11,6 +11,7 @@ import type { RuntimeSandboxRegistry } from "#runtime/sandbox/registry.js";
 import type { CompiledRuntimeAgentBundle } from "#runtime/sessions/compiled-agent-cache.js";
 import type { ResolvedConnectionDefinition } from "#runtime/types.js";
 import type {
+  AgentControl,
   AgentReasoningDefinition,
   AgentWorkflowRetentionDefinition,
   SessionUsageLimit,
@@ -29,6 +30,7 @@ export interface SessionAgentSettings {
   };
   readonly modelCallsPerStep?: number;
   readonly retention?: AgentWorkflowRetentionDefinition;
+  readonly control?: AgentControl;
 }
 
 export interface BundleReference {

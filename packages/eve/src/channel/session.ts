@@ -49,6 +49,8 @@ export interface Session extends SessionReader {
   prewarm(): Promise<PrewarmSessionResult>;
   clear(options?: SessionControlOptions): Promise<Delivery>;
   compact(options?: SessionControlOptions): Promise<Delivery>;
+  /** Lets a turn the agent's `control` holds ask it again; changes nothing when no turn is held. */
+  resume(options?: SessionControlOptions): Promise<Delivery>;
   /** Retires this session without creating a replacement or changing this handle's ID. */
   end(options?: SessionControlOptions & { readonly reason?: string }): Promise<Delivery>;
   /**
@@ -232,6 +234,11 @@ export function createSession(
     },
     async clear(options) {
       const command = controlCommand({ kind: "clear" as const }, options);
+      const result = await runtime.dispatchSession({ command, sessionId: id });
+      return commandDelivery(runtime, result, command.deliveryId);
+    },
+    async resume(options) {
+      const command = controlCommand({ kind: "resume" as const }, options);
       const result = await runtime.dispatchSession({ command, sessionId: id });
       return commandDelivery(runtime, result, command.deliveryId);
     },

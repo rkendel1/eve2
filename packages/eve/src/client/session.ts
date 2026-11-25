@@ -199,6 +199,11 @@ export class ClientSession {
     return this.#control("compact", options);
   }
 
+  /** Lets a turn the agent's `control` holds ask it again; changes nothing when no turn is held. */
+  async resume(options?: { readonly signal?: AbortSignal }): Promise<Delivery> {
+    return this.#control("resume", options);
+  }
+
   /** Terminally retires this exact session ID. The handle remains pinned to it. */
   async end(options?: {
     readonly reason?: string;
@@ -208,7 +213,7 @@ export class ClientSession {
   }
 
   async #control(
-    kind: "cancel" | "clear" | "compact" | "end",
+    kind: "cancel" | "clear" | "compact" | "end" | "resume",
     options?: {
       readonly signal?: AbortSignal;
       readonly turnId?: string | null;

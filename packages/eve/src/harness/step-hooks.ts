@@ -17,6 +17,7 @@ import { REPLY_TOOL_NAME } from "#protocol/reply-tool.js";
 import { isInvalidToolCall } from "#harness/tool-call-input-errors.js";
 import type { Usage } from "#protocol/session-events/envelope.js";
 import type { ToolSignIn } from "#harness/call-executor.js";
+import type { HeldCalls } from "#harness/session-machine/view.js";
 import type { TurnPosition } from "#harness/session-machine/view.js";
 import { normalizeAssistantStepFinishReason } from "#harness/finish-reason.js";
 import type { RuntimeModelReference } from "#runtime/agent/bootstrap.js";
@@ -48,6 +49,7 @@ export type HarnessStepResult = Pick<
   readonly approvalRequests?: readonly ApprovalAsk[];
   readonly policyApprovals?: Readonly<Record<string, import("#harness/clearance.js").Clearance>>;
   readonly signIns?: readonly ToolSignIn[];
+  readonly controlHold?: { readonly reason?: string; readonly calls: HeldCalls };
 };
 
 interface StepHooksInput {

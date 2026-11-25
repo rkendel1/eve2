@@ -21,7 +21,11 @@ import type {
   ResolvedSkillDefinition,
   ResolvedInstructionsDefinition,
 } from "#runtime/types.js";
-import type { AgentToolExposure, SessionUsageLimit } from "#shared/agent-definition.js";
+import type {
+  AgentControl,
+  AgentToolExposure,
+  SessionUsageLimit,
+} from "#shared/agent-definition.js";
 import type { ApprovalPolicy } from "#approval/definition.js";
 
 interface ResolveAgentInput {
@@ -111,6 +115,7 @@ export async function resolveAgent(input: ResolveAgentInput): Promise<ResolvedAg
 
 interface AgentConfigFunctions {
   readonly approval?: ApprovalPolicy;
+  readonly control?: AgentControl;
   readonly sessionUsage?: SessionUsageLimit | false;
 }
 
@@ -121,13 +126,14 @@ async function loadAgentConfigFunctions(
 ): Promise<AgentConfigFunctions> {
   const sessionUsage = manifest.config.limits?.sessionUsage;
   const approval = manifest.config.approval === true;
+  const control = manifest.config.control === true;
   const source = manifest.config.source;
-  if (approval && source === undefined) {
+  if ((approval || control) && source === undefined) {
     throw new Error(
-      'The compiled agent marks an "approval" policy but has no agent config module.',
+      `The compiled agent marks ${approval ? 'an "approval" policy' : 'a "control"'} but has no agent config module.`,
     );
   }
-  if ((sessionUsage !== true && !approval) || source === undefined) {
+  if ((sessionUsage !== true && !approval && !control) || source === undefined) {
     return sessionUsage === false ? { sessionUsage: false } : {};
   }
   const definition = await loadResolvedModuleExport({
@@ -145,8 +151,14 @@ async function loadAgentConfigFunctions(
       `The compiled agent marks an "approval" policy, but "${source.logicalPath}" no longer exports one. Rebuild the agent.`,
     );
   }
+  if (control && authored.control === undefined) {
+    throw new Error(
+      `The compiled agent marks a "control", but "${source.logicalPath}" no longer exports one. Rebuild the agent.`,
+    );
+  }
   return {
     ...(approval && { approval: authored.approval }),
+    ...(control && { control: authored.control }),
     sessionUsage: sessionUsage === false ? false : authored.limits?.sessionUsage,
   };
 }
@@ -191,10 +203,11 @@ function requireCompiledSourceOwner(
 
 function createResolvedAgentConfig(
   manifest: CompiledAgentNodeManifest,
-  { approval, sessionUsage }: AgentConfigFunctions,
+  { approval, control, sessionUsage }: AgentConfigFunctions,
 ): NonNullable<ResolvedAgent["config"]> {
   const config: {
     approval?: ApprovalPolicy;
+    control?: AgentControl;
     compaction?: NonNullable<ResolvedAgent["config"]>["compaction"];
     defaultTools?: boolean;
     description?: string;
@@ -213,6 +226,9 @@ function createResolvedAgentConfig(
   }
   if (approval !== undefined) {
     config.approval = approval;
+  }
+  if (control !== undefined) {
+    config.control = control;
   }
   if (manifest.config.description !== undefined) {
     config.description = manifest.config.description;

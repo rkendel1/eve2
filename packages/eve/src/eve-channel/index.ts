@@ -32,6 +32,7 @@ import {
   EVE_SESSION_CANCEL_ROUTE_PATTERN,
   EVE_SESSION_CLEAR_ROUTE_PATTERN,
   EVE_SESSION_COMPACT_ROUTE_PATTERN,
+  EVE_SESSION_RESUME_ROUTE_PATTERN,
   EVE_SESSION_ROUTE_PATTERN,
   EVE_SESSION_END_ROUTE_PATTERN,
   EVE_SESSION_RESET_ROUTE_PATTERN,
@@ -606,6 +607,30 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
           const errorId = logError(log, "session-clear request failed", error, { sessionId });
           return Response.json(
             { error: "Failed to clear the session context.", errorId, ok: false },
+            { status: 500 },
+          );
+        }
+        return deliveryResponse(result);
+      }),
+
+      POST(EVE_SESSION_RESUME_ROUTE_PATTERN, async (req, { attachSession, params }) => {
+        const authResult = await routeAuth(req, input.auth);
+        if (authResult instanceof Response) return authResult;
+        const sessionId = requireSessionId(params);
+        if (sessionId instanceof Response) return sessionId;
+        const body = await parseSessionControlBody(req);
+        if (body instanceof Response) return body;
+        let result: Awaited<ReturnType<Session["resume"]>>;
+        try {
+          result = await attachSession(sessionId).resume({
+            auth: sessionAuthFromResult(authResult),
+          });
+        } catch (error) {
+          const commandError = sessionCommandErrorResponse(error);
+          if (commandError !== undefined) return commandError;
+          const errorId = logError(log, "session-resume request failed", error, { sessionId });
+          return Response.json(
+            { error: "Failed to resume the session.", errorId, ok: false },
             { status: 500 },
           );
         }

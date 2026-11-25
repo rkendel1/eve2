@@ -15,7 +15,8 @@ import type { ModelResponse } from "#harness/model-call/run.js";
 import type { EndsTurnTools } from "#harness/model-call/tools.js";
 import type { JsonValue } from "#shared/json.js";
 import { failTurnForEffect, type Step, stepReference } from "#harness/step/context.js";
-import { complete, fail, suspendStep } from "#harness/session-machine/transitions.js";
+import { complete, fail, holdCalls, suspendStep } from "#harness/session-machine/transitions.js";
+import { holdTurn } from "#harness/step/control-hold.js";
 import { type ToolResultPart, withResult } from "#harness/session-machine/suspended-steps.js";
 import { clearTurnClientContextState } from "#harness/turn-client-context.js";
 import { collectWorkflowCalls } from "#harness/coordination.js";
@@ -59,6 +60,21 @@ function getInvalidToolCallInputErrors(input: {
 
 export async function handleStepResult(step: Step, input: ModelResponse): Promise<StepResult> {
   const { promptMessages, result } = input;
+  step.session = {
+    ...step.session,
+    compaction: withPromptMeasurement(step.session.compaction, {
+      promptMessages,
+      inputTokens: result.usage?.inputTokens,
+      modelId: stepReference(step).id,
+      promptMessageCount: input.durableModelPromptMessageCount,
+      requestEnvelopeTokens: input.requestEnvelopeTokens,
+    }),
+  };
+  return await settleStepResult(step, input);
+}
+
+export async function settleStepResult(step: Step, input: ModelResponse): Promise<StepResult> {
+  const { promptMessages, result } = input;
 
   const stepOutput = resolveAssistantStepText(result.response.messages, result.text);
   const invalidInputToolErrors = getInvalidToolCallInputErrors({
@@ -91,16 +107,12 @@ export async function handleStepResult(step: Step, input: ModelResponse): Promis
   });
   const responseMessages = await stageToolResultMedia(normalizedProviderHistory.messages);
 
-  step.session = {
-    ...step.session,
-    compaction: withPromptMeasurement(step.session.compaction, {
-      promptMessages,
-      inputTokens: result.usage?.inputTokens,
-      modelId: stepReference(step).id,
-      promptMessageCount: input.durableModelPromptMessageCount,
-      requestEnvelopeTokens: input.requestEnvelopeTokens,
-    }),
-  };
+  if (result.controlHold !== undefined) {
+    const { calls, reason } = result.controlHold;
+    step.session = changeHistory(step.session, { extend: promptMessages });
+    await step.apply(holdCalls(step.view(), { calls, event: step.position(), responseMessages }));
+    return await holdTurn(step, "tools", reason);
+  }
 
   const approvalRequests = result.approvalRequests ?? [];
   const blockedCallIds = new Set([

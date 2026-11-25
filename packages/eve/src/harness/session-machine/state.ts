@@ -35,9 +35,27 @@ export interface ApprovedCall {
   readonly responder?: SessionAuthContext;
 }
 
+export interface HeldToolCall {
+  readonly type: "tool-call";
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly input: unknown;
+  readonly providerExecuted?: boolean;
+  readonly invalid?: boolean;
+  readonly dynamic?: boolean;
+}
+
+export interface HeldCalls {
+  readonly toolCalls: readonly HeldToolCall[];
+  readonly excludedCallIds: readonly string[];
+  readonly finishReason: "stop" | "tool-calls";
+  readonly text: string;
+}
+
 export interface SuspendedStep {
   readonly event: StepCoordinates;
   readonly messages: readonly ModelMessage[];
+  readonly held?: HeldCalls;
   readonly requests: readonly ApprovalAsk[];
   readonly approved?: readonly ApprovedCall[];
   readonly tasks: readonly RuntimeWorkflowTaskRequest[];

@@ -152,6 +152,8 @@
   "TaskStartedData",
   "TraceContext",
   "TurnFact",
+  "TurnHeld",
+  "TurnHeldData",
   "TurnObservation",
   "TurnOutcome",
   "TurnPaused",

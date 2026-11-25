@@ -44,6 +44,9 @@ export function mockChannelContext<TState = undefined>(
         async clear() {
           return { status: "no_active_session" } as never;
         },
+        async resume() {
+          return { status: "no_active_session" } as never;
+        },
         async end() {
           return { status: "no_active_session" } as never;
         },

@@ -28,6 +28,7 @@ import type { WorkflowToolRunMessage } from "#execution/tools/workflow/messages.
 type SessionAdmission =
   | { readonly admission: DeliveryAdmission; readonly kind: "delivery" }
   | { readonly kind: "cancel"; readonly origin?: ControlOrigin }
+  | { readonly kind: "resume"; readonly origin: ControlOrigin }
   | { readonly kind: "consumed" }
   | { readonly kind: "unsupported"; readonly settlement: ControlSettlement }
   | { readonly kind: "runtime-action-result"; readonly payload: RuntimeActionResultHookPayload }
@@ -92,6 +93,8 @@ export async function admitSessionInboxPayload(
     case "reset":
       input.queue.enqueueControl("reset", controlOrigin(command));
       return { kind: "cancel" };
+    case "resume":
+      return { kind: "resume", origin: controlOrigin(command) };
     case "cancel": {
       const origin = controlOrigin(command);
       return origin === undefined ? { kind: "cancel" } : { kind: "cancel", origin };

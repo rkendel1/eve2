@@ -17,6 +17,7 @@ import { defineHook, type HookDefinition } from "#public/definitions/hook.js";
 import { always } from "#tools/approval/policies.js";
 import { defineTool } from "#tools/definition.js";
 import { defineWorkflowTool } from "#tools/workflow-definition.js";
+import type { AgentControl } from "#shared/agent-definition.js";
 
 type StreamResult = Awaited<ReturnType<MockLanguageModelV4["doStream"]>>;
 
@@ -38,6 +39,7 @@ export interface ProbeOptions {
   readonly tools?: readonly ProbeTool[];
   readonly events?: HookDefinition["events"];
   readonly modules?: NonNullable<Parameters<typeof createTestRuntime>[0]>["modules"];
+  readonly control?: AgentControl;
 }
 
 export interface Probe {
@@ -64,6 +66,7 @@ export async function probe(options: ProbeOptions): Promise<Probe> {
     agent: {
       definition: defineAgent({
         model: defineDynamic(() => ({ model, modelContextWindowTokens: 200_000 })),
+        ...(options.control !== undefined && { control: options.control }),
       }),
       name: options.name,
     },

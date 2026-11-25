@@ -19,6 +19,8 @@ export const EVE_SESSION_COMPACT_ROUTE_PATTERN = `${EVE_SESSION_ROUTE_PATH}/:ses
 
 export const EVE_SESSION_CLEAR_ROUTE_PATTERN = `${EVE_SESSION_ROUTE_PATH}/:sessionId/clear`;
 
+export const EVE_SESSION_RESUME_ROUTE_PATTERN = `${EVE_SESSION_ROUTE_PATH}/:sessionId/resume`;
+
 export const EVE_SESSION_END_ROUTE_PATTERN = `${EVE_SESSION_ROUTE_PATH}/:sessionId/end`;
 
 export const EVE_SESSION_RESET_ROUTE_PATTERN = `${EVE_SESSION_ROUTE_PATH}/:sessionId/reset`;
@@ -75,6 +77,10 @@ export function createEveSessionCompactRoutePath(sessionId: string): string {
 
 export function createEveSessionClearRoutePath(sessionId: string): string {
   return `${EVE_SESSION_ROUTE_PATH}/${encodeURIComponent(sessionId)}/clear`;
+}
+
+export function createEveSessionResumeRoutePath(sessionId: string): string {
+  return `${EVE_SESSION_ROUTE_PATH}/${encodeURIComponent(sessionId)}/resume`;
 }
 
 export function createEveSessionEndRoutePath(sessionId: string): string {

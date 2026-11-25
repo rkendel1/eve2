@@ -79,6 +79,7 @@ import {
   NO_INLINE_CALLS,
 } from "#harness/call-executor.js";
 import { extractGatewayCostUsd } from "./usage.js";
+import { holdStepCalls } from "#harness/step/control-hold.js";
 import type { Usage } from "#protocol/session-events/envelope.js";
 
 const environment = process.env.NODE_ENV ?? "unknown";
@@ -429,20 +430,29 @@ export class ModelCaller {
       allowEmptyStop: !step.hasDelegatedCaller,
       hasInlineResults: trailingInlineToolResultParts.length > 0,
     });
-    const calls = await this.runInlineCalls(stepResult, messages, {
+    const controlHold = await holdStepCalls(step, {
       excludedCallIds: invalidInputToolCallIds,
-      telemetry,
+      stepResult,
+      tools: catalog,
     });
+    const calls =
+      controlHold === undefined
+        ? await this.runInlineCalls(stepResult, messages, {
+            excludedCallIds: invalidInputToolCallIds,
+            telemetry,
+          })
+        : NO_INLINE_CALLS;
     const notRun = answerSkippedToolCalls(stepResult, catalog, invalidInputToolCallIds);
     this.unkeptUsage = undefined;
     await emitStepActions(step.publish, step.position(), stepResult, notRun);
-    return withCallResults({
+    const result = withCallResults({
       answers: [...trailingInlineToolResultParts, ...notRun],
       calls,
       invalidInputToolCallIds,
       responseMessages,
       stepResult,
     });
+    return controlHold === undefined ? result : { ...result, controlHold };
   }
 
   private async runInlineCalls(

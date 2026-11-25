@@ -177,11 +177,13 @@ export type {
 export type {
   TurnStartedData,
   TurnPausedData,
+  TurnHeldData,
   TurnOutcome,
   TurnSettledData,
   TurnStarted,
   TurnSettled,
   TurnPaused,
+  TurnHeld,
   TurnFact,
 } from "#protocol/session-events/families/turn.js";
 

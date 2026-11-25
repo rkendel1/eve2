@@ -12,7 +12,7 @@ type DecodedSessionInbox =
   | SessionPrewarmPayload
   | DeliverHookPayload
   | SessionTimeoutHookPayload
-  | Extract<SessionCommand, { readonly kind: "cancel" | "clear" | "compact" | "reset" }>;
+  | Extract<SessionCommand, { readonly kind: "cancel" | "clear" | "compact" | "reset" | "resume" }>;
 
 export class SessionInboxPayloadError extends Error {
   constructor(message: string) {
@@ -73,6 +73,7 @@ export function decodeSessionInboxPayload(value: unknown): DecodedSessionInbox {
     case "clear":
     case "compact":
     case "reset":
+    case "resume":
       if (typeof payload.deliveryId !== "string" || payload.deliveryId.length === 0) {
         throw new SessionInboxPayloadError("Session controls require a nonempty deliveryId.");
       }

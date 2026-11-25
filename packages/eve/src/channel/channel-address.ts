@@ -86,6 +86,7 @@ interface ChannelAddress<TState = undefined> {
   cancel(options?: { readonly turnId?: string | null } & SessionControlOptions): Promise<Delivery>;
   compact(options?: SessionControlOptions): Promise<Delivery>;
   clear(options?: SessionControlOptions): Promise<Delivery>;
+  resume(options?: SessionControlOptions): Promise<Delivery>;
   end(options?: { readonly reason?: string } & SessionControlOptions): Promise<Delivery>;
   resolveSession(): Promise<Session | undefined>;
 }
@@ -255,6 +256,14 @@ export function createChannelAddress<TState = undefined>(input: {
     },
     async clear(options) {
       const command = controlCommand({ kind: "clear" as const }, options);
+      const result = await input.runtime.dispatchContinuation({
+        command,
+        continuationToken: namespacedToken,
+      });
+      return commandDelivery(input.runtime, result, command.deliveryId);
+    },
+    async resume(options) {
+      const command = controlCommand({ kind: "resume" as const }, options);
       const result = await input.runtime.dispatchContinuation({
         command,
         continuationToken: namespacedToken,

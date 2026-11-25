@@ -65,6 +65,9 @@ export async function normalizeDynamicSubagentAgentConfig(input: {
       `${message} The "approval" field cannot be selected at runtime; the root agent's \`approval\` applies.`,
     );
   }
+  if (definition.control !== undefined) {
+    throw new Error(`${message} The "control" field cannot be selected at runtime.`);
+  }
 
   const config: {
     compaction?: DynamicSubagentAgentConfig["compaction"];

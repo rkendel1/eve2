@@ -43,6 +43,10 @@ export type ClearSessionResult =
   | { readonly status: "accepted"; readonly sessionId: string }
   | { readonly status: "no_active_session" };
 
+export type ResumeSessionResult =
+  | { readonly status: "accepted"; readonly sessionId: string }
+  | { readonly status: "no_active_session" };
+
 /**
  * Identifies one turn within a session.
  *
@@ -155,6 +159,7 @@ export type SessionCommand =
   | { readonly kind: "prewarm"; readonly targetDeploymentId?: string }
   | ({ readonly kind: "compact" } & SessionControlIdentity)
   | ({ readonly kind: "clear" } & SessionControlIdentity)
+  | ({ readonly kind: "resume" } & SessionControlIdentity)
   | ({ readonly kind: "reset"; readonly reason?: string } & SessionControlIdentity);
 
 export interface SessionControlIdentity {
@@ -168,7 +173,7 @@ export interface SessionControlOptions {
 }
 
 export function controlCommand<
-  TCommand extends { readonly kind: "cancel" | "clear" | "compact" | "reset" },
+  TCommand extends { readonly kind: "cancel" | "clear" | "compact" | "reset" | "resume" },
 >(
   command: TCommand,
   options?: SessionControlOptions,
@@ -203,7 +208,9 @@ export type SessionCommandResult<TCommand extends SessionCommand = SessionComman
           ? CompactSessionResult
           : TCommand extends { readonly kind: "clear" }
             ? ClearSessionResult
-            : EndSessionResult;
+            : TCommand extends { readonly kind: "resume" }
+              ? ResumeSessionResult
+              : EndSessionResult;
 
 export interface DispatchContinuationInput<TCommand extends SessionCommand = SessionCommand> {
   readonly command: TCommand;

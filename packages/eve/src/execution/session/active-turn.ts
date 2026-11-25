@@ -48,6 +48,8 @@ export class ActiveTurn {
   private readonly runtimeResults: RuntimeEvent[] = [];
   private readonly controller: AbortController;
   #cancelledBy: ControlOrigin | undefined;
+  #heldByControl = false;
+  readonly #resumes: ControlOrigin[] = [];
   readonly #control: boolean;
   private readonly expectedTurnId: string;
   private readonly input: SessionExecutionInput;
@@ -265,6 +267,13 @@ export class ActiveTurn {
           );
         }
         return false;
+      case "resume":
+        if (this.#heldByControl) {
+          this.#resumes.push(admitted.origin);
+          return true;
+        }
+        await this.settleResumes([admitted.origin], "ignored");
+        return false;
       case "unsupported": {
         const { settlement } = admitted;
         await this.input.cursor.advance((state) =>
@@ -274,6 +283,23 @@ export class ActiveTurn {
       }
       case "consumed":
         return value.kind === "authorization-callback";
+    }
+  }
+
+  async settleResumes(
+    origins: readonly ControlOrigin[],
+    outcome: "applied" | "ignored",
+  ): Promise<void> {
+    for (const origin of origins) {
+      const { deliveryId } = origin;
+      const projection = storedProjection(readDurableSession(this.input.cursor.sessionState).state);
+      if (projection.view.deliveries[deliveryId] !== undefined) continue;
+      await this.input.cursor.advance((state) =>
+        settleControlDeliveryStep({
+          ...state,
+          settlement: { control: controlDeliveryOf(origin), outcome, source: "resume" },
+        }),
+      );
     }
   }
 
@@ -304,6 +330,15 @@ export class ActiveTurn {
       if (isSteeringMessage(routed.remainder, this.identity)) steered = true;
     }
     return steered;
+  }
+
+  holdForControl(): void {
+    this.#heldByControl = true;
+  }
+
+  takeResumes(): readonly ControlOrigin[] {
+    this.#heldByControl = false;
+    return this.#resumes.splice(0);
   }
 
   get cancelledBy(): ControlOrigin | undefined {

@@ -24,6 +24,8 @@ import {
 export type {
   ApprovalAsk,
   ApprovedCall,
+  HeldCalls,
+  HeldToolCall,
   StepCoordinates,
   SuspendedStep,
   TurnState,
@@ -120,6 +122,7 @@ export interface RuntimeWait {
 
 export function runtimeWait(state: SessionStateMap | undefined): RuntimeWait | undefined {
   const waiting = suspendedSteps(state).flatMap((step) => {
+    if (step.held !== undefined) return [];
     const tasks = runningTasks(step);
     const taskToolCalls = pendingTaskToolCalls(step.messages);
     return tasks.length === 0 && taskToolCalls.length === 0 ? [] : [{ step, tasks, taskToolCalls }];

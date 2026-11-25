@@ -84,6 +84,14 @@ export async function nextTurnDelivery(input: {
       await input.ignore(admitted.settlement);
       continue;
     }
+    if (admitted.kind === "resume") {
+      await input.ignore({
+        control: controlDeliveryOf(admitted.origin),
+        outcome: "ignored",
+        source: "resume",
+      });
+      continue;
+    }
     if (admitted.kind !== "cancel") continue;
     const projection = storedProjection(readDurableSession(cursor.sessionState).state);
     const view = projection.view;
