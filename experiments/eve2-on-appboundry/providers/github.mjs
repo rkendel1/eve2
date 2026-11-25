@@ -144,7 +144,7 @@ mkdirSync(WORK, { recursive: true });
 
 function exec(argv, cwd, timeoutMs, extraEnv = {}) {
   return new Promise((resolve) => {
-    const env = { ...process.env, CI: "1", ...extraEnv };
+    const env = { ...process.env, CI: "1", NO_COLOR: "1", FORCE_COLOR: "0", ...extraEnv };
     for (const k of NOISE_ENV) delete env[k];
     const child = spawn(argv[0], argv.slice(1), { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     let out = "";

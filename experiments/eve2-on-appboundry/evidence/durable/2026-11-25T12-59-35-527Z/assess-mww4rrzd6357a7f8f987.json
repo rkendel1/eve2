@@ -1,0 +1,3029 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:durable-1795611576925",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "durable-1795611576925"
+    },
+    "operation": "assess",
+    "status": "completed",
+    "reference": "EVE-975F662EAE44",
+    "attempts": 0,
+    "steps": 41,
+    "work": {
+      "decisions": 31,
+      "gateAttempts": 0,
+      "restores": 0,
+      "objective": "Review rkendel1/appboundry for an unresolved reliability defect in packages/appboundry-host (the artifact host: guest execution and limits, collections and transactions, identity and sessions, backups, the capability ledger). The after-commit outbox (performOutbox, recoverOutbox, retryOutbox) is already tracked in issue #99; look elsewhere. Find one defect you can prove with a failing test.",
+      "sha": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+      "base": "main",
+      "checks": [
+        "build",
+        "test"
+      ],
+      "checkpoint": {
+        "files": {
+          "packages/appboundry-host/test/admin-many-sessions.test.ts": "231db10f12f8421ef4d8c5c4ace2c2a703e8130a6c3335bc5b6718962a6e3796"
+        },
+        "tree": "7f2bd54154004633369ef2449be2a8ac2168cd0f",
+        "seq": 1,
+        "at": "2026-11-25T13:03:36.575Z"
+      },
+      "findings": [
+        {
+          "title": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records",
+          "severity": "high",
+          "summary": "The admin module reads the whole sessions collection with an unpaged FeltDB find() (`#sessions()` in admin.ts). FeltDB refuses an unpaged find() that matches more than 1,000 records (QUERY_LIMIT_EXCEEDED). The rest of the host already routes whole-collection reads through paged-read.ts because of this limit, but admin.ts does not. Once more than 1,000 sessions exist, every admin path that calls `#sessions()` throws instead of answering: listSessions, revokeSessions, disableUser's session revocation, and bootstrap --recover's operator-session revocation. Sessions are never pruned elsewhere, because only listSessions deletes expired ones and it fails first. So the condition is permanent. An operator can then no longer revoke a user's or a leaked token's access, and cannot recover operator access. The test admin-many-sessions.test.ts issues 1,005 sessions for one user and expects revokeSessions({ user }) to revoke 1,005. It received the error string 'threw QUERY_LIMIT_EXCEEDED ... find() on \"_appboundry_sessions\" matches more than 1000 records', so the test failed on its assertion. The same unpaged pattern affects operators, users and the audit log (admin.ts lines 95, 177, 268, 275).",
+          "evidence": [
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/admin.ts",
+              "startLine": 99,
+              "endLine": 99,
+              "quote": "    return (await this.#db.collection<SessionRecord>(SESSIONS_COLLECTION).find({} as never)) as SessionRecord[];"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/admin.ts",
+              "startLine": 252,
+              "endLine": 254,
+              "quote": "  async revokeSessions(actor: Actor, input: { sessionId?: unknown; user?: unknown }): Promise<{ revoked: number }> {\n    if ((input.sessionId === undefined) === (input.user === undefined)) throw new HostError(\"INVALID_ARGUMENT\", \"Revoke one session (<session-id>) or every session of a user (--user <id>).\");\n    const all = await this.#sessions();"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/admin.ts",
+              "startLine": 240,
+              "endLine": 242,
+              "quote": "    const all = await this.#sessions();\n    const expired = all.filter(s => Date.parse(s.expiresAt) <= now);\n    if (expired.length) await this.#write(this.#deleteSessions(expired)).catch(() => undefined);"
+            },
+            {
+              "kind": "check",
+              "check": "test",
+              "target": "packages/appboundry-host/test/admin-many-sessions.test.ts",
+              "expect": "fails"
+            }
+          ],
+          "fix": "Read the admin collections in pages with paged-read.ts's readAll, as backup.ts and collections.ts already do. For example, `#sessions()` becomes `readAll(this.#db, { collection: SESSIONS_COLLECTION })`; apply the same to `#operators()`, the users reads and audit(). Revocations that delete more sessions than one transaction allows should be split into batches."
+        }
+      ],
+      "prove": {
+        "finding": 1,
+        "evidence": 0,
+        "results": [
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/admin.ts:99-99 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/admin.ts:252-254 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/admin.ts:240-242 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": false,
+            "why": "packages/appboundry-host/test/admin-many-sessions.test.ts fails without running its assertions (load or setup error)"
+          }
+        ]
+      },
+      "pending": null
+    },
+    "createdAt": "2026-11-25T12:59:36.932Z",
+    "updatedAt": "2026-11-25T13:04:16.823Z",
+    "report": {
+      "filed": [],
+      "skipped": [],
+      "notFiled": [],
+      "hypotheses": [
+        {
+          "title": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records",
+          "why": "packages/appboundry-host/test/admin-many-sessions.test.ts fails without running its assertions (load or setup error)"
+        }
+      ],
+      "decisions": 31
+    },
+    "id": "mww4rrzd6357a7f8f987",
+    "__version": 42
+  },
+  "executions": [
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 0,
+      "at": "2026-11-25T12:59:40.049Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:open",
+      "outcome": "succeeded",
+      "outboundId": "out.622f86796c42a1f9ba45ff9f7981d83e28f38fa115fc052849325b8595d63168",
+      "id": "mww4rudxd5a48787c9d3",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 0,
+      "at": "2026-11-25T12:59:40.059Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at cd32300380a6; preparing it.",
+      "id": "mww4rue4e6808addf745",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 1,
+      "at": "2026-11-25T12:59:55.671Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.status succeeded",
+      "capability": "code.workspace.status",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:status:1",
+      "outcome": "succeeded",
+      "outboundId": "out.a59a2c39fb1a3cc7d652cc97e4c3e13469891b4c7eb104f71c2be6c2c5043926",
+      "id": "mww4s6ft063e863695ec",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 2,
+      "at": "2026-11-25T13:00:06.709Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.status succeeded",
+      "capability": "code.workspace.status",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:status:2",
+      "outcome": "succeeded",
+      "outboundId": "out.59cdfe4d5376815367bfedde5f99099a1ee595a79726de36b603843acfe41bca",
+      "id": "mww4seyfeb59ab6a651e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 2,
+      "at": "2026-11-25T13:00:06.711Z",
+      "from": "preparing",
+      "to": "investigating",
+      "kind": "observe",
+      "summary": "Working copy prepared.",
+      "id": "mww4seygac70691828b1",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 3,
+      "at": "2026-11-25T13:00:10.450Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:0",
+      "outcome": "succeeded",
+      "outboundId": "out.f0ac49448bdb26f6bbe22f88dc09bc9963a6a8cc7e94a5a30e40f45375a9d540",
+      "id": "mww4shucbe0918e98b8f",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 3,
+      "at": "2026-11-25T13:00:10.470Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:1",
+      "outcome": "succeeded",
+      "outboundId": "out.ad43ea06a4a6ed3167648eb1029519b66b399bdf2b4b06e3a03802540ff06fb8",
+      "id": "mww4shuw1726db64d02f",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 4,
+      "at": "2026-11-25T13:00:13.174Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:1",
+      "outcome": "succeeded",
+      "outboundId": "out.f9006d2a7a2a4d6b87859425afe598be3bd8395d39761bd3d6292e3d57ac3b03",
+      "id": "mww4sjy014757dc1eaf5",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 4,
+      "at": "2026-11-25T13:00:13.196Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:2",
+      "outcome": "succeeded",
+      "outboundId": "out.9054bede401e7d735c5393b47cdce764db73b5a75ebc3e62b04b80886537eeef",
+      "id": "mww4sjyma0d343d8cbf0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 5,
+      "at": "2026-11-25T13:00:17.557Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:2",
+      "outcome": "succeeded",
+      "outboundId": "out.5fe47a0ec70415ce6fc68d647b26fdec37aac4d7f06b16fc327223c009b464bd",
+      "id": "mww4snbrd1ea56cd92bc",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 5,
+      "at": "2026-11-25T13:00:17.576Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:3",
+      "outcome": "succeeded",
+      "outboundId": "out.a21ebe3b4fe288d7f6a331d6a5c25748a8b633e4f56e8a949b36178e7d7f1fe5",
+      "id": "mww4sncaee2ff54ad0a9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 6,
+      "at": "2026-11-25T13:00:21.072Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:3",
+      "outcome": "succeeded",
+      "outboundId": "out.f98bafafa5b76f408a6b3c835a21285ded1a43506153f2bbb9b511324e0c0976",
+      "id": "mww4sq1g406d114d9816",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 6,
+      "at": "2026-11-25T13:00:21.094Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:4",
+      "outcome": "succeeded",
+      "outboundId": "out.d5419dd6d2e1a18589e932e48779f675e2e29b4ebb52ea76cb3cc43cd836604c",
+      "id": "mww4sq20fd0a4f8d7be8",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 7,
+      "at": "2026-11-25T13:00:25.108Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:4",
+      "outcome": "succeeded",
+      "outboundId": "out.b62a07127713e683b80fa4d8378e9ebc17199353c64844f36f714e308ad81c22",
+      "id": "mww4st5i8dd9c82aa35e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 7,
+      "at": "2026-11-25T13:00:25.137Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:5",
+      "outcome": "succeeded",
+      "outboundId": "out.49845f703bb914d28a3f1c77b82dde9413c5e4d44d05da94f34b2092e95414e8",
+      "id": "mww4st6bcccc99cb6e0d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 8,
+      "at": "2026-11-25T13:00:29.615Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:5",
+      "outcome": "succeeded",
+      "outboundId": "out.47ba042023df881fc59a03177dfc274712cc557c23dc9ed631ec99bff46f3ca5",
+      "id": "mww4swmpee4bbf3bfb68",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 8,
+      "at": "2026-11-25T13:00:29.643Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:6",
+      "outcome": "succeeded",
+      "outboundId": "out.c15938f31f42a9b949f83a63c7575dc7c8ce3d438b67235d90412be4f1417aea",
+      "id": "mww4swni662d80211d01",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 9,
+      "at": "2026-11-25T13:00:33.394Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:6",
+      "outcome": "succeeded",
+      "outboundId": "out.5a1c620ff13beeca7b80fb92079ee6a5b2cf1ad6a9e44a562d0a7d1f5efdbad0",
+      "id": "mww4szjtc9604f06a9b0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 9,
+      "at": "2026-11-25T13:00:33.418Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:7",
+      "outcome": "succeeded",
+      "outboundId": "out.ce09115876c422832924435dc4b0f6c5697480ac96fe7c62bf3a14885e3e32fe",
+      "id": "mww4szkd9558a601f190",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 10,
+      "at": "2026-11-25T13:00:38.266Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:7",
+      "outcome": "succeeded",
+      "outboundId": "out.a3b991dfb83d7be435f80b503591c09dc1d5e3d8318551efbb2cea6816543ed2",
+      "id": "mww4t3b0bb2e23cb3497",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 10,
+      "at": "2026-11-25T13:00:38.283Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:8",
+      "outcome": "succeeded",
+      "outboundId": "out.5e5c6bc924564190959f92aaef0457f04e34c665c872076bc27e409afea2ce73",
+      "id": "mww4t3bh2c42b912205e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 11,
+      "at": "2026-11-25T13:00:42.587Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:8",
+      "outcome": "succeeded",
+      "outboundId": "out.27efe3676e7eb03335f3cd86ba84884e28e3450229a2532471e96f2ad3a556a6",
+      "id": "mww4t6n10bdb6fc35ef8",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 11,
+      "at": "2026-11-25T13:00:42.603Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:9",
+      "outcome": "succeeded",
+      "outboundId": "out.1ad3e9b825e1ffb8de05d123029e40b154ea84e224939c34e2185ae001de076e",
+      "id": "mww4t6ng36fc6f34bae0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 12,
+      "at": "2026-11-25T13:00:47.343Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:9",
+      "outcome": "succeeded",
+      "outboundId": "out.67b4eeba779e70cd87e76bb846f00e6909211b2448da594abac5ff4577ca78fa",
+      "id": "mww4tab58c6a3e5f93f9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 12,
+      "at": "2026-11-25T13:00:47.359Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:10",
+      "outcome": "succeeded",
+      "outboundId": "out.bab28c535b3629fa1680dab11c05d8c0c1a575beae89eb71c83a4c7aefec04fa",
+      "id": "mww4tabl48f10a9a6985",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 13,
+      "at": "2026-11-25T13:00:51.479Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:10",
+      "outcome": "succeeded",
+      "outboundId": "out.ec8fa004ca6c4e342b8b79baed27685f2c0aea196b0d6d0fce3c7c84f262df0c",
+      "id": "mww4tdi1ce992184fded",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 13,
+      "at": "2026-11-25T13:00:51.493Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:11",
+      "outcome": "succeeded",
+      "outboundId": "out.d6025a96ddf8ceb808a0022786a0b41337a2a8ad4478413bcfb2182451dc5440",
+      "id": "mww4tdif90ed666be79e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 14,
+      "at": "2026-11-25T13:00:57.503Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:11",
+      "outcome": "succeeded",
+      "outboundId": "out.bfead59cb5a25cfb9800c2af13cb949452c11fffb17c3767b1accd98c017b607",
+      "id": "mww4ti5d8af3640ad403",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 14,
+      "at": "2026-11-25T13:00:57.519Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:12",
+      "outcome": "succeeded",
+      "outboundId": "out.303c20dd1e766ef3813f1963806907aa9e04e09842ab73fa07d104f0a1e3df59",
+      "id": "mww4ti5s84a5933236da",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 15,
+      "at": "2026-11-25T13:01:03.155Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:12",
+      "outcome": "succeeded",
+      "outboundId": "out.cab3ce5a94b7cd1c9c2b65587c240a02c3e022287fdcc257d68b2a1f0fe9cbf9",
+      "id": "mww4tmid14e40390f888",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 15,
+      "at": "2026-11-25T13:01:03.170Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:13",
+      "outcome": "succeeded",
+      "outboundId": "out.c3db2503b63816b62261ec848b04e63c4389a8148b8bf6e7d581229ca98c6545",
+      "id": "mww4tmir4c629ef98149",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 16,
+      "at": "2026-11-25T13:01:10.338Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:13",
+      "outcome": "succeeded",
+      "outboundId": "out.83c323b49643a24102ed8f4d021f11d8c4f329e3bd2b41890322d34b705792cf",
+      "id": "mww4ts1v1d08dad5495a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 16,
+      "at": "2026-11-25T13:01:10.360Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:14",
+      "outcome": "succeeded",
+      "outboundId": "out.81d7a10a1b38d81ca6d5b7ab09177a7f069cd53d88e89df6b7f195c40c5dca6c",
+      "id": "mww4ts2j3dd08fa7b45a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 17,
+      "at": "2026-11-25T13:01:16.387Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:14",
+      "outcome": "succeeded",
+      "outboundId": "out.7a4b405bac112fe21703e022d24e702682bcccac242a51b5ca3129040ba5b78b",
+      "id": "mww4twpx13069ced50cf",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 17,
+      "at": "2026-11-25T13:01:16.404Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:15",
+      "outcome": "succeeded",
+      "outboundId": "out.04b09ab4a7bcd08bdb60845e6e6689e0d98e5107ad2900e54944d19d741c8c64",
+      "id": "mww4twqe8987c2e32b0d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 18,
+      "at": "2026-11-25T13:01:21.724Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:15",
+      "outcome": "succeeded",
+      "outboundId": "out.6c32915d3c4cc18e901cf6398d0400e19946d6e8622f1ea6fa2a53ef6a17d3fb",
+      "id": "mww4u0u618a2a2a2e16e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 18,
+      "at": "2026-11-25T13:01:21.747Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:16",
+      "outcome": "succeeded",
+      "outboundId": "out.13a00e872c870d1d82247f2766e8f8b7c2c17c126ac98da9ff2e9243b6b1a44e",
+      "id": "mww4u0utcae99c24faf2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 19,
+      "at": "2026-11-25T13:01:29.091Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:16",
+      "outcome": "succeeded",
+      "outboundId": "out.3d8db01185a4a10cba628deae64d10dc4251a08729ae190981bacc2c0d3da3b1",
+      "id": "mww4u6itedd7bc34989e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 19,
+      "at": "2026-11-25T13:01:29.112Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:17",
+      "outcome": "succeeded",
+      "outboundId": "out.9e364b82c875f08a943efe074d7faeb862324ee0152207244d91646bcc278413",
+      "id": "mww4u6je7147b627e791",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 20,
+      "at": "2026-11-25T13:01:35.879Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:17",
+      "outcome": "succeeded",
+      "outboundId": "out.f56f46e9d70f236a2ddba9d3a4ca45de9d3ee8a03e746015bf748faeab34a72e",
+      "id": "mww4ubre1fea79104e9a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 20,
+      "at": "2026-11-25T13:01:35.896Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:18",
+      "outcome": "succeeded",
+      "outboundId": "out.f4a051159ccefb4c7ca09e26c5c13634a62b5518f4b38e4d41ffb765bfa9ad38",
+      "id": "mww4ubru6799864a29ac",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 21,
+      "at": "2026-11-25T13:01:44.061Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:18",
+      "outcome": "succeeded",
+      "outboundId": "out.828ea9f56b18820e025ea64dabb5999e725142f98af86da34db5b5a4b8bf8677",
+      "id": "mww4ui2o9fdded867efa",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 21,
+      "at": "2026-11-25T13:01:44.078Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:19",
+      "outcome": "succeeded",
+      "outboundId": "out.6c8e863d542d20681eff4d34e24271a6fdacf0af612836b151c1c83740ad07dc",
+      "id": "mww4ui35e23e73d2d57d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 22,
+      "at": "2026-11-25T13:01:55.127Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:19",
+      "outcome": "succeeded",
+      "outboundId": "out.3eb156317eb152d9c2c76bd560492999ed82a8e502a8a23133c13a794f3a1e76",
+      "id": "mww4uqm129d7fad660a4",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 22,
+      "at": "2026-11-25T13:01:55.143Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:20",
+      "outcome": "succeeded",
+      "outboundId": "out.3d9ea09ab7910e77492aa424cacd0df0f4ba41af4a2af4a475030590207763e2",
+      "id": "mww4uqmh0be877076eaf",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 23,
+      "at": "2026-11-25T13:02:08.327Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:20",
+      "outcome": "succeeded",
+      "outboundId": "out.6656ab8ad7259178c969651dc50560b1dc8a9cd7e2491a495b68020ddfe06e1e",
+      "id": "mww4v0so225b7632e8e9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 23,
+      "at": "2026-11-25T13:02:08.346Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:21",
+      "outcome": "succeeded",
+      "outboundId": "out.3a2017b3a913b78e3cce4226f37f23a145e2701fa77edb2d5eb091ca2b7231dc",
+      "id": "mww4v0t76859ed229fe7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 24,
+      "at": "2026-11-25T13:02:19.361Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:21",
+      "outcome": "succeeded",
+      "outboundId": "out.8fe893962ff37ff1b19fa613c73dca483b3f97ddeb4517e5d7bb1f1257e8de12",
+      "id": "mww4v9b66103d7b80216",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 24,
+      "at": "2026-11-25T13:02:19.376Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:22",
+      "outcome": "succeeded",
+      "outboundId": "out.6d36955c3aea213c23a34916d4857345e788a9c20dd0383c00cdba5fb32aa546",
+      "id": "mww4v9bm86a080cc8063",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 25,
+      "at": "2026-11-25T13:02:31.830Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:22",
+      "outcome": "succeeded",
+      "outboundId": "out.8a56f432dfd0e3fe9de14450f8cc008b48ae1f26c767a360eaacfe1ef51d354f",
+      "id": "mww4vixk99d5e76d0129",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 25,
+      "at": "2026-11-25T13:02:31.856Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:23",
+      "outcome": "succeeded",
+      "outboundId": "out.5d5e8b9fe9b3335344c38855a1e9768e76768b59f486f92969362807dbe19245",
+      "id": "mww4viya40fcd22760af",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 26,
+      "at": "2026-11-25T13:02:41.868Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:23",
+      "outcome": "succeeded",
+      "outboundId": "out.15e3adecad29aa4811355912381ebaa7e996d9f0dfaaabd8a36b0269dbc6502c",
+      "id": "mww4vqoe9a59fd7d443b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 26,
+      "at": "2026-11-25T13:02:41.889Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:24",
+      "outcome": "succeeded",
+      "outboundId": "out.1d3c1e69315987a12292b868f2bec15b1badaa0c282e161314bd7e45d9643b43",
+      "id": "mww4vqoza71644f0c1d7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 27,
+      "at": "2026-11-25T13:02:50.336Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:24",
+      "outcome": "succeeded",
+      "outboundId": "out.456314f57e19a3fb3f6de6cda2b6c64ca15b049013bf76a97c3cb9de7f4c292d",
+      "id": "mww4vx7qe47cc6da5667",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 27,
+      "at": "2026-11-25T13:02:50.356Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:25",
+      "outcome": "succeeded",
+      "outboundId": "out.d9fa8bfa1f0fb14811499b884459335a957ddc847900b7e37501745e32d9230a",
+      "id": "mww4vx86426c423c1856",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 28,
+      "at": "2026-11-25T13:02:57.884Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:25",
+      "outcome": "succeeded",
+      "outboundId": "out.6a1c4ab45eccd04f95272e124e552c79ff292379236eeae2918fd79910a97d64",
+      "id": "mww4w31a5e2395da47af",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 28,
+      "at": "2026-11-25T13:02:57.899Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:26",
+      "outcome": "succeeded",
+      "outboundId": "out.8707c428ca055faba9da816a8ccb3f2b8a70655532fd37a0ff2e4402c626f039",
+      "id": "mww4w31ob8f1868b02ec",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 29,
+      "at": "2026-11-25T13:03:05.890Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:26",
+      "outcome": "succeeded",
+      "outboundId": "out.9b9a233bd2c16e353438abcb1b1f1a7019ab3ba40befa840eb03f59440cb5fac",
+      "id": "mww4w97o3bc4be950915",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 29,
+      "at": "2026-11-25T13:03:05.909Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:27",
+      "outcome": "succeeded",
+      "outboundId": "out.bc5ad0f835cf2edb678cbcd8918bd56ce18d2a086932f0d6335321ebd98e0e8b",
+      "id": "mww4w988e1c4f65388ad",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 30,
+      "at": "2026-11-25T13:03:16.963Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:27",
+      "outcome": "succeeded",
+      "outboundId": "out.f25d58168bb7a41fe9c64b4e6fd499108acf913bfd83f861fd5b178ec6d21dc8",
+      "id": "mww4whr9f29d764909c9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 30,
+      "at": "2026-11-25T13:03:16.980Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:28",
+      "outcome": "succeeded",
+      "outboundId": "out.a194fddd387ef2aca05ae331646fc3a190090fb171de3993142c84211da73651",
+      "id": "mww4whrq58e22033c610",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 31,
+      "at": "2026-11-25T13:03:36.449Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:28",
+      "outcome": "succeeded",
+      "outboundId": "out.6d9db2dd8ac429a84dfd05024c8d29df797c95ee9af39f2f13a903cecf294d93",
+      "id": "mww4wwsj5f27324db91d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 31,
+      "at": "2026-11-25T13:03:36.492Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.write succeeded",
+      "capability": "code.workspace.write",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:29",
+      "outcome": "succeeded",
+      "outboundId": "out.c998ffb28751f451fa63a5afe3c2d359245eef5d0e3faaaaf04a5b3592ab7d57",
+      "id": "mww4wwtp9699e5e1c8c2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 32,
+      "at": "2026-11-25T13:03:43.127Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:29",
+      "outcome": "succeeded",
+      "outboundId": "out.06a16f0be13f23a047876d56fccd3e23e66186cc3b9eb27ee49f53061df29bd2",
+      "id": "mww4x1y119436d585647",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 32,
+      "at": "2026-11-25T13:03:47.791Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:act:30",
+      "outcome": "succeeded",
+      "outboundId": "out.39d3908fdc2b57bb71f311e2b6a479697ac6f58cc7434bbaae477301e44ef0e7",
+      "id": "mww4x5jl4740c7d489b6",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 33,
+      "at": "2026-11-25T13:04:06.108Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:decide:30",
+      "outcome": "succeeded",
+      "outboundId": "out.32b5c9fb902df92b630638339a823595e0d055039cf072711b2db0baf4b0ac64",
+      "id": "mww4xjoe609f7f582d67",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 33,
+      "at": "2026-11-25T13:04:06.127Z",
+      "from": "investigating",
+      "to": "proving",
+      "kind": "decide",
+      "summary": "The investigation proposed 1 finding(s); proving each before anything is filed.",
+      "id": "mww4xjox384c9fbe56da",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 34,
+      "at": "2026-11-25T13:04:06.823Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:prove:0:0",
+      "outcome": "succeeded",
+      "outboundId": "out.4c2ccc4e7aba8fa52c0a59c9be59e6166bcc71286c2d62328cf64c3508ebd44b",
+      "id": "mww4xk89dce3b9e4c02d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 34,
+      "at": "2026-11-25T13:04:06.828Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records: verified (packages/appboundry-host/src/admin.ts:99-99 contains the quoted code).",
+      "id": "mww4xk8d65cd45f30d81",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 35,
+      "at": "2026-11-25T13:04:07.817Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:prove:0:1",
+      "outcome": "succeeded",
+      "outboundId": "out.c87290d66581a6d70b8333a9cff047dd938c795f341967fedfe0b76ac882b51f",
+      "id": "mww4xkzu797690b5bf9a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 35,
+      "at": "2026-11-25T13:04:07.821Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records: verified (packages/appboundry-host/src/admin.ts:252-254 contains the quoted code).",
+      "id": "mww4xkzy2bbb10ef0284",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 36,
+      "at": "2026-11-25T13:04:08.822Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:prove:0:2",
+      "outcome": "succeeded",
+      "outboundId": "out.3c202f9a836f4abf18427c61cab2b10bf62d01275915001d3531246c3fdf4357",
+      "id": "mww4xlrreebcd01649db",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 36,
+      "at": "2026-11-25T13:04:08.826Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records: verified (packages/appboundry-host/src/admin.ts:240-242 contains the quoted code).",
+      "id": "mww4xlrv74fcbde84f59",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 37,
+      "at": "2026-11-25T13:04:14.062Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:prove-run:0:3",
+      "outcome": "succeeded",
+      "outboundId": "out.5cc931f484c878a62f156eeca39aa222737d0e5949f5ddec55a576903a7ea998",
+      "id": "mww4xptc83eb1c4ee863",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 38,
+      "at": "2026-11-25T13:04:14.823Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mww4rrzd6357a7f8f987:result:run_bc3c23f261:38",
+      "outcome": "succeeded",
+      "outboundId": "out.68d06ef3a2ccc25bf77df5522198bcac2b6024e3debfa681f10f9ad1957abf40",
+      "id": "mww4xqeha36931f71a66",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 38,
+      "at": "2026-11-25T13:04:14.847Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records: rejected (packages/appboundry-host/test/admin-many-sessions.test.ts fails without running its assertions (load or setup error)).",
+      "id": "mww4xqf5b4830ed786ff",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 39,
+      "at": "2026-11-25T13:04:15.818Z",
+      "from": "proving",
+      "to": "filing",
+      "kind": "verify",
+      "summary": "Proved 1 of 1 finding(s).",
+      "id": "mww4xr64c108a3ecbf76",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "seq": 40,
+      "at": "2026-11-25T13:04:16.821Z",
+      "from": "filing",
+      "to": "completed",
+      "kind": "report",
+      "summary": "Filed 0 issue(s); 0 already tracked, 0 over the limit, 1 not proven.",
+      "id": "mww4xrxzbd4826628248",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "checkpoint",
+      "at": "2026-11-25T12:59:40.055Z",
+      "digest": "80a2368d74b76f3a",
+      "data": {
+        "seq": 0,
+        "base": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+        "tree": "961f4b029e569c7ed36f5b1425ebef9e42ae6a5d",
+        "files": 0,
+        "seeded": []
+      },
+      "id": "mww4rue12cbe484e36c0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T12:59:40.057Z",
+      "digest": "13165d20d75678ef",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main cd32300380a6; checks: build, test."
+      },
+      "id": "mww4rue399253d0d0568",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:10.452Z",
+      "digest": "c3b6cd3846709717",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 67,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1440,
+        "latencyMs": 2758,
+        "messageId": "msg_011ChPgru3QL4YAebsqjajvK"
+      },
+      "id": "mww4shuf84741481cf7b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:10.455Z",
+      "digest": "503431965abb971f",
+      "data": {
+        "n": 1,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host\"}",
+        "resultJson": null,
+        "rationale": "Start by exploring the package structure."
+      },
+      "id": "mww4shui9580072e8945",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:10.472Z",
+      "digest": "cc200957b9f17998",
+      "data": {
+        "n": 1,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host"
+        },
+        "summary": "packages/appboundry-host: README.md  package.json  src/  test/  tsconfig.json  tsconfig.tsbuildinfo"
+      },
+      "id": "mww4shuz9059afaaf2fe",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:13.176Z",
+      "digest": "b4eb2b9b79c29e78",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 77,
+        "cacheReadTokens": 1440,
+        "cacheWriteTokens": 67,
+        "latencyMs": 2490,
+        "messageId": "msg_011ChPgs7LaP2zoYMCuNxJtD"
+      },
+      "id": "mww4sjy2a6426bd66070",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:13.179Z",
+      "digest": "975d3cc5c7ffb04c",
+      "data": {
+        "n": 2,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "Explore the source layout to locate the relevant subsystems."
+      },
+      "id": "mww4sjy50afed484f4ce",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:13.198Z",
+      "digest": "5f232709b3a43618",
+      "data": {
+        "n": 2,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src: admin-channel.ts  admin.ts  appport.ts  archive.ts  artifact.ts  authority-fence.ts  backup.ts  bin.ts  capabilities.ts  cli.ts  collections.ts  contract.ts  guest.ts  host.ts  http.ts  identity.ts  index.ts  integrity.ts  invocations.ts  isolation-verify.ts  managed.ts  manifest.ts  mcp.ts  memory-policy.ts  paged-read.ts  routing.ts  services.ts  state.ts  tenancy.ts  transactions.ts  verify.ts"
+      },
+      "id": "mww4sjyqa8a553f24ae7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:17.559Z",
+      "digest": "330256c2d545ed55",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 103,
+        "cacheReadTokens": 1507,
+        "cacheWriteTokens": 240,
+        "latencyMs": 3878,
+        "messageId": "msg_011ChPgsL541MENun34oX8x3"
+      },
+      "id": "mww4snbte51478d81f58",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:17.561Z",
+      "digest": "27863a8a2b4f44ed",
+      "data": {
+        "n": 3,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/test\"}",
+        "resultJson": null,
+        "rationale": "See existing test conventions and runner before choosing a target."
+      },
+      "id": "mww4snbvf89a87eab90c",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:17.578Z",
+      "digest": "0ede9dbd9ac3d614",
+      "data": {
+        "n": 3,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/test"
+        },
+        "summary": "packages/appboundry-host/test: artifact-host.test.ts  backup-integrity.test.ts  capabilities.test.ts  components.test.ts  crypto.test.ts  events.test.ts  feltdb-authority.mjs  fixtures/  helpers.ts  identity-declarations.test.ts  incarnation-binding.test.ts  isolation-boundary.test.ts  large-collections.test.ts  managed-acceptance.test.ts  mcp.test.ts  memory-boundary.test.ts  migrations.test.ts  outbox-outcome.test.ts  production-acceptance.test.ts  production-ops.test.ts  requirements.test.ts  state-contract.test.ts  tenancy-work.test.ts  tenancy.test.ts  transactional-effects.test.ts  transactions.test.ts"
+      },
+      "id": "mww4snce7a886d26902b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:21.077Z",
+      "digest": "3cd94eba974f88fb",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 135,
+        "cacheReadTokens": 1747,
+        "cacheWriteTokens": 303,
+        "latencyMs": 3390,
+        "messageId": "msg_011ChPgsdCBgrCYeyG2iicNv"
+      },
+      "id": "mww4sq1jf988c0bcf4a0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:21.079Z",
+      "digest": "1ae132a4b31acaa5",
+      "data": {
+        "n": 4,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/paged-read.ts\"}",
+        "resultJson": null,
+        "rationale": "Start with a small, self-contained module (paged reads) where off-by-one or cursor defects could drop or duplicate records."
+      },
+      "id": "mww4sq1l9db90ceb2fee",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:21.096Z",
+      "digest": "c8f92c12af74afd7",
+      "data": {
+        "n": 4,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/paged-read.ts"
+        },
+        "summary": "packages/appboundry-host/src/paged-read.ts lines 1-75 of 75:\n1\t/**\n2\t * Whole-result reads from FeltDB, one page at a time.\n3\t *\n4\t * FeltDB refuses an unpaged `collection.find()` that matches more than 1,000 records (QUERY_LIMIT_EXCEEDED). An\n5\t * artifact's `find`, `count`, a mutation's view of its own writes, and a backup must not fail where the same\n6\t * application works on FeltKit, whose runtime reads whole results this way (FeltKit `runtime/paged-read.ts`). The\n7\t * host keeps its own copy: AppBoundry does not depend on FeltKit.\n8\t *\n9\t * A page that says more records remain without a cursor to them, or a cursor that does not move, is refused rather\n10\t * than returned as a complete result.\n11\t */\n12\timport type { StateFirstDB } from \"@feltdb/core\";\n13\t// HostError is used only inside functions, so the import cycle with collections.ts is safe.\n14\timport { HostError } from \"./collections.js\";\n15\t\n16\t/** The largest page FeltDB's `db.query` answers. */\n17\texport const PAGE_LIMIT = 1_000;\n18\t\n19\ttype AnyDoc = Record<string, unknown> & { id: string; __version: number };\n20\t\n21\texport interface PagedRead {\n22\t  collection: string;\n23\t  where?: ReadonlyArray<Record<string, unknown>>;\n24\t  orderBy?: ReadonlyArray<{ field: string; direction: \"asc\" | \"desc\" }>;\n25\t}\n26\t\n27\texport async function* queryPages(db: StateFirstDB, request: PagedRead, pageSize = PAGE_LIMIT): AsyncGenerator<AnyDoc[]> {\n28\t  let cursor: string | undefined;\n29\t  const seen = new Set<string>();\n30\t  for (;;) {\n31\t    const page = await db.query<AnyDoc>({\n32\t      collection: request.collection,\n33\t      ...(request.where?.length ? { where: request.where } : {}),\n34\t      ...(request.orderBy?.length ? { orderBy: request.orderBy } : {}),\n35\t      limit:\n…\nthrow new HostError(\"INTERNAL\", `FeltDB reported more \"${request.collection}\" records without a cursor to them; the read was stopped rather than returned incomplete.`);\n41\t      return;\n42\t    }\n43\t    if (seen.has(page.nextCursor)) throw new HostError(\"INTERNAL\", `FeltDB returned the same cursor twice while reading \"${request.collection}\"; the read was stopped rather than repeated.`);\n44\t    seen.add(page.nextCursor);\n45\t    cursor = page.nextCursor;\n46\t  }\n47\t}\n48\t\n49\t/** Every matching record (or the first `limit`), read in pages. */\n50\texport async function readAll(db: StateFirstDB, request: PagedRead, limit?: number): Promise<AnyDoc[]> {\n51\t  const out: AnyDoc[] = [];\n52\t  for await (const page of queryPages(db, request, limit !== undefined ? Math.min(limit, PAGE_LIMIT) : PAGE_LIMIT)) {\n53\t    for (const record of page) {\n54\t      if (limit !== undefined && out.length >= limit) return out;\n55\t      out.push(record);\n56\t    }\n57\t    if (limit !== undefined && out.length >= limit) return out;\n58\t  }\n59\t  return out;\n60\t}\n61\t\n62\t/** How many records match, counted page by page; no page is kept. */\n63\texport async function countAll(db: StateFirstDB, request: PagedRead): Promise<number> {\n64\t  let n = 0;\n65\t  for await (const page of queryPages(db, request)) n += page.length;\n66\t  return n;\n67\t}\n68\t\n69\t/** As FeltDB's own `find()` does: a server reports a record's key as `recordId` beside its `id`. */\n70\tfunction storedDocument(record: AnyDoc): AnyDoc {\n71\t  if (!record || typeof record !== \"object\" || !(\"recordId\" in record) || (record as Record<string, unknown>).recordId !== record.id) return record;\n72\t  const { recordId: _key, ...document } = record as Record<string, unknown>;\n73\t  return document as AnyDoc;\n74\t}\n75\t"
+      },
+      "id": "mww4sq2ddafdde9299dc",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:25.110Z",
+      "digest": "7c0801d5b488b492",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 166,
+        "cacheReadTokens": 2050,
+        "cacheWriteTokens": 1509,
+        "latencyMs": 3419,
+        "messageId": "msg_011ChPgsvJLLKKFSuWpgUpbe"
+      },
+      "id": "mww4st5l1d2ce224dc00",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:25.114Z",
+      "digest": "08c2dc7b5722b8a8",
+      "data": {
+        "n": 5,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/paged-read.ts\", \"startLine\": 30, \"endLine\": 47}",
+        "resultJson": null,
+        "rationale": "Lines 35-40 of the paging loop were cut off in the last read. They hold the limit, cursor and termination logic that I need to check for a paging defect."
+      },
+      "id": "mww4st5o479158db7013",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:25.139Z",
+      "digest": "3d132771b5295d80",
+      "data": {
+        "n": 5,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/paged-read.ts",
+          "startLine": 30,
+          "endLine": 47
+        },
+        "summary": "packages/appboundry-host/src/paged-read.ts lines 30-47 of 75:\n30\t  for (;;) {\n31\t    const page = await db.query<AnyDoc>({\n32\t      collection: request.collection,\n33\t      ...(request.where?.length ? { where: request.where } : {}),\n34\t      ...(request.orderBy?.length ? { orderBy: request.orderBy } : {}),\n35\t      limit: pageSize,\n36\t      ...(cursor ? { cursor } : {})\n37\t    } as never);\n38\t    yield (page.records as AnyDoc[]).map(storedDocument);\n39\t    if (!page.nextCursor) {\n40\t      if (page.exhausted === false) throw new HostError(\"INTERNAL\", `FeltDB reported more \"${request.collection}\" records without a cursor to them; the read was stopped rather than returned incomplete.`);\n41\t      return;\n42\t    }\n43\t    if (seen.has(page.nextCursor)) throw new HostError(\"INTERNAL\", `FeltDB returned the same cursor twice while reading \"${request.collection}\"; the read was stopped rather than repeated.`);\n44\t    seen.add(page.nextCursor);\n45\t    cursor = page.nextCursor;\n46\t  }\n47\t}"
+      },
+      "id": "mww4st6hd0ccc2551e18",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:29.617Z",
+      "digest": "526a3ed051c1a9b3",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 217,
+        "cacheReadTokens": 3559,
+        "cacheWriteTokens": 462,
+        "latencyMs": 3925,
+        "messageId": "msg_011ChPgtDTTzhiLnWNX6Jasi"
+      },
+      "id": "mww4swmrf3e3fcb2a9cd",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:29.619Z",
+      "digest": "6b4015f16fcab7ca",
+      "data": {
+        "n": 6,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\": \"readAll\\\\(|countAll\\\\(|queryPages\\\\(\", \"path\": \"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "The paged-read logic itself looks sound, so the next question is whether its callers use it correctly. Finding every call site of readAll, countAll and queryPages shows where a whole-result read could still come back truncated or incomplete."
+      },
+      "id": "mww4swmuf5791dd41997",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:29.646Z",
+      "digest": "cb38d5f8f4e30b2b",
+      "data": {
+        "n": 6,
+        "action": "search",
+        "input": {
+          "pattern": "readAll\\(|countAll\\(|queryPages\\(",
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src/backup.ts:88:     const records = (await readAll(db, { collection: name })).sort((a, b) => String(a.id).localeCompare(String(b.id)));\npackages/appboundry-host/src/capabilities.ts:244:     return (await readAll(this.db, { collection: OUTBOUND_COLLECTION })) as unknown as OutboundRecord[];\npackages/appboundry-host/src/collections.ts:313:     return this.guard(readAll(this.host.db, { collection: name, where: equalityWhere(asFilter(filter)) as never, ...(orderBy ? { orderBy } : {}) }, opts.limit as number | undefined));\npackages/appboundry-host/src/collections.ts:335:     return this.guard(countAll(this.host.db, { collection: name, where: equalityWhere(asFilter(filter)) as never }));\npackages/appboundry-host/src/collections.ts:392:     const committed = await this.guard(readAll(this.host.db, { collection: name, where: where as never }));\npackages/appboundry-host/src/invocations.ts:114:   async list(): Promise<InvocationRecord[]> { return (await readAll(this.host.db, { collection: INVOCATIONS_COLLECTION })) as unknown as InvocationRecord[]; }\npackages/appboundry-host/src/paged-read.ts:27: export async function* queryPages(db: StateFirstDB, request: PagedRead, pageSize = PAGE_LIMIT): AsyncGenerator<AnyDoc[]> {\npackages/appboundry-host/src/paged-read.ts:50: export async function readAll(db: StateFirstDB, request: PagedRead, limit?: number): Promise<AnyDoc[]> {\npackages/appboundry-host/src/paged-read.ts:52:   for await (const page of queryPages(db, request, limit !== undefined ? Math.min(limit, PAGE_LIMIT) : PAGE_LIMIT)) {\npackages/appboundry-host/src/paged-read.ts:63: export async function countAll(db: StateFirstDB, request: PagedRead): Promise<number> {\npackages/appboundry-host/src/paged-read.ts:65:   for await (const page of queryPages(db, request)) n += page.length;"
+      },
+      "id": "mww4swnp46a94a30ff49",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:33.401Z",
+      "digest": "285e9749a36b3c24",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 202,
+        "cacheReadTokens": 4021,
+        "cacheWriteTokens": 831,
+        "latencyMs": 3686,
+        "messageId": "msg_011ChPgtWeKS35zSLJ8HsQYU"
+      },
+      "id": "mww4szjv5afe69bbb3aa",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:33.403Z",
+      "digest": "b8a73b27b2fafab6",
+      "data": {
+        "n": 7,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/test/large-collections.test.ts\"}",
+        "resultJson": null,
+        "rationale": "See how existing tests exercise paged reads and set up the host, to model a focused failing test."
+      },
+      "id": "mww4szjxc8a93f346bba",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:33.421Z",
+      "digest": "e2eff24e91dc69e9",
+      "data": {
+        "n": 7,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/test/large-collections.test.ts"
+        },
+        "summary": "packages/appboundry-host/test/large-collections.test.ts lines 1-85 of 85:\n1\t/**\n2\t * Collections past FeltDB's 1,000-match `find()` limit. FeltDB refuses an unpaged `find()` that matches more than 1,000\n3\t * records (QUERY_LIMIT_EXCEEDED). FeltKit's own runtime reads whole results page by page (FeltKit\n4\t * `runtime/paged-read.ts`), so an artifact must not fail where the same application works on FeltKit: `find`, `count`,\n5\t * a `find` inside a mutation that has already written to the collection, and a backup of the state.\n6\t */\n7\timport { mkdtemp, rm } from \"node:fs/promises\";\n8\timport { tmpdir } from \"node:os\";\n9\timport { join } from \"node:path\";\n10\timport { afterEach, beforeEach, describe, expect, it } from \"vitest\";\n11\timport { ArtifactHost, loadArtifact, localActor, restoreBackup, type Principal } from \"@appport/appboundry-host\";\n12\timport { syntheticArtifact, type SyntheticFunction } from \"./helpers.js\";\n13\t\n14\tlet work: string;\n15\tbeforeEach(async () => { work = await mkdtemp(join(tmpdir(), \"appboundry-large-\")); });\n16\tafterEach(async () => { await rm(work, { recursive: true, force: true }); });\n17\t\n18\tconst N = 1_250;\n19\tconst FUNCTIONS: SyntheticFunction[] = [\n20\t  { name: \"items:seed\", kind: \"mutation\", access: \"data.write\", body: `async (a, host) => { for (let i = 0; i < a.n; i++) await host(\"db.insert\", { collection: \"items\", value: { name: a.prefix + i } }); return a.n; }` },\n21\t  { name: \"items:all\", kind: \"query\", access: \"data.read\", body: `async (a, host) => (await host(\"db.find\", { collection: \"items\", filter: {}, options: {} })).length` },\n22\t  { name: \"items:first\", kind: \"query\", access: \"data.read\", body: `async (a, host) => (await host(\"db.find\", { collection: \"items\", filter: {}, options: { limit\n…\nunt\", {}, ada)).toBe(N);\n54\t      expect(await ok(host, \"items:first\", {}, ada)).toBe(10);\n55\t      expect(await ok(host, \"items:named\", { name: \"item-500-7\" }, ada)).toBe(1);\n56\t    } finally { await host.close(); }\n57\t  }, 120_000);\n58\t\n59\t  it(\"a mutation that has written to a large collection can still find and count in it\", async () => {\n60\t    const { host, ada } = await populated();\n61\t    try {\n62\t      expect(await ok(host, \"items:addThenFind\", { name: \"needle\" }, ada)).toEqual({ found: 1, count: N + 1 });\n63\t      expect(await ok(host, \"items:named\", { name: \"needle\" }, ada)).toBe(1);\n64\t    } finally { await host.close(); }\n65\t  }, 120_000);\n66\t\n67\t  it(\"backs up and restores a state whose collection holds more than 1,000 records\", async () => {\n68\t    const { host, stateDir } = await populated();\n69\t    let lines: string[];\n70\t    try { lines = await host.backup(); } finally { await host.close(); }\n71\t    const header = JSON.parse(lines[0]!) as { collections: Array<{ name: string; records: number }> };\n72\t    expect(header.collections.find(c => c.name === \"items\")?.records).toBe(N);\n73\t    const restored = join(work, \"restored\");\n74\t    const result = await restoreBackup(`${lines.join(\"\\n\")}\\n`, restored, { applicationId: \"large\" });\n75\t    expect(result.records).toBe(lines.length - 2);\n76\t    const again = await open(restored);\n77\t    try {\n78\t      const session = await again.admin(a => a.issueSession({ kind: \"operator\", id: \"ops\" }, { user: \"ada\" }));\n79\t      const ada = (await again.identity.principalForToken(session.token))!;\n80\t      expect(await ok(again, \"items:count\", {}, ada)).toBe(N);\n81\t    } finally { await again.close(); }\n82\t    expect(stateDir).not.toBe(restored);\n83\t  }, 120_000);\n84\t});\n85\t"
+      },
+      "id": "mww4szkle0e6bcd4765c",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:38.268Z",
+      "digest": "0b8de7662988df99",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 227,
+        "cacheReadTokens": 4852,
+        "cacheWriteTokens": 1484,
+        "latencyMs": 4549,
+        "messageId": "msg_011ChPgtokisxAmTmYzAfLQu"
+      },
+      "id": "mww4t3b242e27bc90b6e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:38.270Z",
+      "digest": "db788a392bbebac4",
+      "data": {
+        "n": 8,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":280,\"endLine\":430}",
+        "resultJson": null,
+        "rationale": "Inspect find/count and the mutation's read-your-writes overlay that uses readAll, to look for limit/ordering or overlay defects."
+      },
+      "id": "mww4t3b417a6c39b7f14",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:38.285Z",
+      "digest": "0ec9d511b75784ea",
+      "data": {
+        "n": 8,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 280,
+          "endLine": 430
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 280-430 of 560:\n280\t  protected readonly host: CollectionHost;\n281\t\n282\t  constructor(host: CollectionHost) {\n283\t    this.host = host;\n284\t  }\n285\t\n286\t  protected track(name: unknown): string {\n287\t    const resolved = this.host.resolve(name, \"read\");\n288\t    this.reads.add(resolved);\n289\t    return resolved;\n290\t  }\n291\t\n292\t  protected async guard<T>(work: Promise<T>): Promise<T> {\n293\t    try {\n294\t      return await work;\n295\t    } catch (error) {\n296\t      throw feltdbRefusal(error) ?? error;\n297\t    }\n298\t  }\n299\t\n300\t  async get(collection: unknown, id: unknown): Promise<AnyDoc | null> {\n301\t    const name = this.track(collection);\n302\t    if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"get() needs a record id.\");\n303\t    return (await this.guard(this.host.db.collection<AnyDoc>(name).get(id))) ?? null;\n304\t  }\n305\t\n306\t  async find(collection: unknown, filter?: unknown, options?: unknown): Promise<AnyDoc[]> {\n307\t    const name = this.track(collection);\n308\t    const opts = isRecord(options) ? options : {};\n309\t    checkLimit(opts.limit, \"find()\");\n310\t    const orderBy = asOrderBy(opts.orderBy);\n311\t    // Every match unless the caller asked for at most `limit`, read in FeltDB pages: an unpaged find() is refused past\n312\t    // 1,000 matches, and FeltKit's runtime returns every match (see paged-read.ts).\n313\t    return this.guard(readAll(this.host.db, { collection: name, where: equalityWhere(asFilter(filter)) as never, ...(orderBy ? { orderBy } : {}) }, opts.limit as number | undefined));\n314\t  }\n315\t\n316\t  async query(collection: unknown, request: unknown): Promise<{ records: AnyDoc[]; nextCursor?: string; exhausted: boolean }> {\n317\n…\nnding, base);\n398\t      byId.delete(pending.id);\n399\t      if (merged && matchesWhere(merged, where)) byId.set(pending.id, merged);\n400\t    }\n401\t    return [...byId.values()];\n402\t  }\n403\t\n404\t  override async get(collection: unknown, id: unknown): Promise<AnyDoc | null> {\n405\t    this.#assertOpen();\n406\t    const name = this.track(collection);\n407\t    if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"get() needs a record id.\");\n408\t    const pending = this.#pending.get(this.#key(name, id));\n409\t    if (pending?.op === \"insert\") return this.#overlayOne(pending, null);\n410\t    return this.#overlayOne(pending, await this.#committedGet(name, id));\n411\t  }\n412\t\n413\t  override async find(collection: unknown, filter?: unknown, options?: unknown): Promise<AnyDoc[]> {\n414\t    this.#assertOpen();\n415\t    const name = this.host.resolve(collection, \"read\");\n416\t    const where = equalityWhere(asFilter(filter));\n417\t    await this.#fence(name, where);\n418\t    if (this.#pendingFor(name).length === 0) return super.find(collection, filter, options);\n419\t    this.track(collection);\n420\t    const opts = isRecord(options) ? options : {};\n421\t    checkLimit(opts.limit, \"find()\");\n422\t    const matched = sortRecords(await this.#overlayAll(name, where), asOrderBy(opts.orderBy));\n423\t    return opts.limit ? matched.slice(0, opts.limit as number) : matched;\n424\t  }\n425\t\n426\t  /** As `find(...).length`, with the same fence and this mutation's own writes; counted in pages when there are none. */\n427\t  override async count(collection: unknown, filter?: unknown): Promise<number> {\n428\t    this.#assertOpen();\n429\t    const name = this.host.resolve(collection, \"read\");\n430\t    const where = equalityWhere(asFilter(filter));"
+      },
+      "id": "mww4t3bt5386e42ccc78",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:42.589Z",
+      "digest": "4565c651da7da7d4",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 251,
+        "cacheReadTokens": 6336,
+        "cacheWriteTokens": 1483,
+        "latencyMs": 3866,
+        "messageId": "msg_011ChPguBBaDCbryuABy3pTJ"
+      },
+      "id": "mww4t6n3c215a10cee73",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:42.591Z",
+      "digest": "a60af2c440eafd55",
+      "data": {
+        "n": 9,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":316,\"endLine\":400}",
+        "resultJson": null,
+        "rationale": "Read the remaining find/query/count/overlay logic in the collection views to look for paging or overlay defects."
+      },
+      "id": "mww4t6n5ff4cab7baedf",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:42.604Z",
+      "digest": "0fab76f3d0ea87c6",
+      "data": {
+        "n": 9,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 316,
+          "endLine": 400
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 316-400 of 560:\n316\t  async query(collection: unknown, request: unknown): Promise<{ records: AnyDoc[]; nextCursor?: string; exhausted: boolean }> {\n317\t    const name = this.track(collection);\n318\t    const req = isRecord(request) ? request : {};\n319\t    checkLimit(req.limit, \"query()\");\n320\t    if (!req.limit) throw new HostError(\"INVALID_ARGUMENT\", \"query() needs a limit; FeltDB queries are bounded.\");\n321\t    const where = asWhere(req.where);\n322\t    const orderBy = asOrderBy(req.orderBy);\n323\t    const page = await this.guard(this.host.db.query<AnyDoc>({\n324\t      collection: name,\n325\t      ...(where ? { where } : {}),\n326\t      ...(orderBy ? { orderBy } : {}),\n327\t      limit: req.limit as number,\n328\t      ...(typeof req.cursor === \"string\" ? { cursor: req.cursor } : {})\n329\t    } as never));\n330\t    return { records: page.records, exhausted: page.exhausted, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) };\n331\t  }\n332\t\n333\t  async count(collection: unknown, filter?: unknown): Promise<number> {\n334\t    const name = this.track(collection);\n335\t    return this.guard(countAll(this.host.db, { collection: name, where: equalityWhere(asFilter(filter)) as never }));\n336\t  }\n337\t}\n338\t\n339\t/** A mutation's view: reads see pending writes; writes commit together, or not at all. */\n340\texport class CollectionTransaction extends CollectionReader {\n341\t  readonly #pending = new Map<string, Pending>();\n342\t  readonly #observed = new Map<string, { collection: string; id: string; version: number | null }>();\n343\t  readonly #fences = new Map<string, unknown>();\n344\t  #closed = false;\n345\t\n346\t  #key(collection: string, id: string) {\n347\t    return `${collection}\\u0000${\n…\nn.\", { cause: error, details: { feltdbCode: (error as { code?: unknown }).code ?? null } });\n374\t    }\n375\t  }\n376\t\n377\t  async #committedGet(collection: string, id: string): Promise<AnyDoc | null> {\n378\t    const record = (await this.guard(this.host.db.collection<AnyDoc>(collection).get(id))) ?? null;\n379\t    const key = this.#key(collection, id);\n380\t    if (!this.#observed.has(key)) this.#observed.set(key, { collection, id, version: record ? record.__version : null });\n381\t    return record;\n382\t  }\n383\t\n384\t  #overlayOne(pending: Pending | undefined, committed: AnyDoc | null): AnyDoc | null {\n385\t    if (!pending) return committed;\n386\t    if (pending.op === \"delete\") return null;\n387\t    return { ...(pending.value as Record<string, unknown>), id: pending.id, __version: committed?.__version ?? 0 } as AnyDoc;\n388\t  }\n389\t\n390\t  /** The committed records matching `where` (read in pages), with this mutation's own writes applied, still matching `where`. */\n391\t  async #overlayAll(name: string, where: WhereClause[]): Promise<AnyDoc[]> {\n392\t    const committed = await this.guard(readAll(this.host.db, { collection: name, where: where as never }));\n393\t    const byId = new Map(committed.map(record => [record.id, record]));\n394\t    for (const pending of this.#pendingFor(name)) {\n395\t      // A pending write to a record that did not match before still needs its committed version.\n396\t      const base = pending.op === \"insert\" ? null : (byId.get(pending.id) ?? ((await this.guard(this.host.db.collection<AnyDoc>(name).get(pending.id))) ?? null));\n397\t      const merged = this.#overlayOne(pending, base);\n398\t      byId.delete(pending.id);\n399\t      if (merged && matchesWhere(merged, where)) byId.set(pending.id, merged);\n400\t    }"
+      },
+      "id": "mww4t6nq67d5f24656c2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:47.345Z",
+      "digest": "b20849a340fd923e",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 296,
+        "cacheReadTokens": 7819,
+        "cacheWriteTokens": 1445,
+        "latencyMs": 4619,
+        "messageId": "msg_011ChPguUvAfq1KJaama8Yf6"
+      },
+      "id": "mww4tab73d2a83e0899a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:47.347Z",
+      "digest": "c8034c47243e2006",
+      "data": {
+        "n": 10,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/backup.ts\"}",
+        "resultJson": null,
+        "rationale": "Backup is a data-integrity path; inspect how it reads and restores records."
+      },
+      "id": "mww4tab98c4c6e305a21",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:47.361Z",
+      "digest": "6c1f54d6111a316b",
+      "data": {
+        "n": 10,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/backup.ts"
+        },
+        "summary": "packages/appboundry-host/src/backup.ts lines 1-193 of 193:\n1\t/**\n2\t * Backups of an installation's data (`appboundry.backup/1`), separate from the artifact:\n3\t * code and data have independent lifecycles.\n4\t *\n5\t * A backup is newline-delimited JSON:\n6\t *\n7\t *   {\"format\":\"appboundry.backup/1\",\"application\":{…},\"artifact\":{…},\"collections\":[…],…}\n8\t *   {\"c\":\"tasks\",\"r\":{…record…}}                 one line per record, by collection then id\n9\t *   {\"end\":true,\"records\":N,\"sha256\":\"…\"}         SHA-256 over every preceding line\n10\t *\n11\t * It holds every collection in the state (the application's, AppPort Services', and the\n12\t * host's users, operators, audit and idempotency records) except sessions: tokens are\n13\t * never carried across, so a restored installation issues new ones.\n14\t *\n15\t * Consistency. A backup is taken by the process that holds the state: through the\n16\t * running runtime, which stops admitting new calls and waits for the ones in flight to\n17\t * finish before reading (host.ts, `exclusive`), or directly on a stopped state under\n18\t * FeltDB's lock. Every mutation commits as one FeltDB transaction, so the backup holds\n19\t * each transaction entirely or not at all.\n20\t *\n21\t * Restore writes into an empty directory only, after verifying the whole file. It marks\n22\t * the state \"restore in progress\" first and \"complete\" last; a state whose restore did\n23\t * not complete is refused by the runtime. Record contents and ids are kept; FeltDB\n24\t * assigns new record versions.\n25\t */\n26\timport type { StateFirstDB } from \"@feltdb/core\";\n27\timport { createHash } from \"node:crypto\";\n28\timport { RUNTIME_COLLECTION, type ManagedConfig } from \"./managed.js\";\n29\timport { readAll } from \"./paged-read.js\";\n30\timport { H\n…\np.header.collections.map(c => c.name)])) {\n174\t        const existing = (await db.collection(name).find({}, { limit: 1 } as never)) as unknown[];\n175\t        if (existing.length) throw new HostError(\"CONFLICT\", `The managed environment ${opened.binding.kind === \"managed\" ? `${opened.binding.applicationId}/${opened.binding.environment}` : \"\"} already has records in ${name}. Restore only into an empty environment; existing data is never overwritten.`);\n176\t      }\n177\t    }\n178\t    const startedAt = new Date().toISOString();\n179\t    const marker: RestoreRecord = { id: \"restore\", status: \"in-progress\", backupSha256: backup.sha256, startedAt };\n180\t    await db.transaction({ operations: [{ collection: STATE_COLLECTION, id: \"restore\", requireAbsent: true, value: marker }] } as never);\n181\t    for (let i = 0; i < backup.records.length; i += RESTORE_BATCH) {\n182\t      const batch = backup.records.slice(i, i + RESTORE_BATCH).filter(({ collection, record }) => !(collection === STATE_COLLECTION && record.id === \"restore\"));\n183\t      if (!batch.length) continue;\n184\t      await db.transaction({ operations: batch.map(({ collection, record }) => ({ collection, id: record.id, requireAbsent: true, value: record })) } as never);\n185\t    }\n186\t    const current = (await db.collection<RestoreRecord>(STATE_COLLECTION).get(\"restore\")) as RestoreRecord;\n187\t    await db.transaction({ operations: [{ collection: STATE_COLLECTION, id: \"restore\", ifVersion: current.__version, value: { ...marker, status: \"complete\", completedAt: new Date().toISOString() } }] } as never);\n188\t    return { header: backup.header, records: backup.records.length, skippedInternal: backup.skippedInternal };\n189\t  } finally {\n190\t    await db.close();\n191\t  }\n192\t}\n193\t"
+      },
+      "id": "mww4tabt778bb3ea564e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:51.481Z",
+      "digest": "782d5356b2b950df",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 294,
+        "cacheReadTokens": 9264,
+        "cacheWriteTokens": 1399,
+        "latencyMs": 3754,
+        "messageId": "msg_011ChPguqfLgMUeqPhwNQprn"
+      },
+      "id": "mww4tdi3d8c0d7d250c0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:51.483Z",
+      "digest": "b08df29dfcb354aa",
+      "data": {
+        "n": 11,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 430, \"endLine\": 560}",
+        "resultJson": null,
+        "rationale": "Read the rest of the transaction view (count, writes, commit) to look for overlay or commit defects."
+      },
+      "id": "mww4tdi5e1c6528886ad",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:51.495Z",
+      "digest": "cee95f98ce639c43",
+      "data": {
+        "n": 11,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 430,
+          "endLine": 560
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 430-560 of 560:\n430\t    const where = equalityWhere(asFilter(filter));\n431\t    await this.#fence(name, where);\n432\t    if (this.#pendingFor(name).length === 0) return super.count(collection, filter);\n433\t    this.track(collection);\n434\t    return (await this.#overlayAll(name, where)).length;\n435\t  }\n436\t\n437\t  override async query(collection: unknown, request: unknown): Promise<{ records: AnyDoc[]; nextCursor?: string; exhausted: boolean }> {\n438\t    this.#assertOpen();\n439\t    const name = this.host.resolve(collection, \"read\");\n440\t    const req = isRecord(request) ? request : {};\n441\t    await this.#fence(name, asWhere(req.where) ?? []);\n442\t    if (this.#pendingFor(name).length === 0) return super.query(collection, request);\n443\t    this.track(collection);\n444\t    checkLimit(req.limit, \"query()\");\n445\t    if (!req.limit) throw new HostError(\"INVALID_ARGUMENT\", \"query() needs a limit; FeltDB queries are bounded.\");\n446\t    if (req.cursor) {\n447\t      throw new HostError(\"INVALID_ARGUMENT\", \"query() cursors cannot be combined with this mutation's own pending writes to the same collection.\", { hint: \"Page before writing, or read with find().\" });\n448\t    }\n449\t    const matched = sortRecords(await this.#overlayAll(name, asWhere(req.where) ?? []), asOrderBy(req.orderBy));\n450\t    return { records: matched.slice(0, req.limit as number), exhausted: matched.length <= (req.limit as number) };\n451\t  }\n452\t\n453\t  #write(collection: unknown): string {\n454\t    this.#assertOpen();\n455\t    const name = this.host.resolve(collection, \"write\");\n456\t    this.reads.add(name);\n457\t    return name;\n458\t  }\n459\t\n460\t  async insert(collection: unknown, value: unknown): Promise<string> {\n461\t\n…\nion, value: { ...pending.value, id: pending.id } });\n535\t        writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });\n536\t      } else {\n537\t        operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion });\n538\t        writes.push({ collection: pending.collection, id: pending.id, op: \"delete\", expectedVersion: pending.baseVersion! });\n539\t      }\n540\t    }\n541\t    if (operations.length === 0 && extra.length === 0) return { transactionId, writes: [] };\n542\t    for (const collection of new Set(writes.map(w => w.collection))) {\n543\t      operations.push({ collection: COLLECTION_MARKERS, id: collection, value: { id: collection, transactionId, changedAt: Date.now() } });\n544\t    }\n545\t    operations.push(...extra);\n546\t    const preconditions: Array<Record<string, unknown>> = [...guards];\n547\t    for (const [key, observed] of this.#observed) {\n548\t      if (this.#pending.has(key)) continue;\n549\t      preconditions.push(observed.version === null ? { collection: observed.collection, id: observed.id, requireAbsent: true } : { collection: observed.collection, id: observed.id, ifVersion: observed.version });\n550\t    }\n551\t    try {\n552\t      const fences = [...this.#fences.values()];\n553\t      const result = await this.host.db.transaction({ transactionId, operations, ...(preconditions.length ? { preconditions } : {}), ...(fences.length ? { fences } : {}) } as never);\n554\t      return { transactionId: result.transactionId, writes, ...(result.commitRevision !== undefined ? { commitRevision: result.commitRevision } : {}) };\n555\t    } catch (error) {\n556\t      throw commitError(error, transactionId);\n557\t    }\n558\t  }\n559\t}\n560\t"
+      },
+      "id": "mww4tdir74d5b235a276",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:00:57.505Z",
+      "digest": "937326d21d16ebc5",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 463,
+        "cacheReadTokens": 10663,
+        "cacheWriteTokens": 1403,
+        "latencyMs": 5771,
+        "messageId": "msg_011ChPgv8qSzyJJTxpKpP1MG"
+      },
+      "id": "mww4ti5fc9c46ca88f3c",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:00:57.507Z",
+      "digest": "357a162a9c3b9167",
+      "data": {
+        "n": 12,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/backup.ts\",\"startLine\":30,\"endLine\":172}",
+        "resultJson": null,
+        "rationale": "Backup/restore is a data-integrity area; the middle of backup.ts was truncated, so read it to check record selection, hashing and restore verification."
+      },
+      "id": "mww4ti5h10ee556cc3bb",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:00:57.520Z",
+      "digest": "0725a85c7f4147f5",
+      "data": {
+        "n": 12,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/backup.ts",
+          "startLine": 30,
+          "endLine": 172
+        },
+        "summary": "packages/appboundry-host/src/backup.ts lines 30-172 of 193:\n30\timport { HostError } from \"./collections.js\";\n31\timport { SESSIONS_COLLECTION } from \"./identity.js\";\n32\timport { isEmptyDirectory, openInstallation, STATE_COLLECTION, type RestoreRecord, type StateRecord } from \"./state.js\";\n33\t\n34\texport const BACKUP_FORMAT = \"appboundry.backup/1\";\n35\t/** Never in a backup: sessions (credentials), and a managed runtime's lease. */\n36\texport const EXCLUDED_COLLECTIONS = [SESSIONS_COLLECTION, RUNTIME_COLLECTION] as const;\n37\t/**\n38\t * FeltDB's own bookkeeping, kept by the engine in collections of its own (FeltDB 0.21: `__indexes__`, one record per\n39\t * index, with no `id`). It is not application data and FeltDB rebuilds it from the state contract, so a backup does not\n40\t * carry it. Backups written by 1.7.0 to 1.7.2 did carry it, and could not be restored; a restore skips these records so\n41\t * that those backups restore, equal to the data they hold.\n42\t */\n43\texport const FELTDB_INTERNAL_COLLECTIONS = [\"__indexes__\"] as const;\n44\tconst isInternal = (name: string) => (FELTDB_INTERNAL_COLLECTIONS as readonly string[]).includes(name);\n45\tconst RESTORE_BATCH = 200;\n46\t\n47\texport interface BackupHeader {\n48\t  format: typeof BACKUP_FORMAT;\n49\t  createdAt: string;\n50\t  application: { id: string; version: string };\n51\t  artifact: { moduleSha256: string; manifestSha256: string; producer: string };\n52\t  environment: string;\n53\t  feltdb: string;\n54\t  collections: Array<{ name: string; records: number }>;\n55\t  excluded: string[];\n56\t}\n57\t\n58\texport interface BackupTrailer {\n59\t  end: true;\n60\t  records: number;\n61\t  sha256: string;\n62\t}\n63\t\n64\t/**\n65\t * Every collection with records in the state: from FeltDB's own operation log on a l\n…\nring } });\n151\t  }\n152\t  if (records.length + internal !== trailer.records) fail(`The backup declares ${trailer.records} records and holds ${records.length + internal}.`);\n153\t  const declared = new Map(header.collections.filter(c => !isInternal(c.name)).map(c => [c.name, c.records]));\n154\t  for (const [name, count] of declared) {\n155\t    if (records.filter(r => r.collection === name).length !== count) fail(`The backup's count for ${name} does not match its records.`);\n156\t  }\n157\t  if (!records.some(r => r.collection === STATE_COLLECTION && r.record.id === \"artifact\")) fail(\"The backup has no application record.\");\n158\t  return { header, records, skippedInternal: internal, sha256 };\n159\t}\n160\t\n161\t/** Restore a verified backup into an empty state directory. */\n162\texport async function restoreBackup(text: string, stateDir: string, options: { applicationId?: string; managed?: ManagedConfig | null } = {}): Promise<{ header: BackupHeader; records: number; skippedInternal: number }> {\n163\t  const backup = verifyBackup(text);\n164\t  if (options.applicationId && options.applicationId !== backup.header.application.id) {\n165\t    throw new HostError(\"CONFLICT\", `The backup is application ${backup.header.application.id}; the artifact is ${options.applicationId}.`);\n166\t  }\n167\t  if (!isEmptyDirectory(stateDir)) throw new HostError(\"CONFLICT\", `${stateDir} is not empty. Restore into a new, empty directory; an existing state is never overwritten.`);\n168\t  const opened = await openInstallation(stateDir, backup.header.application.id, options.managed ?? null);\n169\t  const { db } = opened;\n170\t  try {\n171\t    if (opened.managed) {\n172\t      // A managed environment is restored into only when it holds nothing of the backup's collections."
+      },
+      "id": "mww4ti627e79d848406a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:03.157Z",
+      "digest": "98a9eab508015f7e",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 393,
+        "cacheReadTokens": 12066,
+        "cacheWriteTokens": 1453,
+        "latencyMs": 5424,
+        "messageId": "msg_011ChPgvaSKdvL77G2dGaXBS"
+      },
+      "id": "mww4tmie86dec7e5c0ec",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:03.158Z",
+      "digest": "ac6b49091183fd1e",
+      "data": {
+        "n": 13,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/backup.ts\",\"startLine\":64,\"endLine\":151}",
+        "resultJson": null,
+        "rationale": "Read the backup creation and verification logic that was elided, looking for data loss or false-success paths."
+      },
+      "id": "mww4tmih2d72d4cab171",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:03.171Z",
+      "digest": "855f855ed701d56d",
+      "data": {
+        "n": 13,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/backup.ts",
+          "startLine": 64,
+          "endLine": 151
+        },
+        "summary": "packages/appboundry-host/src/backup.ts lines 64-151 of 193:\n64\t/**\n65\t * Every collection with records in the state: from FeltDB's own operation log on a local\n66\t * state; on a managed environment (whose log is the authority's, not the client's) from the\n67\t * collections the state record names, which are those of the contract the artifact needs.\n68\t */\n69\tasync function collectionsOf(db: StateFirstDB, state: StateRecord, managed: boolean): Promise<string[]> {\n70\t  const names = new Set<string>();\n71\t  if (managed) {\n72\t    if (!state.collections?.length) throw new HostError(\"CONFLICT\", \"This managed state's application record does not list its collections; run the artifact once with this AppBoundry before backing it up.\");\n73\t    for (const name of state.collections) names.add(name);\n74\t  } else {\n75\t    for (const operation of await db.exportOperations(0)) names.add(operation.collection);\n76\t  }\n77\t  return [...names].filter(name => !(EXCLUDED_COLLECTIONS as readonly string[]).includes(name) && !isInternal(name)).sort();\n78\t}\n79\t\n80\t/** The backup's lines. The caller must hold the state still while it runs (see the module comment). */\n81\texport async function backupLines(db: StateFirstDB, feltdbVersion: string, options: { managed?: boolean } = {}): Promise<string[]> {\n82\t  const state = (await db.collection<StateRecord>(STATE_COLLECTION).get(\"artifact\")) as StateRecord | null;\n83\t  if (!state) throw new HostError(\"CONFLICT\", \"This state has no application record yet; run the artifact once before backing it up.\");\n84\t  const body: string[] = [];\n85\t  const counts: Array<{ name: string; records: number }> = [];\n86\t  for (const name of await collectionsOf(db, state, options.managed === true)) {\n87\t    // In pages: an unp\n…\nlet header: BackupHeader;\n129\t  let trailer: BackupTrailer;\n130\t  try {\n131\t    header = JSON.parse(lines[0]!) as BackupHeader;\n132\t    trailer = JSON.parse(lines[lines.length - 1]!) as BackupTrailer;\n133\t  } catch {\n134\t    return fail(\"The file is not an AppBoundry backup (not JSON lines).\");\n135\t  }\n136\t  if (header.format !== BACKUP_FORMAT) fail(`Backup format ${JSON.stringify(header.format)} is not supported; this host restores ${BACKUP_FORMAT}.`);\n137\t  if (trailer.end !== true) fail(\"The backup is truncated: it has no end record.\");\n138\t  const digest = createHash(\"sha256\");\n139\t  for (const line of lines.slice(0, -1)) digest.update(`${line}\\n`);\n140\t  const sha256 = digest.digest(\"hex\");\n141\t  if (sha256 !== trailer.sha256) fail(\"The backup's SHA-256 does not match its contents; it was changed or damaged.\");\n142\t  const records: Array<{ collection: string; record: Record<string, unknown> & { id: string } }> = [];\n143\t  let internal = 0;\n144\t  for (const line of lines.slice(1, -1)) {\n145\t    const entry = JSON.parse(line) as { c?: unknown; r?: unknown };\n146\t    // FeltDB-internal records (see FELTDB_INTERNAL_COLLECTIONS) are counted but not restored.\n147\t    if (typeof entry.c === \"string\" && isInternal(entry.c)) { internal += 1; continue; }\n148\t    if (typeof entry.c !== \"string\" || typeof entry.r !== \"object\" || entry.r === null || typeof (entry.r as { id?: unknown }).id !== \"string\") fail(\"The backup holds a malformed record.\");\n149\t    if ((EXCLUDED_COLLECTIONS as readonly string[]).includes(entry.c as string)) fail(`The backup holds ${String(entry.c)}, which a backup never carries.`);\n150\t    records.push({ collection: entry.c as string, record: entry.r as Record<string, unknown> & { id: string } });\n151\t  }"
+      },
+      "id": "mww4tmiza527c66e5c08",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:10.339Z",
+      "digest": "6f40d269922c8102",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 468,
+        "cacheReadTokens": 13519,
+        "cacheWriteTokens": 1446,
+        "latencyMs": 6594,
+        "messageId": "msg_011ChPgw2BdgnySFhh8umfkR"
+      },
+      "id": "mww4ts1x1733d6a7db31",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:10.341Z",
+      "digest": "06d3db0f1d30e938",
+      "data": {
+        "n": 14,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":1,\"endLine\":280}",
+        "resultJson": null,
+        "rationale": "Read the helpers in collections.ts (checkLimit, matchesWhere, sortRecords, equalityWhere) to look for a correctness defect in the transaction overlay."
+      },
+      "id": "mww4ts1z1a5118a48dca",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:10.363Z",
+      "digest": "2f900f526cba298f",
+      "data": {
+        "n": 14,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 1,
+          "endLine": 280
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 1-280 of 560:\n1\t/**\n2\t * Host interface `collections@1`: an artifact's records, in FeltDB.\n3\t *\n4\t * The guest asks; this module decides. Every operation names a collection, which must be\n5\t * declared by the manifest and granted to the artifact (permissions.collections). Every\n6\t * record written is validated here against the collection's JSON Schema from the\n7\t * manifest, whatever the guest checked. A query's operations can only read.\n8\t *\n9\t * A mutation's writes are buffered here, per call, and committed as ONE FeltDB atomic\n10\t * transaction when the handler returns (nothing is written if it fails):\n11\t *   - inserts are `requireAbsent` creates;\n12\t *   - updates and deletes carry `ifVersion` = the version the call observed;\n13\t *   - records the call read by id but did not write become preconditions;\n14\t *   - find/query/count capture FeltDB read bases before reading, re-checked at commit, so\n15\t *     a concurrent change to anything matching their equality predicate fails the commit\n16\t *     (CONFLICT); a read with no equality clause fences the collection's change marker.\n17\t * Reads inside a mutation see its own pending writes. These are the semantics FeltKit\n18\t * gives `ctx.db` (FeltKit runtime/data.ts), kept here so an artifact behaves the same.\n19\t */\n20\timport { classifyError, FeltDBErrorCode, FeltDBServiceError, type StateFirstDB } from \"@feltdb/core\";\n21\timport { fromJSONSchema, type Schema } from \"@appport/schema\";\n22\timport { randomBytes } from \"node:crypto\";\n23\timport type { ArtifactManifest } from \"./manifest.js\";\n24\timport { countAll, readAll } from \"./paged-read.js\";\n25\t\n26\t/** Per-collection change markers (see the module comment). */\n27\texport con\n…\n43\t        if ((error as { code?: unknown } | null)?.code !== FeltDBErrorCode.PRECONDITION_FAILED) throw error;\n244\t      }\n245\t    }\n246\t  }\n247\t\n248\t  resolve(name: unknown, access: \"read\" | \"write\"): string {\n249\t    if (typeof name !== \"string\" || !this.#schemas.has(name)) {\n250\t      throw new HostError(\"NOT_FOUND\", `Collection \"${String(name)}\" is not declared by this application.`, {\n251\t        hint: \"An artifact reaches only the collections its manifest declares.\"\n252\t      });\n253\t    }\n254\t    if (!(access === \"read\" ? this.#readable : this.#writable).has(name)) {\n255\t      throw new HostError(\"FORBIDDEN\", `The artifact is not permitted to ${access} collection \"${name}\".`);\n256\t    }\n257\t    return name;\n258\t  }\n259\t\n260\t  validate(name: string, value: Record<string, unknown>): void {\n261\t    const result = this.#schemas.get(name)!.validate(value) as { ok: boolean; issues?: Array<{ path?: Array<string | number>; message: string }> };\n262\t    if (!result.ok) {\n263\t      const issues = (result.issues ?? []).map(issue => ({ path: (issue.path ?? []).join(\".\") || \"(root)\", message: issue.message }));\n264\t      throw new HostError(\"VALIDATION_FAILED\", `Invalid \"${name}\" record: ${issues.map(i => `${i.path}: ${i.message}`).join(\"; \")}`, { details: { collection: name, issues } });\n265\t    }\n266\t  }\n267\t\n268\t  reader(): CollectionReader {\n269\t    return new CollectionReader(this);\n270\t  }\n271\t\n272\t  transaction(): CollectionTransaction {\n273\t    return new CollectionTransaction(this);\n274\t  }\n275\t}\n276\t\n277\t/** A query's view: reads only, each collection read recorded for change notifications. */\n278\texport class CollectionReader {\n279\t  readonly reads = new Set<string>();\n280\t  protected readonly host: CollectionHost;"
+      },
+      "id": "mww4ts2se24ab335dde9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:16.389Z",
+      "digest": "6a88841da6944b04",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 359,
+        "cacheReadTokens": 14965,
+        "cacheWriteTokens": 1420,
+        "latencyMs": 5636,
+        "messageId": "msg_011ChPgwYPKtJgPS8h5PWVV3"
+      },
+      "id": "mww4twpzdd3aa63afeb5",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:16.391Z",
+      "digest": "67796431098e3c5a",
+      "data": {
+        "n": 15,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 340, \"endLine\": 376}",
+        "resultJson": null,
+        "rationale": "Read the transaction's pending bookkeeping and fence logic that was elided in the earlier read."
+      },
+      "id": "mww4twq015d7adaa6e1c",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:16.406Z",
+      "digest": "2c26aea15d0f8c90",
+      "data": {
+        "n": 15,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 340,
+          "endLine": 376
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 340-376 of 560:\n340\texport class CollectionTransaction extends CollectionReader {\n341\t  readonly #pending = new Map<string, Pending>();\n342\t  readonly #observed = new Map<string, { collection: string; id: string; version: number | null }>();\n343\t  readonly #fences = new Map<string, unknown>();\n344\t  #closed = false;\n345\t\n346\t  #key(collection: string, id: string) {\n347\t    return `${collection}\\u0000${id}`;\n348\t  }\n349\t\n350\t  #assertOpen() {\n351\t    if (this.#closed) throw new HostError(\"INTERNAL\", \"This mutation has already finished; its transaction is closed.\");\n352\t  }\n353\t\n354\t  #pendingFor(collection: string): Pending[] {\n355\t    return [...this.#pending.values()].filter(p => p.collection === collection);\n356\t  }\n357\t\n358\t  async #fence(collection: string, where: WhereClause[]): Promise<void> {\n359\t    const equality = where\n360\t      .filter(clause => \"eq\" in clause && clause.eq !== undefined && [clause.neq, clause.lt, clause.lte, clause.gt, clause.gte].every(v => v === undefined))\n361\t      .map(clause => ({ field: clause.field, eq: clause.eq }))\n362\t      .sort((a, b) => a.field.localeCompare(b.field));\n363\t    const key = JSON.stringify([collection, equality]);\n364\t    if (this.#fences.has(key)) return;\n365\t    const reads = equality.length ? { predicates: [{ collection, where: equality }] } : { records: [{ collection: COLLECTION_MARKERS, id: collection }] };\n366\t    try {\n367\t      this.#fences.set(key, await this.host.db.readBasis(reads as never));\n368\t    } catch (error) {\n369\t      // A refusal (a promoted contract, an unreachable authority) is that refusal; only an\n370\t      // authority without read fences is reported as such. FeltDB's message stays out of the answer.\n371\t      const refusal = feltdbRefusal(error);\n372\t      if (refusal) throw refusal;\n373\t      throw new HostError(\"UNAVAILABLE\", \"This FeltDB authority cannot fence reads, so the mutation cannot guarantee its reads are current. Nothing was written.\", { cause: error, details: { feltdbCode: (error as { code?: unknown }).code ?? null } });\n374\t    }\n375\t  }\n376\t"
+      },
+      "id": "mww4twqj85b358a5e522",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:21.726Z",
+      "digest": "929b11bf39a3a940",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 406,
+        "cacheReadTokens": 16385,
+        "cacheWriteTokens": 883,
+        "latencyMs": 4976,
+        "messageId": "msg_011ChPgwymJQeBjeTEdnsycm"
+      },
+      "id": "mww4u0u9238b8bce61c2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:21.729Z",
+      "digest": "898c43ca3c898bc5",
+      "data": {
+        "n": 16,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":460,\"endLine\":535}",
+        "resultJson": null,
+        "rationale": "Inspect the buffered write logic (insert/update/delete merging) in mutations for state-corrupting combinations."
+      },
+      "id": "mww4u0uhd8c47e2c71f2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:21.749Z",
+      "digest": "bc20f4b7db971d46",
+      "data": {
+        "n": 16,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 460,
+          "endLine": 535
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 460-535 of 560:\n460\t  async insert(collection: unknown, value: unknown): Promise<string> {\n461\t    const name = this.#write(collection);\n462\t    if (!isRecord(value)) throw new HostError(\"INVALID_ARGUMENT\", \"insert() needs a record object.\");\n463\t    const fields = stripSystem(value);\n464\t    this.host.validate(name, fields);\n465\t    const id = newId();\n466\t    this.#pending.set(this.#key(name, id), { collection: name, id, op: \"insert\", value: fields });\n467\t    return id;\n468\t  }\n469\t\n470\t  async #existing(name: string, id: unknown): Promise<{ current: Record<string, unknown>; pending?: Pending; base?: number }> {\n471\t    if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"A record id is required.\");\n472\t    const pending = this.#pending.get(this.#key(name, id));\n473\t    if (pending?.op === \"delete\") throw new HostError(\"NOT_FOUND\", `${name}/${id} was deleted earlier in this mutation.`);\n474\t    if (pending) return { current: pending.value ?? {}, pending, ...(pending.baseVersion !== undefined ? { base: pending.baseVersion } : {}) };\n475\t    const committed = await this.#committedGet(name, id);\n476\t    if (!committed) throw new HostError(\"NOT_FOUND\", `${name}/${id} does not exist.`, { details: { collection: name, id } });\n477\t    return { current: stripSystem(committed), base: committed.__version };\n478\t  }\n479\t\n480\t  async patch(collection: unknown, id: unknown, fields: unknown, unset: unknown = []): Promise<AnyDoc> {\n481\t    const name = this.#write(collection);\n482\t    if (fields !== undefined && fields !== null && !isRecord(fields)) throw new HostError(\"INVALID_ARGUMENT\", \"patch() needs an object of fields.\");\n483\t    if (!Array.isArray(unset) \n…\n  return null;\n508\t    }\n509\t    this.#pending.set(key, { collection: name, id: id as string, op: \"delete\", ...(base !== undefined ? { baseVersion: base } : {}) });\n510\t    return null;\n511\t  }\n512\t\n513\t  /** Discard every pending write (the handler failed). */\n514\t  abandon(): void {\n515\t    this.#closed = true;\n516\t    this.#pending.clear();\n517\t  }\n518\t\n519\t  /**\n520\t   * Commit every pending write in one FeltDB transaction. `extra` operations (the host's\n521\t   * own bookkeeping, such as an idempotency record) commit in the same transaction.\n522\t   */\n523\t  /** `guards`: records this transaction does not write but whose version must be unchanged at commit (FeltDB preconditions). */\n524\t  async commit(transactionId: string, extra: Array<Record<string, unknown>> = [], guards: Array<Record<string, unknown>> = []): Promise<{ transactionId: string; writes: CommittedWrite[]; commitRevision?: number }> {\n525\t    this.#assertOpen();\n526\t    this.#closed = true;\n527\t    const writes: CommittedWrite[] = [];\n528\t    const operations: Array<Record<string, unknown>> = [];\n529\t    for (const pending of this.#pending.values()) {\n530\t      if (pending.op === \"insert\") {\n531\t        operations.push({ collection: pending.collection, id: pending.id, requireAbsent: true, value: { ...pending.value, id: pending.id } });\n532\t        writes.push({ collection: pending.collection, id: pending.id, op: \"insert\" });\n533\t      } else if (pending.op === \"update\") {\n534\t        operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion, value: { ...pending.value, id: pending.id } });\n535\t        writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });"
+      },
+      "id": "mww4u0v4c2e119a89b27",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:29.093Z",
+      "digest": "8c7ccb368a0238d1",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 526,
+        "cacheReadTokens": 17268,
+        "cacheWriteTokens": 1420,
+        "latencyMs": 6328,
+        "messageId": "msg_011ChPgxRSQ3gneNVvZM8Bax"
+      },
+      "id": "mww4u6iv954147628c5e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:29.095Z",
+      "digest": "1efc4ad368eb18f4",
+      "data": {
+        "n": 17,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":26,\"endLine\":243}",
+        "resultJson": null,
+        "rationale": "Read the helpers (equalityWhere, matchesWhere, sortRecords, checkLimit, patch logic) used by the transactional overlay to look for divergences between a mutation's view and committed data."
+      },
+      "id": "mww4u6iycef363da8afa",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:29.114Z",
+      "digest": "61aecda9aff0eeb6",
+      "data": {
+        "n": 17,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 26,
+          "endLine": 243
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 26-243 of 560:\n26\t/** Per-collection change markers (see the module comment). */\n27\texport const COLLECTION_MARKERS = \"_appboundry_collections\";\n28\tconst MAX_FIND = 10_000;\n29\t\n30\texport class HostError extends Error {\n31\t  readonly code: string;\n32\t  readonly details?: unknown;\n33\t  readonly hint?: string;\n34\t  constructor(code: string, message: string, options: { details?: unknown; hint?: string; cause?: unknown } = {}) {\n35\t    super(message, options.cause === undefined ? undefined : { cause: options.cause });\n36\t    this.name = \"HostError\";\n37\t    this.code = code;\n38\t    if (options.details !== undefined) this.details = options.details;\n39\t    if (options.hint !== undefined) this.hint = options.hint;\n40\t  }\n41\t\n42\t  toJSON(): { code: string; message: string; details?: unknown; hint?: string } {\n43\t    return { code: this.code, message: this.message, ...(this.details !== undefined ? { details: this.details } : {}), ...(this.hint !== undefined ? { hint: this.hint } : {}) };\n44\t  }\n45\t}\n46\t\n47\ttype AnyDoc = Record<string, unknown> & { id: string; __version: number };\n48\t\n49\tinterface WhereClause {\n50\t  field: string;\n51\t  eq?: unknown;\n52\t  neq?: unknown;\n53\t  lt?: unknown;\n54\t  lte?: unknown;\n55\t  gt?: unknown;\n56\t  gte?: unknown;\n57\t}\n58\t\n59\tinterface OrderBy {\n60\t  field: string;\n61\t  direction: \"asc\" | \"desc\";\n62\t}\n63\t\n64\tinterface Pending {\n65\t  collection: string;\n66\t  id: string;\n67\t  op: \"insert\" | \"update\" | \"delete\";\n68\t  value?: Record<string, unknown>;\n69\t  baseVersion?: number;\n70\t}\n71\t\n72\texport interface CommittedWrite {\n73\t  collection: string;\n74\t  id: string;\n75\t  op: \"insert\" | \"update\" | \"delete\";\n76\t  expectedVersion?: number;\n77\t}\n78\t\n79\texport fun\n…\nage}. Nothing was written.`, { details, cause: error });\n214\t  if (classifyError(error.code) === \"retryable\") return new HostError(\"UNAVAILABLE\", `FeltDB refused the commit (${error.code}); nothing was written. AppBoundry did not resend it.`, { details, cause: error });\n215\t  return error;\n216\t}\n217\t\n218\t/** The artifact's declared collections, their schemas, and what the artifact may do with them. */\n219\texport class CollectionHost {\n220\t  readonly #db: StateFirstDB;\n221\t  readonly #schemas = new Map<string, Schema>();\n222\t  readonly #readable: ReadonlySet<string>;\n223\t  readonly #writable: ReadonlySet<string>;\n224\t\n225\t  constructor(db: StateFirstDB, manifest: ArtifactManifest) {\n226\t    this.#db = db;\n227\t    for (const collection of manifest.collections) this.#schemas.set(collection.name, fromJSONSchema(collection.schema as never));\n228\t    this.#readable = new Set(manifest.permissions.collections.read);\n229\t    this.#writable = new Set(manifest.permissions.collections.write);\n230\t  }\n231\t\n232\t  get db(): StateFirstDB {\n233\t    return this.#db;\n234\t  }\n235\t\n236\t  /** Create the change marker of every writable collection, so later marker writes are updates on every FeltDB authority. */\n237\t  async ensureMarkers(): Promise<void> {\n238\t    for (const name of this.#writable) {\n239\t      if (await this.#db.collection(COLLECTION_MARKERS).get(name)) continue;\n240\t      try {\n241\t        await this.#db.transaction({ operations: [{ collection: COLLECTION_MARKERS, id: name, requireAbsent: true, value: { id: name, transactionId: \"appboundry.markers\", changedAt: Date.now() } }] } as never);\n242\t      } catch (error) {\n243\t        if ((error as { code?: unknown } | null)?.code !== FeltDBErrorCode.PRECONDITION_FAILED) throw error;"
+      },
+      "id": "mww4u6jq29ac8df8180f",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:35.882Z",
+      "digest": "64f426e1e8ab33aa",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 451,
+        "cacheReadTokens": 18688,
+        "cacheWriteTokens": 1502,
+        "latencyMs": 6121,
+        "messageId": "msg_011ChPgxwPDhjLXthYFqV3mW"
+      },
+      "id": "mww4ubrge365afd8fe22",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:35.884Z",
+      "digest": "eef10180a5b8f891",
+      "data": {
+        "n": 18,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/backup.ts\",\"startLine\":84,\"endLine\":128}",
+        "resultJson": null,
+        "rationale": "See how the backup serializes records and counts, which was truncated in the earlier read."
+      },
+      "id": "mww4ubrh2b935edf0535",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:35.898Z",
+      "digest": "1b9221c23b8ce673",
+      "data": {
+        "n": 18,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/backup.ts",
+          "startLine": 84,
+          "endLine": 128
+        },
+        "summary": "packages/appboundry-host/src/backup.ts lines 84-128 of 193:\n84\t  const body: string[] = [];\n85\t  const counts: Array<{ name: string; records: number }> = [];\n86\t  for (const name of await collectionsOf(db, state, options.managed === true)) {\n87\t    // In pages: an unpaged find() is refused past 1,000 records (paged-read.ts).\n88\t    const records = (await readAll(db, { collection: name })).sort((a, b) => String(a.id).localeCompare(String(b.id)));\n89\t    if (!records.length) continue;\n90\t    counts.push({ name, records: records.length });\n91\t    for (const record of records) {\n92\t      const { __version: _v, ...value } = record;\n93\t      body.push(JSON.stringify({ c: name, r: value }));\n94\t    }\n95\t  }\n96\t  const header: BackupHeader = {\n97\t    format: BACKUP_FORMAT,\n98\t    createdAt: new Date().toISOString(),\n99\t    application: { id: state.applicationId, version: state.version },\n100\t    artifact: { moduleSha256: state.moduleSha256, manifestSha256: state.manifestSha256, producer: state.producer },\n101\t    environment: state.environment,\n102\t    feltdb: feltdbVersion,\n103\t    collections: counts,\n104\t    excluded: [...EXCLUDED_COLLECTIONS]\n105\t  };\n106\t  const lines = [JSON.stringify(header), ...body];\n107\t  const digest = createHash(\"sha256\");\n108\t  for (const line of lines) digest.update(`${line}\\n`);\n109\t  const trailer: BackupTrailer = { end: true, records: body.length, sha256: digest.digest(\"hex\") };\n110\t  return [...lines, JSON.stringify(trailer)];\n111\t}\n112\t\n113\texport interface VerifiedBackup {\n114\t  readonly header: BackupHeader;\n115\t  readonly records: ReadonlyArray<{ readonly collection: string; readonly record: Record<string, unknown> & { id: string } }>;\n116\t  /** FeltDB-internal records the file carried (legacy backups) and a restore skips. */\n117\t  readonly skippedInternal: number;\n118\t  readonly sha256: string;\n119\t}\n120\t\n121\t/** Parse and verify a whole backup before anything is written. */\n122\texport function verifyBackup(text: string): VerifiedBackup {\n123\t  const lines = text.split(\"\\n\").filter(line => line.length > 0);\n124\t  const fail = (message: string): never => {\n125\t    throw new HostError(\"BACKUP_INVALID\", message);\n126\t  };\n127\t  if (lines.length < 2) fail(\"The file is not an AppBoundry backup (too short).\");\n128\t  let header: BackupHeader;"
+      },
+      "id": "mww4ubs290b9c4f641e2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:44.064Z",
+      "digest": "4c560af2d69f2c51",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 574,
+        "cacheReadTokens": 20190,
+        "cacheWriteTokens": 971,
+        "latencyMs": 7286,
+        "messageId": "msg_011ChPgyTUxNnDmzvchSCPqU"
+      },
+      "id": "mww4ui2qf5db857730a2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:44.066Z",
+      "digest": "fdb7a39b8d108436",
+      "data": {
+        "n": 19,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":79,\"endLine\":213}",
+        "resultJson": null,
+        "rationale": "Need the helpers (checkLimit, equalityWhere, matchesWhere, sortRecords) used by a mutation's overlay reads to check they agree with FeltDB's committed-read semantics."
+      },
+      "id": "mww4ui2tc0809013bf58",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:44.081Z",
+      "digest": "617dfb024b261b99",
+      "data": {
+        "n": 19,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 79,
+          "endLine": 213
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 79-213 of 560:\n79\texport function newId(): string {\n80\t  return `${Date.now().toString(36)}${randomBytes(6).toString(\"hex\")}`;\n81\t}\n82\t\n83\tconst isRecord = (value: unknown): value is Record<string, unknown> => typeof value === \"object\" && value !== null && !Array.isArray(value);\n84\t\n85\tfunction stripSystem(value: Record<string, unknown>): Record<string, unknown> {\n86\t  const { id: _id, __version: _v, ...rest } = value;\n87\t  return rest;\n88\t}\n89\t\n90\tfunction compare(a: unknown, b: unknown): number {\n91\t  if (a === b) return 0;\n92\t  if (a === undefined || a === null) return -1;\n93\t  if (b === undefined || b === null) return 1;\n94\t  if (typeof a === \"number\" && typeof b === \"number\") return a - b;\n95\t  return String(a) < String(b) ? -1 : 1;\n96\t}\n97\t\n98\tfunction matchesWhere(record: Record<string, unknown>, where: WhereClause[]): boolean {\n99\t  return where.every(clause => {\n100\t    const value = record[clause.field];\n101\t    if (\"eq\" in clause && clause.eq !== undefined && value !== clause.eq) return false;\n102\t    if (\"neq\" in clause && clause.neq !== undefined && value === clause.neq) return false;\n103\t    if (clause.lt !== undefined && !(compare(value, clause.lt) < 0)) return false;\n104\t    if (clause.lte !== undefined && !(compare(value, clause.lte) <= 0)) return false;\n105\t    if (clause.gt !== undefined && !(compare(value, clause.gt) > 0)) return false;\n106\t    if (clause.gte !== undefined && !(compare(value, clause.gte) >= 0)) return false;\n107\t    return true;\n108\t  });\n109\t}\n110\t\n111\tfunction sortRecords<T extends Record<string, unknown>>(records: T[], orderBy: OrderBy[] = []): T[] {\n112\t  return [...records].sort((a, b) => {\n113\t    for (const order of orderBy) {\n1\n…\n). The codes are FeltKit's for the\n200\t  // same refusal, so an artifact answers as it does on a FeltKit server.\n201\t  const violation = (error as { violation?: { rule?: string; collection?: string; id?: string; field?: string; index?: string; target?: { collection: string; id: string }; message?: string } }).violation;\n202\t  if (violation) {\n203\t    const where = `${violation.collection ?? \"?\"}${violation.id ? `/${violation.id}` : \"\"}${violation.field ? `.${violation.field}` : \"\"}`;\n204\t    if (violation.rule === \"unique\") {\n205\t      return new HostError(\"CONFLICT\", `${where} duplicates a value that must be unique (${violation.index ?? \"unique constraint\"}). Nothing was written.`, { details: { ...details, violation }, hint: \"Retrying the same record cannot succeed: change the value, or update the record that holds it.\", cause: error });\n206\t    }\n207\t    if (violation.rule === \"reference\") {\n208\t      const target = violation.target ? `${violation.target.collection}/${violation.target.id}` : \"the referenced record\";\n209\t      return new HostError(\"FAILED_PRECONDITION\", `${where} references ${target}, which does not exist or would no longer exist. Nothing was written.`, { details: { ...details, violation }, hint: \"A reference must name an existing record, and a record cannot be deleted while another references it.\", cause: error });\n210\t    }\n211\t    return new HostError(\"VALIDATION_FAILED\", `${where}: ${violation.message ?? error.message} (FeltDB enforces the artifact's state contract). Nothing was written.`, { details: { ...details, violation }, cause: error });\n212\t  }\n213\t  if (error.code === \"UNKNOWN_COLLECTION\") return new HostError(\"FORBIDDEN\", `${error.message}. Nothing was written.`, { details, cause: error });"
+      },
+      "id": "mww4ui3hcecaff46cdd7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:01:55.129Z",
+      "digest": "ea690839e05f34e4",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 922,
+        "cacheReadTokens": 21161,
+        "cacheWriteTokens": 1411,
+        "latencyMs": 10352,
+        "messageId": "msg_011ChPgz3dY8L7qYzYyr3QLN"
+      },
+      "id": "mww4uqm3892c4ac7fe7e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:01:55.131Z",
+      "digest": "a18471e9e6cc7f4a",
+      "data": {
+        "n": 20,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":480,\"endLine\":512}",
+        "resultJson": null,
+        "rationale": "Check how patch/replace/delete handle records already pending in the same mutation (insert-then-delete, delete-then-insert), a likely source of lost or corrupted writes."
+      },
+      "id": "mww4uqm53cfb65601962",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:01:55.145Z",
+      "digest": "392195557ba93c30",
+      "data": {
+        "n": 20,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 480,
+          "endLine": 512
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 480-512 of 560:\n480\t  async patch(collection: unknown, id: unknown, fields: unknown, unset: unknown = []): Promise<AnyDoc> {\n481\t    const name = this.#write(collection);\n482\t    if (fields !== undefined && fields !== null && !isRecord(fields)) throw new HostError(\"INVALID_ARGUMENT\", \"patch() needs an object of fields.\");\n483\t    if (!Array.isArray(unset) || unset.some(k => typeof k !== \"string\")) throw new HostError(\"INVALID_ARGUMENT\", \"patch() unset must list field names.\");\n484\t    const { current, pending, base } = await this.#existing(name, id);\n485\t    const merged = { ...current, ...stripSystem((fields as Record<string, unknown>) ?? {}) };\n486\t    for (const key of unset as string[]) delete merged[key];\n487\t    this.host.validate(name, merged);\n488\t    this.#pending.set(this.#key(name, id as string), { collection: name, id: id as string, op: pending?.op === \"insert\" ? \"insert\" : \"update\", value: merged, ...(base !== undefined ? { baseVersion: base } : {}) });\n489\t    return { ...merged, id: id as string, __version: pending?.op === \"insert\" ? 1 : (base ?? 0) + 1 };\n490\t  }\n491\t\n492\t  async replace(collection: unknown, id: unknown, value: unknown): Promise<AnyDoc> {\n493\t    const name = this.#write(collection);\n494\t    const { pending, base } = await this.#existing(name, id);\n495\t    const fields = stripSystem(isRecord(value) ? value : {});\n496\t    this.host.validate(name, fields);\n497\t    this.#pending.set(this.#key(name, id as string), { collection: name, id: id as string, op: pending?.op === \"insert\" ? \"insert\" : \"update\", value: fields, ...(base !== undefined ? { baseVersion: base } : {}) });\n498\t    return { ...fields, id: id as string, __version: pending?.op === \"insert\" ? 1 : (base ?? 0) + 1 };\n499\t  }\n500\t\n501\t  async delete(collection: unknown, id: unknown): Promise<null> {\n502\t    const name = this.#write(collection);\n503\t    const { pending, base } = await this.#existing(name, id);\n504\t    const key = this.#key(name, id as string);\n505\t    if (pending?.op === \"insert\") {\n506\t      this.#pending.delete(key);\n507\t      return null;\n508\t    }\n509\t    this.#pending.set(key, { collection: name, id: id as string, op: \"delete\", ...(base !== undefined ? { baseVersion: base } : {}) });\n510\t    return null;\n511\t  }\n512\t"
+      },
+      "id": "mww4uqmnd547a2d194af",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:02:08.328Z",
+      "digest": "408a0334ed97935f",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 941,
+        "cacheReadTokens": 22572,
+        "cacheWriteTokens": 976,
+        "latencyMs": 12544,
+        "messageId": "msg_011ChPgzre1sG2ziFMyidYJw"
+      },
+      "id": "mww4v0sq60720eca8784",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:02:08.330Z",
+      "digest": "8460484548e5e0c4",
+      "data": {
+        "n": 21,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":111,\"endLine\":200}",
+        "resultJson": null,
+        "rationale": "Read the helper functions (sortRecords, checkLimit, equalityWhere, asWhere, feltdbRefusal) that were cut off in the earlier read, to check how a mutation's reads overlay its own writes."
+      },
+      "id": "mww4v0ss2c3e64d2fd66",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:02:08.348Z",
+      "digest": "32004dfd16ddd278",
+      "data": {
+        "n": 21,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 111,
+          "endLine": 200
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 111-200 of 560:\n111\tfunction sortRecords<T extends Record<string, unknown>>(records: T[], orderBy: OrderBy[] = []): T[] {\n112\t  return [...records].sort((a, b) => {\n113\t    for (const order of orderBy) {\n114\t      const c = compare(a[order.field], b[order.field]);\n115\t      if (c !== 0) return order.direction === \"desc\" ? -c : c;\n116\t    }\n117\t    return compare(a.id, b.id);\n118\t  });\n119\t}\n120\t\n121\tfunction equalityWhere(filter: Record<string, unknown> | undefined): WhereClause[] {\n122\t  return Object.entries(filter ?? {})\n123\t    .filter(([, value]) => value !== undefined)\n124\t    .map(([field, value]) => ({ field, eq: value }));\n125\t}\n126\t\n127\tfunction checkLimit(limit: unknown, name: string): void {\n128\t  if (limit !== undefined && (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > MAX_FIND)) {\n129\t    throw new HostError(\"INVALID_ARGUMENT\", `${name} limit must be an integer between 1 and ${MAX_FIND}.`);\n130\t  }\n131\t}\n132\t\n133\tfunction asOrderBy(value: unknown): OrderBy[] | undefined {\n134\t  if (value === undefined) return undefined;\n135\t  if (!Array.isArray(value) || value.some(o => !isRecord(o) || typeof o.field !== \"string\" || (o.direction !== \"asc\" && o.direction !== \"desc\"))) {\n136\t    throw new HostError(\"INVALID_ARGUMENT\", \"orderBy must be a list of { field, direction: \\\"asc\\\" | \\\"desc\\\" }.\");\n137\t  }\n138\t  return value as OrderBy[];\n139\t}\n140\t\n141\tfunction asWhere(value: unknown): WhereClause[] | undefined {\n142\t  if (value === undefined) return undefined;\n143\t  if (!Array.isArray(value) || value.some(c => !isRecord(c) || typeof c.field !== \"string\")) throw new HostError(\"INVALID_ARGUMENT\", \"where must be a list of { field, eq | neq | lt\n…\n and AppBoundry did not resend it.\";\n181\texport const CONTRACT_CHANGED_HINT = \"The call was made under the previous contract. If it still makes sense, call it again: it runs under the new contract.\";\n182\t\n183\tfunction commitError(error: unknown, transactionId: string): unknown {\n184\t  if (error instanceof HostError) return error;\n185\t  if (!(error instanceof FeltDBServiceError)) return error;\n186\t  const details = { transactionId, feltdbCode: error.code };\n187\t  if (error.code === FeltDBErrorCode.PRECONDITION_FAILED) {\n188\t    // FeltDB names the first failing precondition (a sequence record: see transactions.ts).\n189\t    return new HostError(\"CONFLICT\", \"A record this mutation read changed before it could commit. Nothing was written; it is safe to retry.\", { details: { ...details, failure: (error as { failure?: unknown }).failure ?? null }, cause: error });\n190\t  }\n191\t  if (error.code === FeltDBErrorCode.COMMIT_OUTCOME_UNKNOWN || error.code === FeltDBErrorCode.DURABILITY_FAILURE) {\n192\t    return new HostError(\"OUTCOME_UNKNOWN\", `FeltDB could not confirm the commit (${error.code}); the mutation may or may not have been written.`, {\n193\t      details,\n194\t      hint: \"Read the records it writes before acting again. AppBoundry resent it under the same transaction id until FeltDB stopped answering; it never sends it under a new one.\",\n195\t      cause: error\n196\t    });\n197\t  }\n198\t  if (error.code === FeltDBErrorCode.REVISION_NOT_ACTIVE) return new HostError(\"CONFLICT\", CONTRACT_CHANGED, { details, hint: CONTRACT_CHANGED_HINT, cause: error });\n199\t  // The artifact's state contract refused the write (contract.ts). The codes are FeltKit's for the\n200\t  // same refusal, so an artifact answers as it does on a FeltKit server."
+      },
+      "id": "mww4v0tg5fe508307d63",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:02:19.362Z",
+      "digest": "3cbfa6fd7cc8f278",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 941,
+        "cacheReadTokens": 23548,
+        "cacheWriteTokens": 1510,
+        "latencyMs": 10572,
+        "messageId": "msg_011ChPh1pGRPaNbNLqVdrZya"
+      },
+      "id": "mww4v9b848abacce8c78",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:02:19.364Z",
+      "digest": "61d2f785f9deecb4",
+      "data": {
+        "n": 22,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\"}",
+        "resultJson": null,
+        "rationale": "Paged reads look sound; examine the transaction/sequence machinery for a provable reliability defect."
+      },
+      "id": "mww4v9ba899288989dbd",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:02:19.378Z",
+      "digest": "99ed8bc31183ec1e",
+      "data": {
+        "n": 22,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts"
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 1-269 of 269:\n1\t/**\n2\t * Host interface transactions@1: `db.sequence` and `outbox.stage`, the guest operations behind a\n3\t * producer's transactional sequences and after-commit effects (FeltKit: ctx.db.sequence,\n4\t * ctx.afterCommit). The contract is FeltKit's docs/TRANSACTIONS.md, implemented here on the\n5\t * host's own FeltDB transaction (collections.ts) with host-owned collections:\n6\t *\n7\t *   sequence      per stream (its name): strictly increasing and gapless in commit order, written\n8\t *                 in the mutation's transaction guarded on the version read, so a concurrent\n9\t *                 commit of the same stream refuses the whole transaction (CONFLICT) and a\n10\t *                 failed mutation consumes nothing; independent streams never contend\n11\t *   outbox        one record per effect, committed with the mutation or not at all; performed\n12\t *                 after the commit as the caller (claimed pending → performing, version-checked),\n13\t *                 then done (with its result) or failed (with the error); stale pending and\n14\t *                 performing records are recovered by the worker after a restart; a failed one\n15\t *                 is retried only by an operator. A job or webhook event is created in the same\n16\t *                 FeltDB transaction that records it done (AppPort Services' transaction context,\n17\t *                 @appport/services 0.13.1), so it is created once per committed effect; a\n18\t *                 notification carries the record id as its idempotency key. Creation, not\n19\t *                 delivery: a job's run or a webhook's delivery to its endpoint is the services'\n20\t *                 own (at least o\n…\nlicts: n as number };\n247\t}\n248\t\n249\t/** After-commit effects in `db`, newest first (optionally only one state). */\n250\texport async function listOutbox(db: { collection(name: string): { find(filter: Record<string, unknown>): Promise<unknown[]> } }, filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\n251\t  if (filter.state !== undefined && ![\"pending\", \"performing\", \"done\", \"failed\"].includes(filter.state)) throw new HostError(\"INVALID_ARGUMENT\", \"state is pending, performing, done or failed.\");\n252\t  const rows = (await db.collection(OUTBOX_COLLECTION).find(filter.state ? { state: filter.state } : {})) as Array<OutboxRecord & { __version?: number }>;\n253\t  return rows.map(r => strip(r)).sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.min(Math.max(Number(filter.limit) || 100, 1), 1000));\n254\t}\n255\t\n256\t/** Move a failed record back to pending (an operator's retry); a running host then performs it. */\n257\texport async function retryOutboxRecord(db: Store, id: unknown, by: string): Promise<OutboxRecord> {\n258\t  if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"Name the after-commit effect to retry (see `appboundry admin outbox list --status failed`).\");\n259\t  const record = (await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null;\n260\t  if (!record) throw new HostError(\"NOT_FOUND\", `No after-commit effect ${id}.`);\n261\t  const next = retried(record, by);\n262\t  try {\n263\t    await put(db, id, record.__version, next);\n264\t  } catch {\n265\t    throw new HostError(\"CONFLICT\", `After-commit effect ${id} changed while it was being retried. Nothing was changed; read it again.`);\n266\t  }\n267\t  return next;\n268\t}\n269\t"
+      },
+      "id": "mww4v9bu747b08a155ad",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:02:31.832Z",
+      "digest": "5089ff8e7589fc3b",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 950,
+        "cacheReadTokens": 25058,
+        "cacheWriteTokens": 1348,
+        "latencyMs": 12014,
+        "messageId": "msg_011ChPh2dfxYC7wCBZ51CPK8"
+      },
+      "id": "mww4vixn275b52b5da97",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:02:31.835Z",
+      "digest": "293aafd397ed6afe",
+      "data": {
+        "n": 23,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"expiresAt|ttl|Date\\\\.now\\\\(\\\\)\",\"path\":\"packages/appboundry-host/src/identity.ts\"}",
+        "resultJson": null,
+        "rationale": "The collections and paged-read paths look sound so far; check session expiry handling in identity.ts for lifetime or expiry defects."
+      },
+      "id": "mww4vixp49f0cdc28b2d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:02:31.858Z",
+      "digest": "649da11cd1ee73c5",
+      "data": {
+        "n": 23,
+        "action": "search",
+        "input": {
+          "pattern": "expiresAt|ttl|Date\\.now\\(\\)",
+          "path": "packages/appboundry-host/src/identity.ts"
+        },
+        "summary": "packages/appboundry-host/src/identity.ts:116:   expiresAt: string;\npackages/appboundry-host/src/identity.ts:126:   readonly expiresAt: string;\npackages/appboundry-host/src/identity.ts:224:     const issued = await this.issue({ kind: \"dev\", subject: user.id, principal, issuedBy: \"dev-sign-in\", ttlMs: this.#policy.sessionTtlMs });\npackages/appboundry-host/src/identity.ts:229:   async issue(input: { kind: SessionKind; subject: string; principal?: Principal; issuedBy: string; ttlMs: number }, extra: Array<Record<string, unknown>> = []): Promise<IssuedSession> {\npackages/appboundry-host/src/identity.ts:230:     if (!Number.isFinite(input.ttlMs) || input.ttlMs <= 0) throw new HostError(\"INVALID_ARGUMENT\", \"A session lifetime must be positive.\");\npackages/appboundry-host/src/identity.ts:232:     const now = Date.now();\npackages/appboundry-host/src/identity.ts:240:       expiresAt: new Date(now + input.ttlMs).toISOString(),\npackages/appboundry-host/src/identity.ts:244:     return { token, sessionId: record.sessionId, subject: record.subject, kind: record.kind, expiresAt: record.expiresAt };\npackages/appboundry-host/src/identity.ts:250:     if (!record || Date.parse(record.expiresAt) <= Date.now()) return null;"
+      },
+      "id": "mww4viyf6b8de25dea68",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:02:41.870Z",
+      "digest": "0d3443e3b017b0fc",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 653,
+        "cacheReadTokens": 26406,
+        "cacheWriteTokens": 589,
+        "latencyMs": 9060,
+        "messageId": "msg_011ChPh3avHpoVc5isQfbzto"
+      },
+      "id": "mww4vqogc9d40f748f43",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:02:41.872Z",
+      "digest": "1382d509d6b1738a",
+      "data": {
+        "n": 24,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\": \"\\\\.find\\\\(\\\\{|\\\\.find\\\\(filter|collection\\\\([^)]*\\\\)\\\\.find\\\\(\", \"path\": \"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "Look for unpaged FeltDB find() calls outside the outbox, which fail past 1,000 records (the same class of defect paged-read.ts was written to avoid)."
+      },
+      "id": "mww4vqoi8bdd7a023acc",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:02:41.891Z",
+      "digest": "0be99bcafa331779",
+      "data": {
+        "n": 24,
+        "action": "search",
+        "input": {
+          "pattern": "\\.find\\(\\{|\\.find\\(filter|collection\\([^)]*\\)\\.find\\(",
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src/admin.ts:95:     return (await this.#db.collection<OperatorRecord>(OPERATORS_COLLECTION).find({} as never)) as OperatorRecord[];\npackages/appboundry-host/src/admin.ts:99:     return (await this.#db.collection<SessionRecord>(SESSIONS_COLLECTION).find({} as never)) as SessionRecord[];\npackages/appboundry-host/src/admin.ts:177:     return ((await this.#db.collection<UserRecord>(USERS_COLLECTION).find({} as never)) as UserRecord[]).map(stripVersion).sort((a, b) => a.id.localeCompare(b.id));\npackages/appboundry-host/src/admin.ts:268:     const entries = (await this.#db.collection<AuditEntry>(AUDIT_COLLECTION).find({} as never)) as AuditEntry[];\npackages/appboundry-host/src/admin.ts:275:     const users = (await this.#db.collection<UserRecord>(USERS_COLLECTION).find({} as never)) as UserRecord[];\npackages/appboundry-host/src/backup.ts:174:         const existing = (await db.collection(name).find({}, { limit: 1 } as never)) as unknown[];\npackages/appboundry-host/src/contract.ts:156:   const rows = (await db.collection<Partial<ContractHistoryRecord>>(CONTRACT_HISTORY).find({})) as Array<Partial<ContractHistoryRecord>>;\npackages/appboundry-host/src/contract.ts:198:     const rows = (await db.collection<MigrationRecord & { __version: number }>(collection).find({})) as Array<MigrationRecord & { __version: number }>;\npackages/appboundry-host/src/host.ts:519:     const stale = [...(await outbox.find({ state: \"pending\" } as never)), ...(await outbox.find({ state: \"performing\" } as never))].filter(r => isRecoverable(r as OutboxRecord, now)) as Array<OutboxRecord & { __version: number }>;\npackages/appboundry-host/src/transactions.ts:252:   const rows = (await db.collection(OUTBOX_COLLECTION).find(filter.state ? { state: filter.state } : {})) as Array<OutboxRecord & { __version?: number }>;"
+      },
+      "id": "mww4vqp5459611231876",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:02:50.342Z",
+      "digest": "8f156a5dc9d2a392",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 610,
+        "cacheReadTokens": 26995,
+        "cacheWriteTokens": 875,
+        "latencyMs": 7515,
+        "messageId": "msg_011ChPh4KmzYP6Xhge76PJmg"
+      },
+      "id": "mww4vx7s7b0daf2e8b8a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:02:50.344Z",
+      "digest": "3819c17b0a709252",
+      "data": {
+        "n": 25,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/admin.ts\",\"startLine\":80,\"endLine\":300}",
+        "resultJson": null,
+        "rationale": "admin.ts uses unpaged find({}) on the audit, users, operators and sessions collections. FeltDB refuses an unpaged find past 1,000 matches, and paged-read.ts exists to avoid exactly that, so these may be a real failure under load. Read the context first."
+      },
+      "id": "mww4vx7u4a126db1cb16",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:02:50.358Z",
+      "digest": "94dd929fcc2b51b2",
+      "data": {
+        "n": 25,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/admin.ts",
+          "startLine": 80,
+          "endLine": 300
+        },
+        "summary": "packages/appboundry-host/src/admin.ts lines 80-291 of 291:\n80\t    const at = new Date().toISOString();\n81\t    // FeltDB ids allow letters, digits, \"-\" and \"_\"; zero-padded milliseconds keep them in time order.\n82\t    const entry: AuditEntry = { id: `${String(Date.parse(at)).padStart(15, \"0\")}-${randomBytes(4).toString(\"hex\")}`, at, actor: actorName(actor), action, ...(target ? { target } : {}), ...(details ? { details } : {}) };\n83\t    return { collection: AUDIT_COLLECTION, id: entry.id, requireAbsent: true, value: entry };\n84\t  }\n85\t\n86\t  async #write(operations: Array<Record<string, unknown>>): Promise<void> {\n87\t    await this.#db.transaction({ operations } as never);\n88\t  }\n89\t\n90\t  #requireLocal(actor: Actor, what: string): void {\n91\t    if (actor.kind !== \"local\") throw new HostError(\"FORBIDDEN\", `${what} needs the local operator context (the account that owns the state directory).`);\n92\t  }\n93\t\n94\t  async #operators(): Promise<OperatorRecord[]> {\n95\t    return (await this.#db.collection<OperatorRecord>(OPERATORS_COLLECTION).find({} as never)) as OperatorRecord[];\n96\t  }\n97\t\n98\t  async #sessions(): Promise<SessionRecord[]> {\n99\t    return (await this.#db.collection<SessionRecord>(SESSIONS_COLLECTION).find({} as never)) as SessionRecord[];\n100\t  }\n101\t\n102\t  #deleteSessions(sessions: SessionRecord[]): Array<Record<string, unknown>> {\n103\t    return sessions.map(s => ({ collection: SESSIONS_COLLECTION, id: s.id, ifVersion: s.__version }));\n104\t  }\n105\t\n106\t  /**\n107\t   * Create the first operator and its token. Refused once an operator exists, unless\n108\t   * `recover`: then every operator session is revoked and this operator (re)enabled.\n109\t   */\n110\t  async bootstrap(actor: Actor, input: { operator: unknown; name?\n…\nit this.#write([...this.#deleteSessions(targets), this.#audit(actor, \"sessions.revoke\", String(input.sessionId ?? input.user), { revoked: targets.length })]);\n263\t    return { revoked: targets.length };\n264\t  }\n265\t\n266\t  async audit(input: { limit?: unknown } = {}): Promise<AuditEntry[]> {\n267\t    const limit = typeof input.limit === \"number\" && input.limit > 0 ? Math.min(input.limit, 1000) : 100;\n268\t    const entries = (await this.#db.collection<AuditEntry>(AUDIT_COLLECTION).find({} as never)) as AuditEntry[];\n269\t    return entries.map(e => stripVersion(e as AuditEntry & { __version?: number })).sort((a, b) => b.at.localeCompare(a.at) || b.id.localeCompare(a.id)).slice(0, limit);\n270\t  }\n271\t\n272\t  /** Counts for status: never names or tokens. */\n273\t  async summary(): Promise<{ operators: number; users: number; disabledUsers: number; sessions: Record<SessionKind, number> }> {\n274\t    const now = Date.now();\n275\t    const users = (await this.#db.collection<UserRecord>(USERS_COLLECTION).find({} as never)) as UserRecord[];\n276\t    const sessions = (await this.#sessions()).filter(s => Date.parse(s.expiresAt) > now);\n277\t    return {\n278\t      operators: (await this.#operators()).filter(o => !o.disabled).length,\n279\t      users: users.filter(u => !u.disabled).length,\n280\t      disabledUsers: users.filter(u => u.disabled).length,\n281\t      sessions: { user: sessions.filter(s => s.kind === \"user\").length, dev: sessions.filter(s => s.kind === \"dev\").length, operator: sessions.filter(s => s.kind === \"operator\").length }\n282\t    };\n283\t  }\n284\t}\n285\t\n286\tfunction stripVersion<T extends { __version?: number }>(record: T): Omit<T, \"__version\"> {\n287\t  const { __version: _v, ...rest } = record;\n288\t  return rest;\n289\t}\n290\t\n291\t"
+      },
+      "id": "mww4vx8fab2b2760cdcb",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:02:57.886Z",
+      "digest": "fb0209cb5d33d378",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 541,
+        "cacheReadTokens": 27870,
+        "cacheWriteTokens": 1548,
+        "latencyMs": 7067,
+        "messageId": "msg_011ChPh4vCCPm7EjTRtvPxwx"
+      },
+      "id": "mww4w31b1dd8a9026d95",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:02:57.887Z",
+      "digest": "25e459375d058206",
+      "data": {
+        "n": 26,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/test/large-collections.test.ts\",\"startLine\":22,\"endLine\":53}",
+        "resultJson": null,
+        "rationale": "admin.ts reads sessions, users and audit entries with unpaged find({}) (lines 95, 99, 268, 275), which FeltDB refuses past 1,000 matches. Before writing a test that crosses that limit, I need to see how the existing large-collection tests open a host and issue sessions."
+      },
+      "id": "mww4w31d7001a32cd37f",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:02:57.900Z",
+      "digest": "7bda2f1f5f6a4654",
+      "data": {
+        "n": 26,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/test/large-collections.test.ts",
+          "startLine": 22,
+          "endLine": 53
+        },
+        "summary": "packages/appboundry-host/test/large-collections.test.ts lines 22-53 of 85:\n22\t  { name: \"items:first\", kind: \"query\", access: \"data.read\", body: `async (a, host) => (await host(\"db.find\", { collection: \"items\", filter: {}, options: { limit: 10 } })).length` },\n23\t  { name: \"items:named\", kind: \"query\", access: \"data.read\", body: `async (a, host) => (await host(\"db.find\", { collection: \"items\", filter: { name: a.name }, options: {} })).length` },\n24\t  { name: \"items:count\", kind: \"query\", access: \"data.read\", body: `async (a, host) => host(\"db.count\", { collection: \"items\", filter: {} })` },\n25\t  { name: \"items:addThenFind\", kind: \"mutation\", access: \"data.write\", body: `async (a, host) => { await host(\"db.insert\", { collection: \"items\", value: { name: a.name } }); return { found: (await host(\"db.find\", { collection: \"items\", filter: { name: a.name }, options: {} })).length, count: await host(\"db.count\", { collection: \"items\", filter: {} }) }; }` }\n26\t];\n27\t\n28\tasync function open(stateDir: string) {\n29\t  const artifact = await syntheticArtifact(work, FUNCTIONS, \"large\", { roles: { member: [\"data.*\"] } });\n30\t  return ArtifactHost.open({ artifact: await loadArtifact(artifact), stateDir, environment: \"production\", jobIntervalMs: 0 });\n31\t}\n32\tasync function ok<T>(host: ArtifactHost, name: string, args: unknown, principal: Principal): Promise<T> {\n33\t  const r = await host.call(name, args, { principal, via: \"test\" });\n34\t  if (!r.ok) throw new Error(`${name}: ${r.error.code} ${r.error.message}`);\n35\t  return r.value as T;\n36\t}\n37\tasync function populated() {\n38\t  const stateDir = join(work, \"state\");\n39\t  const host = await open(stateDir);\n40\t  await host.admin(a => a.bootstrap(localActor(), { operator: \"ops\" }));\n41\t  await host.admin(a => a.addUser({ kind: \"operator\", id: \"ops\" }, { id: \"ada\", roles: [\"member\"] }));\n42\t  const session = await host.admin(a => a.issueSession({ kind: \"operator\", id: \"ops\" }, { user: \"ada\" }));\n43\t  const ada = (await host.identity.principalForToken(session.token))!;\n44\t  for (let i = 0; i < N; i += 250) await ok(host, \"items:seed\", { n: 250, prefix: `item-${i}-` }, ada);\n45\t  return { host, ada, stateDir };\n46\t}\n47\t\n48\tdescribe(\"collections past FeltDB's 1,000-match find() limit\", () => {\n49\t  it(\"find and count return every match, as FeltKit's runtime does, and limit still bounds find\", async () => {\n50\t    const { host, ada } = await populated();\n51\t    try {\n52\t      expect(await ok(host, \"items:all\", {}, ada)).toBe(N);\n53\t      expect(await ok(host, \"items:count\", {}, ada)).toBe(N);"
+      },
+      "id": "mww4w31zd78bf413498e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:03:05.892Z",
+      "digest": "be792ff909afb728",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 561,
+        "cacheReadTokens": 29418,
+        "cacheWriteTokens": 1097,
+        "latencyMs": 7073,
+        "messageId": "msg_011ChPh5WJYa7NqNbySYAd4B"
+      },
+      "id": "mww4w97r098823a24a8c",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:03:05.895Z",
+      "digest": "959d517360743efe",
+      "data": {
+        "n": 27,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/admin.ts\",\"startLine\":106,\"endLine\":265}",
+        "resultJson": null,
+        "rationale": "admin.ts reads operators, sessions, users and audit with unpaged find({}), which FeltDB refuses past 1,000 matches. I need the admin API names and signatures to write a test that drives one of those collections past the limit."
+      },
+      "id": "mww4w97taa61ab5ec7c4",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:03:05.912Z",
+      "digest": "529573b532f29cc6",
+      "data": {
+        "n": 27,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/admin.ts",
+          "startLine": 106,
+          "endLine": 265
+        },
+        "summary": "packages/appboundry-host/src/admin.ts lines 106-265 of 291:\n106\t  /**\n107\t   * Create the first operator and its token. Refused once an operator exists, unless\n108\t   * `recover`: then every operator session is revoked and this operator (re)enabled.\n109\t   */\n110\t  async bootstrap(actor: Actor, input: { operator: unknown; name?: unknown; recover?: boolean; ttl?: unknown }): Promise<IssuedSession> {\n111\t    this.#requireLocal(actor, \"Bootstrapping an operator\");\n112\t    const id = assertPrincipalId(input.operator, \"operator\");\n113\t    const ttlMs = input.ttl === undefined ? DEFAULT_OPERATOR_SESSION_TTL_MS : parseDuration(input.ttl, \"--ttl\");\n114\t    const operators = await this.#operators();\n115\t    if (operators.length && !input.recover) {\n116\t      throw new HostError(\"CONFLICT\", `This installation already has operators (${operators.map(o => o.id).join(\", \")}).`, {\n117\t        hint: \"An operator issues tokens with `appboundry admin operators token <id>`. If every operator credential is lost, the local account recovers with `appboundry admin bootstrap --recover --operator <id>`.\"\n118\t      });\n119\t    }\n120\t    const now = new Date().toISOString();\n121\t    const existing = operators.find(o => o.id === id);\n122\t    const record: OperatorRecord = { id, ...(typeof input.name === \"string\" ? { name: input.name } : existing?.name ? { name: existing.name } : {}), disabled: false, createdAt: existing?.createdAt ?? now, createdBy: existing?.createdBy ?? actorName(actor), ...(existing ? { updatedAt: now, updatedBy: actorName(actor) } : {}) };\n123\t    const revoked = input.recover ? (await this.#sessions()).filter(s => s.kind === \"operator\") : [];\n124\t    await this.#write([\n125\t      existing ? { collection: OPERATORS_COLLECTION, \n…\n43\t    return all\n244\t      .filter(s => Date.parse(s.expiresAt) > now)\n245\t      .filter(s => filter.user === undefined || s.subject === filter.user)\n246\t      .filter(s => filter.kind === undefined || s.kind === filter.kind)\n247\t      .map(s => ({ sessionId: s.sessionId, kind: s.kind, subject: s.subject, createdAt: s.createdAt, expiresAt: s.expiresAt, issuedBy: s.issuedBy }))\n248\t      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));\n249\t  }\n250\t\n251\t  /** Revoke one session by its handle, or every session of a user. Effective on the next request. */\n252\t  async revokeSessions(actor: Actor, input: { sessionId?: unknown; user?: unknown }): Promise<{ revoked: number }> {\n253\t    if ((input.sessionId === undefined) === (input.user === undefined)) throw new HostError(\"INVALID_ARGUMENT\", \"Revoke one session (<session-id>) or every session of a user (--user <id>).\");\n254\t    const all = await this.#sessions();\n255\t    const targets = input.sessionId !== undefined\n256\t      ? all.filter(s => s.sessionId === input.sessionId)\n257\t      : all.filter(s => (s.kind === \"user\" || s.kind === \"dev\") && s.subject === input.user);\n258\t    if (input.sessionId !== undefined && !targets.length) throw new HostError(\"NOT_FOUND\", `No session ${String(input.sessionId)}.`);\n259\t    if (targets.some(s => s.kind === \"operator\") && actor.kind === \"operator\" && targets.some(s => s.subject !== actor.id)) {\n260\t      throw new HostError(\"FORBIDDEN\", \"Revoke another operator's access with `operators revoke`.\");\n261\t    }\n262\t    await this.#write([...this.#deleteSessions(targets), this.#audit(actor, \"sessions.revoke\", String(input.sessionId ?? input.user), { revoked: targets.length })]);\n263\t    return { revoked: targets.length };\n264\t  }\n265\t"
+      },
+      "id": "mww4w98k6f8b222438d0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:03:16.966Z",
+      "digest": "74d5c19c2dee2eab",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 854,
+        "cacheReadTokens": 30515,
+        "cacheWriteTokens": 1475,
+        "latencyMs": 10129,
+        "messageId": "msg_011ChPh66a477HDL1QLg7LzG"
+      },
+      "id": "mww4whrb7d18eebd15a2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:03:16.967Z",
+      "digest": "8c944dbd0c7b7b2c",
+      "data": {
+        "n": 28,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/admin.ts\",\"startLine\":125,\"endLine\":243}",
+        "resultJson": null,
+        "rationale": "Several admin reads (#operators, #sessions, users, audit) use an unpaged collection.find({}), which FeltDB refuses past 1,000 matches. Before writing a test I need to see which admin actions add audit and session records, and whether expired sessions are ever purged."
+      },
+      "id": "mww4whrd164db084c255",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:03:16.982Z",
+      "digest": "9a2a80c2ee92da61",
+      "data": {
+        "n": 28,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/admin.ts",
+          "startLine": 125,
+          "endLine": 243
+        },
+        "summary": "packages/appboundry-host/src/admin.ts lines 125-243 of 291:\n125\t      existing ? { collection: OPERATORS_COLLECTION, id, ifVersion: existing.__version, value: record } : { collection: OPERATORS_COLLECTION, id, requireAbsent: true, value: record },\n126\t      ...this.#deleteSessions(revoked),\n127\t      this.#audit(actor, input.recover ? \"operators.recover\" : \"operators.bootstrap\", id, input.recover ? { revokedOperatorSessions: revoked.length } : undefined)\n128\t    ]);\n129\t    return this.#identity.issue({ kind: \"operator\", subject: id, issuedBy: actorName(actor), ttlMs });\n130\t  }\n131\t\n132\t  /** Record an action that changes nothing here (a backup, a restore). */\n133\t  async record(actor: Actor, action: string, target?: string, details?: Record<string, unknown>): Promise<void> {\n134\t    await this.#write([this.#audit(actor, action, target, details)]);\n135\t  }\n136\t\n137\t  async listOperators(): Promise<Array<Omit<OperatorRecord, \"__version\">>> {\n138\t    return (await this.#operators()).map(({ __version: _v, ...o }) => o).sort((a, b) => a.id.localeCompare(b.id));\n139\t  }\n140\t\n141\t  async addOperator(actor: Actor, input: { id: unknown; name?: unknown; ttl?: unknown }): Promise<IssuedSession> {\n142\t    const id = assertPrincipalId(input.id, \"operator\");\n143\t    const ttlMs = input.ttl === undefined ? DEFAULT_OPERATOR_SESSION_TTL_MS : parseDuration(input.ttl, \"--ttl\");\n144\t    if ((await this.#operators()).length === 0) throw new HostError(\"CONFLICT\", \"No operator exists yet. Bootstrap the first one locally: appboundry admin bootstrap --operator <id>.\");\n145\t    if (await this.#db.collection(OPERATORS_COLLECTION).get(id)) throw new HostError(\"CONFLICT\", `Operator ${id} already exists.`);\n146\t    const record: OperatorRecord = { \n…\n\n216\t      this.#audit(actor, \"users.disable\", id, { revokedSessions: sessions.length })\n217\t    ]);\n218\t    return { revokedSessions: sessions.length };\n219\t  }\n220\t\n221\t  async enableUser(actor: Actor, input: { id: unknown }): Promise<Omit<UserRecord, \"__version\">> {\n222\t    const id = assertPrincipalId(input.id, \"user\");\n223\t    const user = await this.#user(id);\n224\t    const next = { ...stripVersion(user), disabled: false, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) };\n225\t    await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.enable\", id)]);\n226\t    return next;\n227\t  }\n228\t\n229\t  async issueSession(actor: Actor, input: { user: unknown; ttl?: unknown }): Promise<IssuedSession> {\n230\t    const id = assertPrincipalId(input.user, \"user\");\n231\t    const user = await this.#user(id);\n232\t    if (user.disabled) throw new HostError(\"CONFLICT\", `User ${id} is disabled. Enable it first.`);\n233\t    const ttlMs = input.ttl === undefined ? this.#identity.sessionTtlMs : parseDuration(input.ttl, \"--ttl\");\n234\t    return this.#identity.issue({ kind: \"user\", subject: id, issuedBy: actorName(actor), ttlMs }, [this.#audit(actor, \"sessions.issue\", id, { ttlMs })]);\n235\t  }\n236\t\n237\t  /** Unexpired sessions; expired ones are removed as they are found. Never a token or its digest. */\n238\t  async listSessions(filter: { user?: unknown; kind?: unknown } = {}): Promise<SessionInfo[]> {\n239\t    const now = Date.now();\n240\t    const all = await this.#sessions();\n241\t    const expired = all.filter(s => Date.parse(s.expiresAt) <= now);\n242\t    if (expired.length) await this.#write(this.#deleteSessions(expired)).catch(() => undefined);\n243\t    return all"
+      },
+      "id": "mww4whrz6838d7d2d829",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:03:36.451Z",
+      "digest": "0769b59fcda10518",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 2142,
+        "cacheReadTokens": 31990,
+        "cacheWriteTokens": 1545,
+        "latencyMs": 18615,
+        "messageId": "msg_011ChPh6uYp2QVCtN3uip6uS"
+      },
+      "id": "mww4wwslde2e44b87723",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:03:36.453Z",
+      "digest": "3b2607812cbeee46",
+      "data": {
+        "n": 29,
+        "kind": "act",
+        "action": "write",
+        "inputJson": "{\"path\":\"packages/appboundry-host/test/admin-many-sessions.test.ts\",\"content\":\"/**\\n * Admin reads of host collections past FeltDB's 1,000-match unpaged find() limit.\\n * Every issued session is a record in the sessions collection; admin.ts reads them with an unpaged find({}).\\n */\\nimport { mkdtemp, rm } from \\\"node:fs/promises\\\";\\nimport { tmpdir } from \\\"node:os\\\";\\nimport { join } from \\\"node:path\\\";\\nimport { afterEach, beforeEach, describe, expect, it } from \\\"vitest\\\";\\nimport { ArtifactHost, loadArtifact, localActor } from \\\"@appport/appboundry-host\\\";\\nimport { syntheticArtifact, type SyntheticFunction } from \\\"./helpers.js\\\";\\n\\nlet work: string;\\nbeforeEach(async () => { work = await mkdtemp(join(tmpdir(), \\\"appboundry-sessions-\\\")); });\\nafterEach(async () => { await rm(work, { recursive: true, force: true }); });\\n\\nconst FUNCTIONS: SyntheticFunction[] = [\\n  { name: \\\"items:count\\\", kind: \\\"query\\\", access: \\\"data.read\\\", body: `async (a, host) => host(\\\"db.count\\\", { collection: \\\"items\\\", filter: {} })` }\\n];\\n\\nconst N = 1_005;\\n\\ndescribe(\\\"admin with more than 1,000 sessions\\\", () => {\\n  it(\\\"still lists and revokes a user's sessions\\\", async () => {\\n    const artifact = await syntheticArtifact(work, FUNCTIONS, \\\"many\\\", { roles: { member: [\\\"data.*\\\"] } });\\n    const host = await ArtifactHost.open({ artifact: await loadArtifact(artifact), stateDir: join(work, \\\"state\\\"), environment: \\\"production\\\", jobIntervalMs: 0 });\\n    try {\\n      await host.admin(a => a.bootstrap(localActor(), { operator: \\\"ops\\\" }));\\n      await host.admin(a => a.addUser({ kind: \\\"operator\\\", id: \\\"ops\\\" }, { id: \\\"ada\\\", roles: [\\\"member\\\"] }));\\n      for (let i = 0; i < N; i++) await host.admin(a => a.issueSession({ kind: \\\"operator\\\", id: \\\"ops\\\" }, { user: \\\"ada\\\" }));\\n      let listed: unknown;\\n      try { listed = (await host.admin(a => a.listSessions({ user: \\\"ada\\\" }))).length; } catch (error) { listed = `threw ${(error as { code?: string }).code ?? \\\"\\\"} ${(error as Error).message}`; }\\n      expect(listed).toBe(N);\\n      let revoked: unknown;\\n      try { revoked = (await host.admin(a => a.revokeSessions({ kind: \\\"operator\\\", id: \\\"ops\\\" }, { user: \\\"ada\\\" }))).revoked; } catch (error) { revoked = `threw ${(error as { code?: string }).code ?? \\\"\\\"} ${(error as Error).message}`; }\\n      expect(revoked).toBe(N);\\n    } finally { await host.close(); }\\n  }, 600_000);\\n});\\n\"}",
+        "resultJson": null,
+        "rationale": "admin.ts reads sessions/audit/users/operators with unpaged find({}), which FeltDB refuses past 1,000 matches (as paged-read.ts documents). Sessions accumulate with every issue, so listing/revoking fails. Test it."
+      },
+      "id": "mww4wwssed2058c944b2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "checkpoint",
+      "at": "2026-11-25T13:03:36.576Z",
+      "digest": "a4453a832cdeaa26",
+      "data": {
+        "seq": 1,
+        "path": "packages/appboundry-host/test/admin-many-sessions.test.ts",
+        "sha256": "231db10f12f8421ef4d8c5c4ace2c2a703e8130a6c3335bc5b6718962a6e3796",
+        "tree": "7f2bd54154004633369ef2449be2a8ac2168cd0f",
+        "files": 1
+      },
+      "id": "mww4www3987eccdafe5d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:03:36.579Z",
+      "digest": "cf59ea4dd11d1728",
+      "data": {
+        "n": 29,
+        "action": "write",
+        "input": {
+          "path": "packages/appboundry-host/test/admin-many-sessions.test.ts"
+        },
+        "summary": "wrote packages/appboundry-host/test/admin-many-sessions.test.ts (2246 bytes); checkpointed"
+      },
+      "id": "mww4www4b5f4e9422f35",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:03:43.129Z",
+      "digest": "7f2a666b5422a91a",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 391,
+        "cacheReadTokens": 33535,
+        "cacheWriteTokens": 78,
+        "latencyMs": 6268,
+        "messageId": "msg_011ChPh8K5vkkenXkWSJV6qT"
+      },
+      "id": "mww4x1y256cf39236087",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:03:43.130Z",
+      "digest": "2e89dca205fbae53",
+      "data": {
+        "n": 30,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\": \"test\", \"target\": \"packages/appboundry-host/test/admin-many-sessions.test.ts\", \"against\": \"change\"}",
+        "resultJson": null,
+        "rationale": "Run the test I wrote. It checks that the admin session and audit reads, which call unpaged find({}) at admin.ts lines 95-100 and 268, fail once more than 1,000 records exist."
+      },
+      "id": "mww4x1y4bb78e32be976",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "observation",
+      "at": "2026-11-25T13:03:47.793Z",
+      "digest": "58db95548368a44f",
+      "data": {
+        "n": 30,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/admin-many-sessions.test.ts",
+          "against": "change"
+        },
+        "summary": "test packages/appboundry-host/test/admin-many-sessions.test.ts against change: exit 1 in 5 s\n(node:1524) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1537) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/eve-mww4rrzd6357a7f8f987\u001b[39m\n\n(node:1572) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1573) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1579) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1572) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[31m❯\u001b[39m packages/appboundry-host/test/admin-many-sessions.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 2446\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m admin with more than 1,000 sessions\u001b[2m > \u001b[22mstill lists and revokes a user's sessions\u001b[39m\u001b[33m 2444\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     → expected 'threw QUERY_LIMIT_EXCEEDED QUERY_LIMI…' to be 1005 // Object.is equality\u001b[39m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m packages/appboundry-host/test/admin-many-sessions.test.ts\u001b[2m > \u001b[22madmin with more than 1,000 sessions\u001b[2m > \u001b[22mstill lists and revokes a user's sessions\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'threw QUERY_LIMIT_EXCEEDED QUERY_LIMI…' to be 1005 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m \n1005\n\n\u001b[31m+ Received:\u001b[39m \n\"threw QUERY_LIMIT_EXCEEDED QUERY_LIMIT_EXCEEDED: find() on \\\"_appboundry_sessions\\\" matches more than 1000 records. Page it with db.query({ collection, where, limit, cursor }), pass { limit } to find(), or use all() for the whole collection.\"\n\n\u001b[36m \u001b[2m❯\u001b[22m packages/appboundry-host/test/admin-many-sessions.test.ts:\u001b[2m32:22\u001b[22m\u001b[39m\n\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 13:03:43\n\u001b[2m   Duration \u001b[22m 3.82s\u001b[2m (transform 501ms, setup 0ms, collect 1.04s, tests 2.45s, environment 0ms, prepare 76ms)\u001b[22m\n\n(node:1638) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mww4x5jw239e40a53646",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:04:06.110Z",
+      "digest": "87242168e51f1b41",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 189,
+        "outputTokens": 1895,
+        "cacheReadTokens": 33613,
+        "cacheWriteTokens": 1567,
+        "latencyMs": 17267,
+        "messageId": "msg_011ChPh9C4nMSuVjVL9JfEvW"
+      },
+      "id": "mww4xjog648fe3297be3",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "decision",
+      "at": "2026-11-25T13:04:06.113Z",
+      "digest": "8ff52dd57e74b3f8",
+      "data": {
+        "n": 31,
+        "kind": "finish",
+        "action": null,
+        "inputJson": null,
+        "resultJson": "{\"findings\":[{\"title\":\"Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records\",\"severity\":\"high\",\"summary\":\"The admin module reads the whole sessions collection with an unpaged FeltDB find() (`#sessions()` in admin.ts). FeltDB refuses an unpaged find() that matches more than 1,000 records (QUERY_LIMIT_EXCEEDED). The rest of the host already routes whole-collection reads through paged-read.ts because of this limit, but admin.ts does not. Once more than 1,000 sessions exist, every admin path that calls `#sessions()` throws instead of answering: listSessions, revokeSessions, disableUser's session revocation, and bootstrap --recover's operator-session revocation. Sessions are never pruned elsewhere, because only listSessions deletes expired ones and it fails first. So the condition is permanent. An operator can then no longer revoke a user's or a leaked token's access, and cannot recover operator access. The test admin-many-sessions.test.ts issues 1,005 sessions for one user and expects revokeSessions({ user }) to revoke 1,005. It received the error string 'threw QUERY_LIMIT_EXCEEDED ... find() on \\\"_appboundry_sessions\\\" matches more than 1000 records', so the test failed on its assertion. The same unpaged pattern affects operators, users and the audit log (admin.ts lines 95, 177, 268, 275).\",\"evidence\":[{\"kind\":\"code\",\"path\":\"packages/appboundry-host/src/admin.ts\",\"startLine\":99,\"endLine\":99,\"quote\":\"    return (await this.#db.collection<SessionRecord>(SESSIONS_COLLECTION).find({} as never)) as SessionRecord[];\"},{\"kind\":\"code\",\"path\":\"packages/appboundry-host/src/admin.ts\",\"startLine\":252,\"endLine\":254,\"quote\":\"  async revokeSessions(actor: Actor, input: { sessionId?: unknown; user?: unknown }): Promise<{ revoked: number }> {\\n    if ((input.sessionId === undefined) === (input.user === undefined)) throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"Revoke one session (<session-id>) or every session of a user (--user <id>).\\\");\\n    const all = await this.#sessions();\"},{\"kind\":\"code\",\"path\":\"packages/appboundry-host/src/admin.ts\",\"startLine\":240,\"endLine\":242,\"quote\":\"    const all = await this.#sessions();\\n    const expired = all.filter(s => Date.parse(s.expiresAt) <= now);\\n    if (expired.length) await this.#write(this.#deleteSessions(expired)).catch(() => undefined);\"},{\"kind\":\"check\",\"check\":\"test\",\"target\":\"packages/appboundry-host/test/admin-many-sessions.test.ts\",\"expect\":\"fails\"}],\"fix\":\"Read the admin collections in pages with paged-read.ts's readAll, as backup.ts and collections.ts already do. For example, `#sessions()` becomes `readAll(this.#db, { collection: SESSIONS_COLLECTION })`; apply the same to `#operators()`, the users reads and audit(). Revocations that delete more sessions than one transaction allows should be split into batches.\"}]}",
+        "rationale": "The new test fails on its assertion: revokeSessions surfaces FeltDB's QUERY_LIMIT_EXCEEDED once more than 1,000 sessions exist, and the unpaged find() at admin.ts:99 is the cause. That is a proven, specific reliability defect outside the outbox scope."
+      },
+      "id": "mww4xjoq80e6272fd3a2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "check_result",
+      "at": "2026-11-25T13:04:14.825Z",
+      "digest": "1565eeda25fe16a7",
+      "data": {
+        "run": "run_bc3c23f261",
+        "purpose": "prove",
+        "check": "test",
+        "target": "packages/appboundry-host/test/admin-many-sessions.test.ts",
+        "against": "change",
+        "tree": "7f2bd54154004633369ef2449be2a8ac2168cd0f",
+        "exitCode": 1,
+        "durationMs": 4216,
+        "verdict": "failed_to_run",
+        "output": "(node:1706) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1719) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/eve-mww4rrzd6357a7f8f987\u001b[39m\n\n(node:1761) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1754) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1755) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:1754) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[31m❯\u001b[39m packages/appboundry-host/test/admin-many-sessions.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 2198\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m admin with more than 1,000 sessions\u001b[2m > \u001b[22mstill lists and revokes a user's sessions\u001b[39m\u001b[33m 2197\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     → expected 'threw QUERY_LIMIT_EXCEEDED QUERY_LIMI…' to be 1005 // Object.is equality\u001b[39m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m packages/appboundry-host/test/admin-many-sessions.test.ts\u001b[2m > \u001b[22madmin with more than 1,000 sessions\u001b[2m > \u001b[22mstill lists and revokes a user's sessions\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'threw QUERY_LIMIT_EXCEEDED QUERY_LIMI…' to be 1005 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected:\u001b[39m \n1005\n\n\u001b[31m+ Received:\u001b[39m \n\"threw QUERY_LIMIT_EXCEEDED QUERY_LIMIT_EXCEEDED: find() on \\\"_appboundry_sessions\\\" matches more than 1000 records. Page it with db.query({ collection, where, limit, cursor }), pass { limit } to find(), or use all() for the whole collection.\"\n\n\u001b[36m \u001b[2m❯\u001b[22m packages/appboundry-host/test/admin-many-sessions.test.ts:\u001b[2m32:22\u001b[22m\u001b[39m\n\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 13:04:10\n\u001b[2m   Duration \u001b[22m 3.50s\u001b[2m (transform 495ms, setup 0ms, collect 1.03s, tests 2.20s, environment 0ms, prepare 67ms)\u001b[22m\n\n(node:1821) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mww4xqep536de9ac1efe",
+      "__version": 1
+    },
+    {
+      "taskId": "mww4rrzd6357a7f8f987",
+      "kind": "finding",
+      "at": "2026-11-25T13:04:14.835Z",
+      "digest": "1a9fe6d37b2a8656",
+      "data": {
+        "finding": {
+          "title": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records",
+          "severity": "high",
+          "summary": "The admin module reads the whole sessions collection with an unpaged FeltDB find() (`#sessions()` in admin.ts). FeltDB refuses an unpaged find() that matches more than 1,000 records (QUERY_LIMIT_EXCEEDED). The rest of the host already routes whole-collection reads through paged-read.ts because of this limit, but admin.ts does not. Once more than 1,000 sessions exist, every admin path that calls `#sessions()` throws instead of answering: listSessions, revokeSessions, disableUser's session revocation, and bootstrap --recover's operator-session revocation. Sessions are never pruned elsewhere, because only listSessions deletes expired ones and it fails first. So the condition is permanent. An operator can then no longer revoke a user's or a leaked token's access, and cannot recover operator access. The test admin-many-sessions.test.ts issues 1,005 sessions for one user and expects revokeSessions({ user }) to revoke 1,005. It received the error string 'threw QUERY_LIMIT_EXCEEDED ... find() on \"_appboundry_sessions\" matches more than 1000 records', so the test failed on its assertion. The same unpaged pattern affects operators, users and the audit log (admin.ts lines 95, 177, 268, 275).",
+          "evidence": [
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/admin.ts",
+              "startLine": 99,
+              "endLine": 99,
+              "quote": "    return (await this.#db.collection<SessionRecord>(SESSIONS_COLLECTION).find({} as never)) as SessionRecord[];"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/admin.ts",
+              "startLine": 252,
+              "endLine": 254,
+              "quote": "  async revokeSessions(actor: Actor, input: { sessionId?: unknown; user?: unknown }): Promise<{ revoked: number }> {\n    if ((input.sessionId === undefined) === (input.user === undefined)) throw new HostError(\"INVALID_ARGUMENT\", \"Revoke one session (<session-id>) or every session of a user (--user <id>).\");\n    const all = await this.#sessions();"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/admin.ts",
+              "startLine": 240,
+              "endLine": 242,
+              "quote": "    const all = await this.#sessions();\n    const expired = all.filter(s => Date.parse(s.expiresAt) <= now);\n    if (expired.length) await this.#write(this.#deleteSessions(expired)).catch(() => undefined);"
+            },
+            {
+              "kind": "check",
+              "check": "test",
+              "target": "packages/appboundry-host/test/admin-many-sessions.test.ts",
+              "expect": "fails"
+            }
+          ],
+          "fix": "Read the admin collections in pages with paged-read.ts's readAll, as backup.ts and collections.ts already do. For example, `#sessions()` becomes `readAll(this.#db, { collection: SESSIONS_COLLECTION })`; apply the same to `#operators()`, the users reads and audit(). Revocations that delete more sessions than one transaction allows should be split into batches."
+        },
+        "proven": false,
+        "verifications": [
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/admin.ts:99-99 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/admin.ts:252-254 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/admin.ts:240-242 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": false,
+            "why": "packages/appboundry-host/test/admin-many-sessions.test.ts fails without running its assertions (load or setup error)"
+          }
+        ],
+        "tests": [
+          {
+            "path": "packages/appboundry-host/test/admin-many-sessions.test.ts",
+            "sha256": "231db10f12f8421ef4d8c5c4ace2c2a703e8130a6c3335bc5b6718962a6e3796"
+          }
+        ],
+        "tree": "7f2bd54154004633369ef2449be2a8ac2168cd0f",
+        "base": "cd32300380a6ac5735b02891218f56814dfa8ac5"
+      },
+      "id": "mww4xqf1194a62ecc938",
+      "__version": 1
+    }
+  ]
+}

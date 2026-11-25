@@ -194,9 +194,10 @@ async function awaitRun(ctx: Ctx, task: Task): Promise<any | null> {
 /** Whether a failing run shows a test failing on its assertions, as opposed to not loading or not running. */
 function classify(run: { exitCode?: number; output?: string }): "passed" | "failed_assertion" | "failed_to_run" {
   if (run.exitCode === 0) return "passed";
-  const out = run.output ?? "";
+  // Runners color their summaries; the words between escape codes are what count.
+  const out = (run.output ?? "").replace(/\u001b\[[0-9;]*m/g, "");
   if (/Failed to load|SyntaxError|ERR_MODULE_NOT_FOUND|Cannot find module|does not provide an export named|Transform failed|No test files found|Unknown file extension/i.test(out)) return "failed_to_run";
-  return /Tests\s+\d+\s+failed|#\s*fail\s+[1-9]|\b[1-9]\d*\s+failing\b|✖ .*\(/.test(out) ? "failed_assertion" : "failed_to_run";
+  return /Tests\s+\d+\s+failed|#\s*fail\s+[1-9]|\b[1-9]\d*\s+failing\b|✖ .*\(|\bAssertionError\b/.test(out) ? "failed_assertion" : "failed_to_run";
 }
 
 /* ------------------------------------------------------------------ the decision loop */
