@@ -58,7 +58,7 @@ const call = async (kind, name, args) => {
   if (!r.ok) throw new Error(`${name}: ${r.error?.code} ${r.error?.message}`);
   return r;
 };
-await call("mutation", "tasks:setPolicy", { operation: "assess.repository", requiresApproval: false, reconcileBeforeRetry: true, maxAttempts: 2, limits: { repositories: [REPOSITORY], maxDecisions: 30, maxIssues: 2 } });
+await call("mutation", "tasks:setPolicy", { operation: "assess.repository", requiresApproval: false, reconcileBeforeRetry: true, maxAttempts: 2, limits: { repositories: [REPOSITORY], maxDecisions: 40, maxIssues: 2 } });
 await call("mutation", "tasks:setPolicy", { operation: "resolve.repository", requiresApproval: false, reconcileBeforeRetry: true, maxAttempts: 2, limits: { repositories: [REPOSITORY], maxDecisions: 40, maxFiles: 5, forbiddenPaths: [".github/", "pnpm-lock.yaml", "package-lock.json", "package.json"], maxGateAttempts: 2 } });
 
 const metrics = { startedAt: new Date().toISOString() };
@@ -76,7 +76,7 @@ async function follow(taskId, label) {
     if (["completed", "blocked", "failed", "verification_failed", "needs_clarification", "needs_approval"].includes(t.status)) {
       writeFileSync(join(runDir, `${label}-${taskId}.json`), JSON.stringify(view, null, 2));
       metrics[label] = { taskId, status: t.status, seconds: Math.round((Date.now() - started) / 1000), steps: t.steps, decisions: t.work?.decisions ?? 0,
-        model: view.evidence.filter((e) => e.kind === "model_usage").reduce((a, e) => ({ calls: a.calls + 1, inputTokens: a.inputTokens + (e.data.inputTokens ?? 0), outputTokens: a.outputTokens + (e.data.outputTokens ?? 0) }), { calls: 0, inputTokens: 0, outputTokens: 0 }),
+        model: view.evidence.filter((e) => e.kind === "model_usage").reduce((a, e) => ({ calls: a.calls + 1, inputTokens: a.inputTokens + (e.data.inputTokens ?? 0), cacheWriteTokens: a.cacheWriteTokens + (e.data.cacheWriteTokens ?? 0), cacheReadTokens: a.cacheReadTokens + (e.data.cacheReadTokens ?? 0), outputTokens: a.outputTokens + (e.data.outputTokens ?? 0) }), { calls: 0, inputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 }),
         invocations: view.executions.filter((e) => e.kind === "invoke").length, report: t.report ?? null };
       return t;
     }

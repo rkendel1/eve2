@@ -179,7 +179,11 @@ const code = [
     input: s.object({ workspace: s.string(), pattern: s.string(), path: s.optional(s.string()) }), output: s.unknown(), authorization: [],
     handler: async ({ workspace: id, pattern, path }) => {
       const w = workspace(id);
-      const r = await exec(["git", "grep", "-n", "-I", "-E", "--max-count", "20", pattern, "--", ...(path ? [inside(w, path).rel] : [])], w.dir, 30_000);
+      const scope = path ? inside(w, path).rel : null;
+      // Dependencies are not tracked by git; a path under node_modules/ is searched with grep, following the package link.
+      const r = scope?.startsWith("node_modules/")
+        ? await exec(["grep", "-rnIE", "--max-count=20", "--exclude-dir=node_modules", pattern, `${scope.replace(/\/$/, "")}/`], w.dir, 30_000)
+        : await exec(["git", "grep", "-n", "-I", "-E", "--max-count", "20", pattern, "--", ...(scope ? [scope] : [])], w.dir, 30_000);
       const matches = r.output.split("\n").filter(Boolean).slice(0, 120).map((l) => { const m = /^([^:]+):(\d+):(.*)$/.exec(l); return m ? { path: m[1], line: Number(m[2]), text: m[3].slice(0, 240) } : null; }).filter(Boolean);
       return { pattern, matches, truncated: r.output.split("\n").length > 120 };
     },

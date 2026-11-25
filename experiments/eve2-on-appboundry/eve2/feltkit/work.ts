@@ -89,7 +89,7 @@ async function preparing(ctx: Ctx, task: Task) {
 const ACTIONS: Record<string, { capability: string; description: string; input: string; writes?: true }> = {
   list: { capability: "code.workspace.list", description: "List a directory.", input: `{"path": "packages"}` },
   read: { capability: "code.workspace.read", description: "Read a file, or lines of it (at most 300 at a time).", input: `{"path": "src/a.ts", "startLine": 1, "endLine": 120}` },
-  search: { capability: "code.workspace.search", description: "Search for a regular expression (git grep -E), optionally under a path.", input: `{"pattern": "readAll\\\\(", "path": "packages/appboundry-host/src"}` },
+  search: { capability: "code.workspace.search", description: "Search for a regular expression (git grep -E), optionally under a path. A dependency's own source is searchable with path node_modules/<package>.", input: `{"pattern": "readAll\\\\(", "path": "packages/appboundry-host/src"}` },
   run: { capability: "code.workspace.run", description: "Run a declared check: build, or test with a test file path as target.", input: `{"check": "test", "target": "packages/x/test/y.test.ts"}` },
   write: { capability: "code.workspace.write", description: "Replace a file's whole content.", input: `{"path": "src/a.ts", "content": "..."}`, writes: true },
   diff: { capability: "code.workspace.diff", description: "Show what you have changed so far.", input: `{}` },
@@ -131,7 +131,11 @@ async function loop(ctx: Ctx, task: Task, spec: { objective: string; guidance: s
   }
   if (work.decisions >= (spec.limits.maxDecisions ?? 30)) return halt(ctx, task, "blocked", `I used my ${work.decisions} decisions without finishing; an operator needs to look at this task before I continue.`);
   const actions = Object.fromEntries(spec.allowed.map((a) => [a, { description: ACTIONS[a]!.description, input: ACTIONS[a]!.input }]));
-  const asked = await invoke(ctx, task, "reasoning.decide", { objective: spec.objective, guidance: spec.guidance, actions, observations: await observations(ctx, task), resultShape: spec.resultShape }, `${task.id}:decide:${work.decisions}`);
+  const max = spec.limits.maxDecisions ?? 30, left = max - work.decisions;
+  const budget = left <= 3
+    ? `You have ${left} decision(s) left. Finish now with what you have already substantiated (an empty result is acceptable); do not start a new line of inquiry.`
+    : `You have ${left} of ${max} decisions left. Stop pursuing a question you cannot settle with the actions available; record what you can prove instead.`;
+  const asked = await invoke(ctx, task, "reasoning.decide", { objective: `${spec.objective}\n\n${budget}`, guidance: spec.guidance, actions, observations: await observations(ctx, task), resultShape: spec.resultShape }, `${task.id}:decide:${work.decisions}`);
   if (asked.outcome !== "succeeded") return unavailable(ctx, task, "reasoning.decide", asked);
   const { decision, usage } = asked.value as { decision: { kind: string; action: string | null; inputJson: string | null; resultJson: string | null; rationale: string }; usage: unknown };
   await keep(ctx, task, "model_usage", usage);

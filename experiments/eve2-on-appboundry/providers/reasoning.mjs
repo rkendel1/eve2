@@ -80,7 +80,12 @@ const decide = defineCapability({
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system,
-      messages: [{ role: "user", content: `Objective:\n${objective}\n\nActions:\n${JSON.stringify(actions, null, 1)}\n\nResult shape when finishing:\n${resultShape}\n\nWhat you have done and observed so far, oldest first:\n${observations || "(nothing yet)"}` }],
+      // The history only grows: one block per observation keeps every earlier block a cacheable prefix of the next call.
+      messages: [{ role: "user", content: [
+        { type: "text", text: `Actions:\n${JSON.stringify(actions, null, 1)}\n\nResult shape when finishing:\n${resultShape}\n\nWhat you have done and observed so far, oldest first:` },
+        ...(observations ? observations.split(/\n\n(?=#\d+ )/) : ["(nothing yet)"]).map((text) => ({ type: "text", text })),
+        { type: "text", text: `Objective:\n${objective}` },
+      ] }],
     });
     const usage = {
       provider: "anthropic", requested: MODEL, served: response.model, stopReason: response.stop_reason,
