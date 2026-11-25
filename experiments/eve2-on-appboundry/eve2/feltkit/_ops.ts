@@ -91,7 +91,7 @@ export const halt = (ctx: Ctx, task: Task, to: string, why: string) => wait(ctx,
 
 /** Whether an outcome may clear up by itself: a provider that is down or restarting, an unknown outcome, a concurrent attempt. */
 export const transient = (result: any) => result.outcome === "unknown"
-  || (result.outcome === "failed" && ["UNAVAILABLE", "RATE_LIMITED", "TIMEOUT"].includes(result.error?.code))
+  || (result.outcome === "failed" && (["UNAVAILABLE", "RATE_LIMITED", "TIMEOUT"].includes(result.error?.code) || /\.UNAVAILABLE$/.test(result.error?.code ?? "")))
   || (result.outcome === "refused" && result.error?.code === "CONFLICT");
 export const MAX_TRANSIENT = 6;
 

@@ -70,7 +70,7 @@ async function gh(method, path, body) {
   const json = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     log("github.error", { method, path, status: response.status, message: json?.message });
-    const code = response.status === 404 ? "NOT_FOUND" : response.status === 401 || response.status === 403 ? "FORBIDDEN" : response.status === 409 || response.status === 422 ? "CONFLICT" : response.status === 429 ? "RATE_LIMITED" : "UNAVAILABLE";
+    const code = response.status === 404 ? "NOT_FOUND" : response.status === 401 || response.status === 403 ? "FORBIDDEN" : response.status === 409 || response.status === 422 ? "CONFLICT" : response.status === 429 ? "RATE_LIMITED" : "provider.UNAVAILABLE";
     throw new AppPortError(code, `GitHub ${method} ${path.split("?")[0]}: ${json?.message ?? response.status}`);
   }
   log("github.call", { method, path: path.split("?")[0], status: response.status });
@@ -157,12 +157,12 @@ function exec(argv, cwd, timeoutMs, extraEnv = {}) {
 }
 async function git(dir, args, timeoutMs = 60_000) {
   const r = await exec(["git", "-c", "advice.detachedHead=false", ...args], dir, timeoutMs);
-  if (r.exitCode !== 0) throw new AppPortError("UNAVAILABLE", `git ${args[0]} failed: ${r.output.trim().slice(-400)}`);
+  if (r.exitCode !== 0) throw new AppPortError("provider.UNAVAILABLE", `git ${args[0]} failed: ${r.output.trim().slice(-400)}`);
   return r.output.trim();
 }
 /** The content tree of a directory as git would commit it: the identity of the revision a check ran on. */
 async function tree(dir) {
-  await git(dir, ["add", "-A", "--", ".", ":!node_modules"]);
+  await git(dir, ["add", "-A"]);
   return git(dir, ["write-tree"]);
 }
 function workspace(id) {
@@ -181,6 +181,8 @@ async function checkout(r, dir, sha) {
   mkdirSync(dir, { recursive: true });
   const url = GIT_URL.replace("{repository}", r);
   await git(dir, ["init", "-q"]);
+  // Installed dependencies are never part of a working copy's content, whether or not the repository ignores them.
+  writeFileSync(join(dir, ".git", "info", "exclude"), "node_modules/\n");
   await git(dir, ["remote", "add", "origin", url]);
   const head = await git(dir, ["ls-remote", "--symref", "origin", "HEAD"], 120_000);
   const base = /ref: refs\/heads\/(\S+)\s+HEAD/.exec(head)?.[1] ?? "main";
@@ -235,7 +237,7 @@ const code = [
       const { sha: at, base } = await checkout(r, dir, sha);
       for (const f of files ?? []) { const { abs } = inside({ dir }, f.path); mkdirSync(dirname(abs), { recursive: true }); writeFileSync(abs, f.content); }
       const w = { id, repository: r, dir, sha: at, base };
-      w.ready = prepareRun(w, dir, "prepare").then((p) => { w.prepared = p; if (p.exitCode !== 0) throw new AppPortError("UNAVAILABLE", `The working copy did not prepare: ${p.output.slice(-300)}`); });
+      w.ready = prepareRun(w, dir, "prepare").then((p) => { w.prepared = p; if (p.exitCode !== 0) throw new AppPortError("provider.UNAVAILABLE", `The working copy did not prepare: ${p.output.slice(-300)}`); });
       w.ready.catch(() => undefined);
       workspaces.set(id, w);
       const t = await tree(dir);
@@ -349,7 +351,7 @@ const changes = [
       const commit = (await exec(["git", "commit-tree", current, "-p", w.sha, "-m", `${message}\n\n${marker.replace(/<!-- | -->/g, "")}`], w.dir, 30_000, {
         GIT_AUTHOR_NAME: "Eve2", GIT_AUTHOR_EMAIL: "eve2@users.noreply.github.com", GIT_AUTHOR_DATE: date, GIT_COMMITTER_NAME: "Eve2", GIT_COMMITTER_EMAIL: "eve2@users.noreply.github.com", GIT_COMMITTER_DATE: date,
       })).output.trim();
-      if (!/^[0-9a-f]{40}$/.test(commit)) throw new AppPortError("UNAVAILABLE", `Commit failed: ${commit.slice(-300)}`);
+      if (!/^[0-9a-f]{40}$/.test(commit)) throw new AppPortError("provider.UNAVAILABLE", `Commit failed: ${commit.slice(-300)}`);
       // 3. The branch: absent → push; present at this commit → done; present with this tree → reuse; anything else → refuse.
       const remote = (await git(w.dir, ["ls-remote", "origin", `refs/heads/${branch}`], 120_000)).split(/\s+/)[0] || null;
       let head = commit;

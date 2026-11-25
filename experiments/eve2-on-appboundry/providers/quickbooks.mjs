@@ -30,14 +30,14 @@ function refreshToken() {
 async function accessToken() {
   if (access.token && Date.now() < access.expiresAt - 60_000) return access.token;
   const refresh = refreshToken();
-  if (!refresh || !REALM) throw new AppPortError("UNAVAILABLE", "QuickBooks is not connected: no realm or refresh token for this provider.");
+  if (!refresh || !REALM) throw new AppPortError("provider.UNAVAILABLE", "QuickBooks is not connected: no realm or refresh token for this provider.");
   const basic = process.env.QBO_CLIENT_ID ? `Basic ${Buffer.from(`${process.env.QBO_CLIENT_ID}:${process.env.QBO_CLIENT_SECRET}`).toString("base64")}` : "Basic aW5qZWN0ZWQ6Ynlwcm94eQ==";
   const response = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
     method: "POST", headers: { authorization: basic, accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }),
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) { log("qbo.token.error", { status: response.status, error: body.error }); throw new AppPortError("UNAVAILABLE", `QuickBooks token refresh failed (${body.error ?? response.status}).`); }
+  if (!response.ok) { log("qbo.token.error", { status: response.status, error: body.error }); throw new AppPortError("provider.UNAVAILABLE", `QuickBooks token refresh failed (${body.error ?? response.status}).`); }
   writeFileSync(TOKEN_FILE, JSON.stringify({ refreshToken: body.refresh_token, rotatedAt: new Date().toISOString() }), { mode: 0o600 });
   access = { token: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
   log("qbo.token.refreshed", { expiresIn: body.expires_in });
@@ -55,7 +55,7 @@ async function qbo(method, path, { body, requestId } = {}) {
     const error = json.Fault?.Error?.[0];
     log("qbo.error", { method, path, status: response.status, intuitTid, code: error?.code, message: error?.Message, detail: error?.Detail });
     if (response.status === 401) access = { token: null, expiresAt: 0 };
-    const code = response.status === 400 ? "INVALID_INPUT" : response.status === 401 || response.status === 403 ? "FORBIDDEN" : response.status === 404 ? "NOT_FOUND" : response.status === 429 ? "RATE_LIMITED" : "UNAVAILABLE";
+    const code = response.status === 400 ? "INVALID_INPUT" : response.status === 401 || response.status === 403 ? "FORBIDDEN" : response.status === 404 ? "NOT_FOUND" : response.status === 429 ? "RATE_LIMITED" : "provider.UNAVAILABLE";
     throw new AppPortError(code, `QuickBooks ${error?.Message ?? response.status}${error?.Detail ? `: ${error.Detail}` : ""}`);
   }
   log("qbo.call", { method, path, status: response.status, intuitTid });
@@ -129,7 +129,7 @@ const capabilities = [
     input: s.object({ kind: s.string(), id: s.string() }), output: s.unknown(), authorization: [],
     handler: async ({ kind, id }) => {
       onlyBills(kind);
-      if (faults.failNextGet) { faults.failNextGet = false; throw new AppPortError("UNAVAILABLE", "Injected: QuickBooks read-back failed."); }
+      if (faults.failNextGet) { faults.failNextGet = false; throw new AppPortError("provider.UNAVAILABLE", "Injected: QuickBooks read-back failed."); }
       return toDocument((await qbo("GET", `/bill/${encodeURIComponent(id)}`)).Bill);
     },
   }),
