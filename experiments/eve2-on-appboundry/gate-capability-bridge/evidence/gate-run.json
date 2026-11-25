@@ -1,0 +1,380 @@
+{
+  "artifact": "/home/user/eve2/experiments/eve2-on-appboundry/gate-capability-bridge/app/ledgerbridge.app",
+  "steps": [
+    {
+      "at": "2026-11-25T09:06:30.354Z",
+      "step": "host.artifact",
+      "application": {
+        "id": "ledgerbridge",
+        "name": "ledgerbridge",
+        "version": "0.0.0"
+      },
+      "module": "db8e7bf7c0e8b82ad260d337c6bb1de28fb3187edb39b6b2f1e2b08b0e557341",
+      "permissions": {
+        "collections": {
+          "read": [
+            "attempts"
+          ],
+          "write": [
+            "attempts"
+          ]
+        },
+        "services": [],
+        "network": "none",
+        "filesystem": "none"
+      }
+    },
+    {
+      "at": "2026-11-25T09:06:30.399Z",
+      "step": "discover",
+      "listed": [
+        {
+          "name": "books.invoices.create",
+          "status": "granted",
+          "reachable": true,
+          "description": "Create an invoice in the books"
+        },
+        {
+          "name": "books.invoices.void",
+          "status": "offered",
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "at": "2026-11-25T09:06:30.399Z",
+      "step": "check",
+      "ok": true,
+      "what": "create is discovered as granted"
+    },
+    {
+      "at": "2026-11-25T09:06:30.399Z",
+      "step": "check",
+      "ok": true,
+      "what": "void is discoverable but not granted"
+    },
+    {
+      "at": "2026-11-25T09:06:30.426Z",
+      "step": "invoke.create",
+      "result": {
+        "outcome": "succeeded",
+        "value": {
+          "id": "inv-1",
+          "amount": 450
+        },
+        "outboundId": "out.feeb00a39ff6dd883b05fe66c33109f32ba66ed36bd945cb422893dffdb1e513",
+        "attempt": 1
+      }
+    },
+    {
+      "at": "2026-11-25T09:06:30.426Z",
+      "step": "check",
+      "ok": true,
+      "what": "create succeeded through AppPort"
+    },
+    {
+      "at": "2026-11-25T09:06:30.440Z",
+      "step": "invoke.replay",
+      "result": {
+        "outcome": "succeeded",
+        "value": {
+          "id": "inv-1",
+          "amount": 450
+        },
+        "outboundId": "out.feeb00a39ff6dd883b05fe66c33109f32ba66ed36bd945cb422893dffdb1e513",
+        "attempt": 1,
+        "replayed": true
+      }
+    },
+    {
+      "at": "2026-11-25T09:06:30.440Z",
+      "step": "check",
+      "ok": true,
+      "what": "same key replays without resending"
+    },
+    {
+      "at": "2026-11-25T09:06:30.449Z",
+      "step": "invoke.ungranted",
+      "result": {
+        "outcome": "refused",
+        "error": {
+          "code": "NOT_GRANTED",
+          "message": "books.invoices.void is offered by books but no grant authorizes this application to invoke it."
+        }
+      }
+    },
+    {
+      "at": "2026-11-25T09:06:30.449Z",
+      "step": "check",
+      "ok": true,
+      "what": "ungranted capability refused before sending"
+    },
+    {
+      "at": "2026-11-25T09:06:30.450Z",
+      "step": "provider.without-credential",
+      "status": 401
+    },
+    {
+      "at": "2026-11-25T09:06:30.450Z",
+      "step": "check",
+      "ok": true,
+      "what": "the provider refuses a caller without its credential"
+    },
+    {
+      "at": "2026-11-25T09:06:31.970Z",
+      "step": "invoke.timeout",
+      "result": {
+        "outcome": "unknown",
+        "reason": "No answer from books within 1500 ms; the request may have taken effect.",
+        "outboundId": "out.8cb6a80e254ccaaf8ad00726272fb69767a2cac47a5cc44549533c411ae2cea4",
+        "attempt": 1
+      }
+    },
+    {
+      "at": "2026-11-25T09:06:31.970Z",
+      "step": "check",
+      "ok": true,
+      "what": "a timeout is recorded as unknown"
+    },
+    {
+      "at": "2026-11-25T09:06:35.192Z",
+      "step": "invoke.resend-same-key",
+      "result": {
+        "outcome": "succeeded",
+        "value": {
+          "id": "inv-2",
+          "amount": 75
+        },
+        "outboundId": "out.8cb6a80e254ccaaf8ad00726272fb69767a2cac47a5cc44549533c411ae2cea4",
+        "attempt": 2
+      }
+    },
+    {
+      "at": "2026-11-25T09:06:35.192Z",
+      "step": "check",
+      "ok": true,
+      "what": "resend with the same key succeeds as attempt 2"
+    },
+    {
+      "at": "2026-11-25T09:06:35.194Z",
+      "step": "provider.state",
+      "invoices": [
+        {
+          "id": "inv-1",
+          "amount": 450
+        },
+        {
+          "id": "inv-2",
+          "amount": 75
+        }
+      ]
+    },
+    {
+      "at": "2026-11-25T09:06:35.194Z",
+      "step": "check",
+      "ok": true,
+      "what": "the provider holds exactly two invoices (no duplicate effect)"
+    },
+    {
+      "at": "2026-11-25T09:06:35.201Z",
+      "step": "app.state",
+      "attempts": [
+        {
+          "key": "gate-001",
+          "outcome": "succeeded",
+          "detail": "inv-1"
+        },
+        {
+          "key": "gate-001",
+          "outcome": "succeeded",
+          "detail": "inv-1"
+        },
+        {
+          "key": "void-001",
+          "outcome": "refused",
+          "detail": "NOT_GRANTED"
+        },
+        {
+          "key": "gate-002",
+          "outcome": "unknown",
+          "detail": "No answer from books within 1500 ms; the request may have taken effect."
+        },
+        {
+          "key": "gate-002",
+          "outcome": "succeeded",
+          "detail": "inv-2"
+        }
+      ]
+    },
+    {
+      "at": "2026-11-25T09:06:35.696Z",
+      "step": "evidence.outbound",
+      "records": [
+        {
+          "id": "out.8cb6a80e254ccaaf8ad00726272fb69767a2cac47a5cc44549533c411ae2cea4",
+          "consumer": {
+            "applicationId": "ledgerbridge",
+            "incarnation": 1
+          },
+          "capability": {
+            "name": "books.invoices.create",
+            "version": 1
+          },
+          "provider": {
+            "applicationId": "books"
+          },
+          "grantId": "grant-ledgerbridge-books-create",
+          "initiator": "ada",
+          "idempotencyKey": "gate-002",
+          "inputSha256": "dbc35768b3ce210e52fae34b02462b7bdb529804987d5f7065ddc37ade8206b9",
+          "input": {
+            "inline": {
+              "amount": 75
+            },
+            "sha256": "dbc35768b3ce210e52fae34b02462b7bdb529804987d5f7065ddc37ade8206b9",
+            "bytes": 13
+          },
+          "state": "succeeded",
+          "attempts": [
+            {
+              "attempt": 1,
+              "requestId": "req_c68880f4-af5e-4047-a6e2-dec5f2b50218.1",
+              "startedAt": "2026-11-25T09:06:30.455Z",
+              "outcome": "unknown",
+              "endedAt": "2026-11-25T09:06:31.960Z",
+              "ms": 1502,
+              "error": {
+                "code": "OUTCOME_UNKNOWN",
+                "message": "No answer from books within 1500 ms; the request may have taken effect."
+              }
+            },
+            {
+              "attempt": 2,
+              "requestId": "req_67dc7306-528f-4491-ac29-6a30b4c642e4.2",
+              "startedAt": "2026-11-25T09:06:35.176Z",
+              "outcome": "succeeded",
+              "endedAt": "2026-11-25T09:06:35.183Z",
+              "ms": 4
+            }
+          ],
+          "createdAt": "2026-11-25T09:06:30.455Z",
+          "updatedAt": "2026-11-25T09:06:35.183Z",
+          "result": {
+            "inline": {
+              "id": "inv-2",
+              "amount": 75
+            },
+            "sha256": "cadfcfd565b49cab7af3121bf225ee462471daaf740d9ade4c1bcb52fdcefad6",
+            "bytes": 26
+          },
+          "resultValue": {
+            "id": "inv-2",
+            "amount": 75
+          }
+        },
+        {
+          "id": "out.feeb00a39ff6dd883b05fe66c33109f32ba66ed36bd945cb422893dffdb1e513",
+          "consumer": {
+            "applicationId": "ledgerbridge",
+            "incarnation": 1
+          },
+          "capability": {
+            "name": "books.invoices.create",
+            "version": 1
+          },
+          "provider": {
+            "applicationId": "books"
+          },
+          "grantId": "grant-ledgerbridge-books-create",
+          "initiator": "ada",
+          "idempotencyKey": "gate-001",
+          "inputSha256": "1323dc57c693e80d80e89b41eecd7154ed371fea90e54794104e3f44aa1713b2",
+          "input": {
+            "inline": {
+              "amount": 450
+            },
+            "sha256": "1323dc57c693e80d80e89b41eecd7154ed371fea90e54794104e3f44aa1713b2",
+            "bytes": 14
+          },
+          "state": "succeeded",
+          "attempts": [
+            {
+              "attempt": 1,
+              "requestId": "req_c50cc4d1-fd81-4782-a846-99252e1b83ca.1",
+              "startedAt": "2026-11-25T09:06:30.407Z",
+              "outcome": "succeeded",
+              "endedAt": "2026-11-25T09:06:30.415Z",
+              "ms": 5
+            }
+          ],
+          "createdAt": "2026-11-25T09:06:30.407Z",
+          "updatedAt": "2026-11-25T09:06:30.415Z",
+          "result": {
+            "inline": {
+              "id": "inv-1",
+              "amount": 450
+            },
+            "sha256": "5027884b69eaca3be1febe4786c95e1a23074760c90086c7c0480c39af951541",
+            "bytes": 27
+          },
+          "resultValue": {
+            "id": "inv-1",
+            "amount": 450
+          }
+        }
+      ]
+    },
+    {
+      "at": "2026-11-25T09:06:35.696Z",
+      "step": "check",
+      "ok": true,
+      "what": "the host's state holds both outbound records after the host stopped"
+    },
+    {
+      "at": "2026-11-25T09:06:35.697Z",
+      "step": "check",
+      "ok": true,
+      "what": "the artifact declares no companion components (no components@1)"
+    },
+    {
+      "at": "2026-11-25T09:06:35.697Z",
+      "step": "check",
+      "ok": true,
+      "what": "produced by FeltKit, requiring capabilities@1"
+    },
+    {
+      "at": "2026-11-25T09:06:35.697Z",
+      "step": "result",
+      "gate": "PASS",
+      "processes": [
+        "books-provider",
+        "appboundry"
+      ]
+    },
+    {
+      "step": "log.books-provider",
+      "lines": [
+        "{\"at\":\"2026-11-25T09:06:29.493Z\",\"event\":\"listening\",\"port\":5301}",
+        "{\"at\":\"2026-11-25T09:06:30.414Z\",\"event\":\"create.committed\",\"key\":\"gate-001\",\"id\":\"inv-1\",\"principal\":\"ledgerbridge\"}",
+        "{\"at\":\"2026-11-25T09:06:30.450Z\",\"event\":\"refused.unauthenticated\",\"path\":\"/appport\"}",
+        "{\"at\":\"2026-11-25T09:06:30.460Z\",\"event\":\"create.committed\",\"key\":\"gate-002\",\"id\":\"inv-2\",\"principal\":\"ledgerbridge\"}"
+      ]
+    },
+    {
+      "step": "log.appboundry",
+      "lines": [
+        "ok  /home/user/eve2/experiments/eve2-on-appboundry/gate-capability-bridge/app/ledgerbridge.app: manifest, module.wasm (sha256:db8e7bf7c0e8b82a…), program section and 0 frontend files verified",
+        "ok  program loaded in the guest: 3 functions match the manifest",
+        "",
+        "  ledgerbridge 0.0.0 running from its artifact",
+        "  App          http://127.0.0.1:5302",
+        "  State        /tmp/gate-UIY5hP/state  (FeltDB 0.21.0, local)",
+        "  Environment  development  (sign-in as dev users: ada)",
+        "  Limits       5000 ms per step, 30000 ms per call, 8 instances, 256 MiB memory each (engine-enforced)",
+        "  Admin        appboundry admin status --state /tmp/gate-UIY5hP/state",
+        "Schema       contract v0 → v1",
+        "  Host access  collections attempts; services none; network none; filesystem none"
+      ]
+    }
+  ]
+}
