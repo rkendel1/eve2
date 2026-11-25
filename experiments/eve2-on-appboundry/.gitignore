@@ -5,3 +5,4 @@ package-lock.json
 .qbo-token.json
 .state/
 evidence/runs/
+evidence/github/*/state/

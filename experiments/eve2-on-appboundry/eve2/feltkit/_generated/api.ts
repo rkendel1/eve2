@@ -3,6 +3,7 @@
 import { createApi } from "@feltdb/feltkit/client";
 import type * as app_module from "../app.js";
 import type * as tasks_module from "../tasks.js";
+import type * as work_module from "../work.js";
 
 /** Typed references to every query and mutation. Type-only imports: no backend code reaches the browser. */
-export const api = createApi<{ "app": typeof app_module; "tasks": typeof tasks_module }>();
+export const api = createApi<{ "app": typeof app_module; "tasks": typeof tasks_module; "work": typeof work_module }>();
