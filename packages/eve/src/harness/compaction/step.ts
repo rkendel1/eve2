@@ -28,7 +28,7 @@ import {
   shouldCompact,
 } from "#harness/compaction/engine.js";
 import { takeBlockingFailure } from "#definitions/kernel.js";
-import { isDeepStrictEqual } from "node:util";
+import { isDeepStrictEqual } from "#platform/util.js";
 import type { Usage } from "#protocol/session-events/envelope.js";
 import { nextChangeId, nextRunId } from "#protocol/session-projection.js";
 import { normalizeModelStreamError } from "#harness/model-call/errors.js";

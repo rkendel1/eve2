@@ -1,4 +1,3 @@
-import { localGatewayModel } from "#internal/model-auth/transport.js";
 import type { LanguageModel } from "ai";
 import type { CompiledModuleMap } from "#compiler/module-map.js";
 import {
@@ -78,6 +77,7 @@ export async function resolveRuntimeModelReference(
     return await loadSourceBackedRuntimeModelReference(reference, scope);
   }
 
+  const { localGatewayModel } = await import("#internal/model-auth/transport.js");
   return localGatewayModel(reference.id) ?? reference.id;
 }
 

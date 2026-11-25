@@ -1,8 +1,5 @@
-import {
-  ensureSandboxAccess,
-  sandboxIdleTimeoutMs,
-  type EnsuredSandboxAccess,
-} from "#execution/sandbox/ensure.js";
+import type { EnsuredSandboxAccess } from "#execution/sandbox/ensure.js";
+import { sandboxIdleTimeoutMs } from "#execution/sandbox/idle-timeout.js";
 import type { HarnessSessionBase } from "#harness/types.js";
 import type { SandboxAccess, SandboxState } from "#sandbox/state.js";
 import type { ContextContainer } from "#context/container.js";
@@ -75,6 +72,7 @@ export const sandboxProvider: FrameworkContextProvider<SandboxAccess> = {
     if (selected === undefined) return undefined;
     const { agent, sandbox } = selected;
 
+    const { ensureSandboxAccess } = await import("#execution/sandbox/ensure.js");
     const access = await ensureSandboxAccess({
       ...sandbox.template,
       nodeId: runtimeNodeId(agent),

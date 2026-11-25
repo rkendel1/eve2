@@ -4,7 +4,7 @@ import { createMcpTracing } from "#tracing/eve/mcp.js";
 import { withConnectionEventSpan } from "#tracing/eve/connection-events.js";
 import { principalOf } from "#execution/session/principal.js";
 import { defineJsonSchema, toInputSchema } from "#tools/schema.js";
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 import {
   createMCPClient,
   type Experimental_MCPEventDefinition as EventDefinition,

@@ -2,7 +2,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveDevelopmentStateDirectory } from "#internal/application/dev-environment.js";
+import { resolveDevelopmentStateDirectory } from "#internal/application/dev-state-directory.js";
 import { resolveDevelopmentRuntimeArtifactsPointerPath } from "#internal/nitro/dev-runtime-artifacts.js";
 import { resolveDevelopmentRuntimeArtifactsSnapshotsDirectory } from "#internal/nitro/dev-runtime-generation-metadata.js";
 import { resolveLocalWorkflowWorldDataDirectory } from "#internal/workflow/local-world-data-directory.js";

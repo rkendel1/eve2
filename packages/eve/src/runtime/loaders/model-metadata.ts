@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { modelMetadataSchema, type ModelMetadata } from "#internal/model-catalog.js";
 import type { RuntimeCompiledArtifactsSource } from "#runtime/compiled-artifacts-source.js";
 import { resolveRuntimeCompilerArtifactPaths } from "#runtime/loaders/artifact-paths.js";
@@ -18,6 +16,7 @@ export async function loadModelMetadata(
     return metadata;
   }
   const path = resolveRuntimeCompilerArtifactPaths(source.appRoot).modelMetadataPath;
+  const { readFile } = await import("node:fs/promises");
   try {
     return modelMetadataSchema.parse(JSON.parse(await readFile(path, "utf8")));
   } catch (error) {

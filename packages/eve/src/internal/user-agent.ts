@@ -1,7 +1,7 @@
-import { resolveInstalledPackageInfo } from "#internal/application/package.js";
+import { evePackageInfo } from "#platform/package-version.js";
 
 export function buildPackageUserAgent(): string {
-  const { name, version } = resolveInstalledPackageInfo();
+  const { name, version } = evePackageInfo();
   return `${name}/${version}`;
 }
 

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import { principalIdentity } from "#channel/principal-identity.js";
 import type { RunInput, SessionAuthContext } from "#channel/types.js";

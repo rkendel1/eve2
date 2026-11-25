@@ -117,6 +117,4 @@ async function loadCompiledBindingNamespace(input: {
   });
 }
 
-export function resolveExtensionBindingMountId(binding: AgentModuleBinding): string | undefined {
-  return binding.owner.kind === "extension" ? binding.owner.mountId : undefined;
-}
+export { resolveExtensionBindingMountId } from "#compiler/extension-mount-bindings.js";

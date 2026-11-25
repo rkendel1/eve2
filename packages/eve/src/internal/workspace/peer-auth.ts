@@ -1,9 +1,14 @@
 import { createHmac } from "node:crypto";
 
+import { CALLBACK_ALLOWED_ORIGINS_ENV } from "#internal/workspace/callback-origins.js";
+
 export const WORKSPACE_SECRET_ENV = "EVE_WORKSPACE_SECRET";
 export const WORKSPACE_AGENT_ENV = "EVE_WORKSPACE_AGENT";
 export const WORKSPACE_PEERS_ENV = "EVE_WORKSPACE_PEERS";
-export const CALLBACK_ALLOWED_ORIGINS_ENV = "EVE_CALLBACK_ALLOWED_ORIGINS";
+export {
+  CALLBACK_ALLOWED_ORIGINS_ENV,
+  isAllowedCallbackOrigin,
+} from "#internal/workspace/callback-origins.js";
 export const WORKFLOW_LOCAL_BASE_URL_ENV = "WORKFLOW_LOCAL_BASE_URL";
 
 export const WORKSPACE_HOST_ENV_NAMES: ReadonlySet<string> = new Set([
@@ -74,14 +79,4 @@ export function mintWorkspacePeerToken(input: {
     .update(`${header}.${payload}`)
     .digest("base64url");
   return `${header}.${payload}.${signature}`;
-}
-
-export function isAllowedCallbackOrigin(origin: string): boolean {
-  const configured = process.env[CALLBACK_ALLOWED_ORIGINS_ENV];
-  if (configured === undefined || configured.trim().length === 0) return false;
-  return configured
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0)
-    .some((entry) => URL.parse(entry)?.origin === origin);
 }

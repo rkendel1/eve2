@@ -1,4 +1,4 @@
-import { AsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage } from "#platform/async-context.js";
 
 import { type ContextAccessor, type ContextKey, resolveKey } from "#context/key.js";
 import { LocalDevRequestKey, type LocalDevRequestProvenance } from "#context/keys.js";

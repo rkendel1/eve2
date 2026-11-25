@@ -1,4 +1,4 @@
-import { setTimeout as delay } from "node:timers/promises";
+import { delay } from "#platform/timers.js";
 
 import { createLogger } from "#internal/logging.js";
 import { classifyModelCallError } from "#harness/model-call/errors.js";

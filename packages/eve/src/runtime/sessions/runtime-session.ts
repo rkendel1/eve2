@@ -1,4 +1,4 @@
-import { AsyncLocalStorage } from "node:async_hooks";
+import { AsyncLocalStorage } from "#platform/async-context.js";
 
 import type { DescribedAgent } from "#channel/agent-description.js";
 import type { InstalledSkillFiles } from "#channel/skill-files.js";

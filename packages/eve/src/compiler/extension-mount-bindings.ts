@@ -5,6 +5,10 @@ export function bindingMountId(binding: AgentModuleBinding): string | undefined 
   return binding.backing.mountId;
 }
 
+export function resolveExtensionBindingMountId(binding: AgentModuleBinding): string | undefined {
+  return binding.owner.kind === "extension" ? binding.owner.mountId : undefined;
+}
+
 export function extensionOverridePaths(
   manifest: CompiledAgentManifest,
 ): ReadonlyMap<string, string> {

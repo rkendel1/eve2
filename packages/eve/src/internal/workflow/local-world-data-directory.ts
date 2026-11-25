@@ -1,5 +1,5 @@
 import { join, relative } from "node:path";
-import { resolveDevelopmentStateDirectory } from "#internal/application/dev-environment.js";
+import { resolveDevelopmentStateDirectory } from "#internal/application/dev-state-directory.js";
 
 export function resolveLocalWorkflowWorldDataDirectory(appRoot: string): string {
   return join(resolveDevelopmentStateDirectory(appRoot), ".workflow-data");

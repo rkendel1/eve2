@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 import type { ModelMessage } from "ai";
 
 import type { HistoryState } from "#context/keys.js";

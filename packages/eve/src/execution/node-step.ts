@@ -6,7 +6,7 @@ import type { HarnessToolDefinition } from "#harness/execute-tool.js";
 import type { ExecutionInstrumentation } from "#instrumentation/runtime.js";
 import { createKernel } from "#harness/kernel.js";
 import type { HandleEventFn, HarnessToolMap, StepFn } from "#harness/types.js";
-import { resolveInstalledPackageInfo } from "#internal/application/package.js";
+import { eveVersion } from "#platform/package-version.js";
 import { createLogger } from "#internal/logging.js";
 import type { RuntimeIdentity } from "#protocol/session-events/families/session.js";
 import { UNSPECIFIED_INPUT_SCHEMA } from "#tools/schema.js";
@@ -97,12 +97,10 @@ export interface RuntimeAgentIdentity {
 }
 
 export function buildRuntimeIdentity(agent: RuntimeAgentIdentity): RuntimeIdentity {
-  const packageInfo = resolveInstalledPackageInfo();
-
   const identity: RuntimeIdentity = {
     agentId: agent.id,
     agentName: agent.name,
-    eveVersion: packageInfo.version,
+    eveVersion: eveVersion(),
   };
 
   const gitSha = process.env.VERCEL_GIT_COMMIT_SHA?.trim();

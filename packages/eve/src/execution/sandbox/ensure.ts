@@ -22,6 +22,7 @@ import {
 } from "#runtime/compiled-artifacts-source.js";
 import { loadSandboxPreparedArtifact } from "#runtime/sandbox/prepared-artifacts.js";
 import { owningSandboxDefinition, type RuntimeSandboxRegistry } from "#runtime/sandbox/registry.js";
+import { idleStop } from "#execution/sandbox/idle-timeout.js";
 import type {
   SandboxConnection,
   SandboxJson,
@@ -77,31 +78,6 @@ interface OpenedSandbox {
 const pendingSandboxStarts = new Map<string, Promise<SandboxSessionState | null>>();
 
 const log = createLogger("execution.sandbox");
-
-function idleStop(
-  registry: RuntimeSandboxRegistry,
-  sessionId: string,
-): { readonly idleTimeoutMs: number; readonly provider: SandboxProviderRuntime } | undefined {
-  const registered = registry.sandbox;
-  if (registered === null || isToolSessionId(sessionId)) return undefined;
-  const owner = owningSandboxDefinition(registered);
-  if (owner.kind !== "independent") return undefined;
-  const provider = getSandboxEnvironmentRuntime(owner.environment);
-  const { idleTimeoutMs } = provider;
-  if (provider.implementation.onSessionIdle === undefined || idleTimeoutMs === false)
-    return undefined;
-  return { idleTimeoutMs, provider };
-}
-
-export function sandboxIdleTimeoutMs(
-  registry: RuntimeSandboxRegistry,
-  sessionId: string,
-  recorded?: SandboxSessionState | null,
-): number | undefined {
-  const stop = idleStop(registry, sessionId);
-  if (stop === undefined || !recordedSandboxStopsIdle(stop.provider, recorded)) return undefined;
-  return stop.idleTimeoutMs;
-}
 
 export async function ensureSandboxAccess(
   input: EnsureSandboxAccessInput,

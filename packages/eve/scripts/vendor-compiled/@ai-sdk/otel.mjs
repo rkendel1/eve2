@@ -6,6 +6,7 @@ function isAiImport(source) {
 
 export default {
   packageName: "@ai-sdk/otel",
+  platform: "neutral",
   compiledPath: "@ai-sdk/otel",
   external: isAiImport,
   copyDeclarations: createDeclarationCopier({

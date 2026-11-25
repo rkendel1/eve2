@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { shutdownActiveSandboxConnections } from "#execution/sandbox/active-connections.js";
 import { isLinuxDockerDaemonAvailableSync } from "#execution/sandbox/bindings/local.js";
-import { ensureSandboxAccess, sandboxIdleTimeoutMs } from "#execution/sandbox/ensure.js";
+import { ensureSandboxAccess } from "#execution/sandbox/ensure.js";
+import { sandboxIdleTimeoutMs } from "#execution/sandbox/idle-timeout.js";
 import { createSandboxPrepareContext } from "#execution/sandbox/prewarm.js";
 import { createSandboxProviderFiles } from "#execution/sandbox/provider-files.js";
 import { TOOL_SESSION_ID_PREFIX } from "#execution/tool-session/id.js";

@@ -1,5 +1,5 @@
 import type { Dirent } from "node:fs";
-import { sep } from "node:path";
+import { sep } from "#platform/path.js";
 
 export const SUPPORTED_AUTHORED_MODULE_FILE_EXTENSIONS = [
   ".cts",

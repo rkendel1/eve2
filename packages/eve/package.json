@@ -47,6 +47,16 @@
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "imports": {
+    "#platform/*.js": {
+      "node": {
+        "eve-source": "./src/platform/node/*.ts",
+        "default": "./dist/src/platform/node/*.js"
+      },
+      "default": {
+        "eve-source": "./src/platform/neutral/*.ts",
+        "default": "./dist/src/platform/neutral/*.js"
+      }
+    },
     "#compiled/*": {
       "eve-source": "./.generated/compiled/*",
       "default": "./dist/src/compiled/*"

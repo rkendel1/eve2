@@ -9,6 +9,16 @@ const parent = `${root}cli/run.js`;
 describe("resolveEveDistImport", () => {
   it("mirrors the default targets of eve's package imports", () => {
     expect(packageJson.imports).toEqual({
+      "#platform/*.js": {
+        node: {
+          "eve-source": "./src/platform/node/*.ts",
+          default: "./dist/src/platform/node/*.js",
+        },
+        default: {
+          "eve-source": "./src/platform/neutral/*.ts",
+          default: "./dist/src/platform/neutral/*.js",
+        },
+      },
       "#compiled/*": { "eve-source": "./.generated/compiled/*", default: "./dist/src/compiled/*" },
       "#*.js": { "eve-source": "./src/*.ts", default: "./dist/src/*.js" },
     });
@@ -18,12 +28,19 @@ describe("resolveEveDistImport", () => {
     ["#compiled/zod/index.js", `${root}compiled/zod/index.js`],
     ["#compiled/@vercel/oidc/index.js", `${root}compiled/@vercel/oidc/index.js`],
     ["#internal/logging.js", `${root}internal/logging.js`],
+    ["#platform/crypto.js", `${root}platform/node/crypto.js`],
     ["#cli/dev/tui/tui.js", `${root}cli/dev/tui/tui.js`],
     ["#internal/node_modulesx.js", `${root}internal/node_modulesx.js`],
     ["./output.js", `${root}cli/output.js`],
     ["../internal/logging.js", `${root}internal/logging.js`],
   ])("maps %s", (specifier, expected) => {
     expect(resolveEveDistImport(specifier, parent, ["node", "import"], root)).toBe(expected);
+  });
+
+  it("maps a platform module to its neutral variant without the node condition", () => {
+    expect(resolveEveDistImport("#platform/crypto.js", parent, ["import", "browser"], root)).toBe(
+      `${root}platform/neutral/crypto.js`,
+    );
   });
 
   it.each([

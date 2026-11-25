@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import type { CompileAgentResult } from "#compiler/compile-agent.js";
-import { resolveDevelopmentStateDirectory } from "#internal/application/dev-environment.js";
+import { resolveDevelopmentStateDirectory } from "#internal/application/dev-state-directory.js";
 import type { CompiledAgentManifest } from "#compiler/manifest.js";
 import { readMaterializedAuthoredModuleIndex } from "#internal/materialized-authored-modules.js";
 import { copyDevelopmentSourceSnapshot } from "#internal/nitro/dev-runtime-source-snapshot-copy.js";

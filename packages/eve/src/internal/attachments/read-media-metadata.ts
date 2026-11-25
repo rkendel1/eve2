@@ -1,4 +1,4 @@
-import { constants as zlibConstants, inflateSync } from "node:zlib";
+import { inflateSync, zlibConstants } from "#platform/zlib.js";
 
 import { readImageDimensions, type MediaMetadata } from "#internal/attachments/media-metadata.js";
 

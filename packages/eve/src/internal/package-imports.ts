@@ -1,5 +1,6 @@
 const distSourceUrl = new URL("../", import.meta.url).href;
 const COMPILED_PREFIX = "#compiled/";
+const PLATFORM_PREFIX = "#platform/";
 
 export function resolveEveDistImport(
   specifier: string,
@@ -17,6 +18,11 @@ export function resolveEveDistImport(
   if (specifier[0] !== "#" || conditions?.includes("eve-source") === true) return undefined;
   if (/[\\%*]|\/\/|(?:^|\/)(?:\.{1,2}|node_modules)(?:\/|$)/u.test(specifier.slice(1))) {
     return undefined;
+  }
+  if (specifier.startsWith(PLATFORM_PREFIX)) {
+    if (!specifier.endsWith(".js")) return undefined;
+    const variant = conditions?.includes("node") === true ? "node" : "neutral";
+    return new URL(`platform/${variant}/${specifier.slice(PLATFORM_PREFIX.length)}`, root).href;
   }
   if (specifier.startsWith(COMPILED_PREFIX)) {
     return new URL(`compiled/${specifier.slice(COMPILED_PREFIX.length)}`, root).href;
