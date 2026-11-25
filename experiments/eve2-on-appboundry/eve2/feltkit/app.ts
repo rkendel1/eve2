@@ -15,10 +15,10 @@ export const app = feltkit({
   roles: {
     // A source connector delivers requests (and their later changes: approvals, edits, replies). Eve's steps run as
     // jobs enqueued by the call that delivered the request, so the connector also holds tasks.advance.
-    source: ["tasks.submit", "tasks.advance", "tasks.read", "jobs.create"],
+    source: ["tasks.submit", "tasks.advance", "tasks.read", "jobs.create", "jobs.execute"],
     // People who operate Eve: they set the policies that bound what it may do, assign work (a repository to assess,
     // an item to resolve; Eve's steps then run as the assigner), and read everything it did.
-    operator: ["tasks.*", "policies.*", "jobs.create"],
+    operator: ["tasks.*", "policies.*", "jobs.create", "jobs.execute"],
   },
   dev: {
     users: [
