@@ -1,0 +1,48 @@
+{
+  "startedAt": "2026-11-25T12:59:36.955Z",
+  "seconds": 280,
+  "providerLives": 1,
+  "timeline": [
+    {
+      "at": "2026-11-25T12:59:35.535Z",
+      "event": "provider.start",
+      "life": 1,
+      "plan": "issue.create#1"
+    },
+    {
+      "at": "2026-11-25T12:59:36.955Z",
+      "event": "assess.assigned",
+      "taskId": "mww4rrzd6357a7f8f987"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "mww4rrzd6357a7f8f987",
+      "operation": "assess",
+      "status": "completed",
+      "steps": 41,
+      "decisions": 31,
+      "restores": 0,
+      "report": {
+        "filed": [],
+        "skipped": [],
+        "notFiled": [],
+        "hypotheses": [
+          {
+            "title": "Admin session operations fail with QUERY_LIMIT_EXCEEDED once the sessions collection holds more than 1,000 records",
+            "why": "packages/appboundry-host/test/admin-many-sessions.test.ts fails without running its assertions (load or setup error)"
+          }
+        ],
+        "decisions": 31
+      },
+      "recoveries": []
+    }
+  ],
+  "model": {
+    "calls": 31,
+    "inputTokens": 5859,
+    "cacheWriteTokens": 35180,
+    "cacheReadTokens": 499020,
+    "outputTokens": 17076
+  }
+}

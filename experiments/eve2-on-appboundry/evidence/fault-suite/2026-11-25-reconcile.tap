@@ -1,0 +1,13 @@
+TAP version 13
+# Subtest: baseline: the whole workflow, uninterrupted, produces one issue, one branch, one pull request
+ok 1 - baseline: the whole workflow, uninterrupted, produces one issue, one branch, one pull request
+  ---
+  duration_ms: 31475.254389
+  type: 'test'
+  ...
+# Subtest: provider killed during assessment (right after it wrote the reproduction): the write is redone, the workflow completes once
+ok 2 - provider killed during assessment (right after it wrote the reproduction): the write is redone, the workflow completes once
+  ---
+  duration_ms: 32626.065641
+  type: 'test'
+  ...

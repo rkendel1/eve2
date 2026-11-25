@@ -6,3 +6,4 @@ package-lock.json
 .state/
 evidence/runs/
 evidence/github/*/state/
+evidence/durable/*/state/

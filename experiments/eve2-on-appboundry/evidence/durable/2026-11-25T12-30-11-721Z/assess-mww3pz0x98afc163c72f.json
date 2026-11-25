@@ -1,0 +1,127 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:durable-1795609813127",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "durable-1795609813127"
+    },
+    "operation": "assess",
+    "status": "blocked",
+    "reference": "EVE-20D60595C142",
+    "attempts": 0,
+    "steps": 2,
+    "work": {
+      "decisions": 0,
+      "gateAttempts": 0,
+      "restores": 0,
+      "objective": "Review rkendel1/appboundry for an unresolved reliability defect in packages/appboundry-host (the artifact host: guest execution and limits, collections and transactions, identity and sessions, backups, the capability ledger). The after-commit outbox (performOutbox, recoverOutbox, retryOutbox) is already tracked in issue #99; look elsewhere. Find one defect you can prove with a failing test.",
+      "sha": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+      "base": "main",
+      "checks": [
+        "build",
+        "test"
+      ],
+      "checkpoint": {
+        "files": {},
+        "seq": 0,
+        "tree": "961f4b029e569c7ed36f5b1425ebef9e42ae6a5d",
+        "at": "2026-11-25T12:30:16.336Z"
+      },
+      "resumeAt": "preparing"
+    },
+    "createdAt": "2026-11-25T12:30:13.133Z",
+    "updatedAt": "2026-11-25T12:30:32.224Z",
+    "openQuestion": "I couldn't use code.workspace.status: INVALID_REQUEST: Error response carries a malformed error object. Nothing was entered; I'll continue when it is available.",
+    "id": "mww3pz0x98afc163c72f",
+    "__version": 3
+  },
+  "executions": [
+    {
+      "taskId": "mww3pz0x98afc163c72f",
+      "seq": 0,
+      "at": "2026-11-25T12:30:16.332Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mww3pz0x98afc163c72f:open",
+      "outcome": "succeeded",
+      "outboundId": "out.c0dcfbe31477b568318b317a09e6613d94855898490bb28dc0f6fb6e5c74de0b",
+      "id": "mww3q1hs5d93a39d3efc",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3pz0x98afc163c72f",
+      "seq": 0,
+      "at": "2026-11-25T12:30:16.345Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at cd32300380a6; preparing it.",
+      "id": "mww3q1i4a854c6bf8cee",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3pz0x98afc163c72f",
+      "seq": 1,
+      "at": "2026-11-25T12:30:32.214Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.status failed: INVALID_REQUEST Error response carries a malformed error object",
+      "capability": "code.workspace.status",
+      "idempotencyKey": "mww3pz0x98afc163c72f:status:1",
+      "outcome": "failed",
+      "outboundId": "out.b4ebe0fc9af17e49daccc461b136dce6b408a1aa49b5f0e34aa976fd2f0d3b76",
+      "detail": {
+        "code": "INVALID_REQUEST",
+        "message": "Error response carries a malformed error object"
+      },
+      "id": "mww3qdqy5107e5ecb31b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3pz0x98afc163c72f",
+      "seq": 1,
+      "at": "2026-11-25T12:30:32.218Z",
+      "from": "preparing",
+      "to": "blocked",
+      "kind": "wait",
+      "summary": "I couldn't use code.workspace.status: INVALID_REQUEST: Error response carries a malformed error object. Nothing was entered; I'll continue when it is available.",
+      "id": "mww3qdr4295b3af9a4d3",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mww3pz0x98afc163c72f",
+      "kind": "checkpoint",
+      "at": "2026-11-25T12:30:16.339Z",
+      "digest": "80a2368d74b76f3a",
+      "data": {
+        "seq": 0,
+        "base": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+        "tree": "961f4b029e569c7ed36f5b1425ebef9e42ae6a5d",
+        "files": 0,
+        "seeded": []
+      },
+      "id": "mww3q1hy604842ba1437",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3pz0x98afc163c72f",
+      "kind": "observation",
+      "at": "2026-11-25T12:30:16.342Z",
+      "digest": "13165d20d75678ef",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main cd32300380a6; checks: build, test."
+      },
+      "id": "mww3q1i10ca39ab87150",
+      "__version": 1
+    }
+  ]
+}

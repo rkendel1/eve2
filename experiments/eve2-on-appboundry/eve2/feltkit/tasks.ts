@@ -296,6 +296,27 @@ const INTENT_SCHEMA = {
 
 /* ------------------------------------------------------------------ reading and operating */
 
+/**
+ * Continue a task after an interruption: a blocked task goes back to the step it stopped at; an active task gets its next
+ * step queued again (a job lost with a stopped host, for example). The task keeps its identity and history; the resume
+ * is recorded. Steps re-read what they need, so resuming a step that had already advanced does no harm.
+ */
+export const resume = app.mutation({
+  access: "tasks.resume",
+  args: { taskId: s.string(), reason: s.string() },
+  handler: async (ctx: Ctx, { taskId, reason }: { taskId: string; reason: string }) => {
+    const task = (await ctx.db.get(tasks, taskId)) as Task | null;
+    if (!task) throw new Error(`No task ${taskId}.`);
+    if (TERMINAL.has(task.status)) return { taskId, status: task.status, resumed: false };
+    const to = task.status === "blocked" && task.work?.resumeAt ? task.work.resumeAt : task.status;
+    if (WAITING.has(to)) return { taskId, status: task.status, resumed: false, why: `${to} waits for its source to change` };
+    await ctx.db.insert(executions, { taskId, seq: task.steps, at: now(), from: task.status, to, kind: "recover", summary: `Resumed by an operator: ${reason}.` });
+    await ctx.db.patch(tasks, taskId, { status: to, openQuestion: undefined, updatedAt: now(), ...(task.work ? { work: { ...task.work, transient: 0, resumeAt: undefined } } : {}) });
+    ctx.afterCommit.jobs.enqueue("eve.advance", { taskId }, { maxAttempts: 3 });
+    return { taskId, status: to, resumed: true };
+  },
+});
+
 export const get = app.query({ access: "tasks.read", args: { taskId: s.string() }, handler: async (ctx: Ctx, { taskId }: { taskId: string }) => ({
   task: await ctx.db.get(tasks, taskId),
   executions: ((await ctx.db.find(executions, { taskId })) as Array<{ at: string }>).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)),
@@ -309,7 +330,7 @@ export const capabilities = app.query({ access: "tasks.read", handler: (ctx: Ctx
 export const setPolicy = app.mutation({
   access: "policies.write",
   args: { operation: s.string(), requiresApproval: s.boolean(), approvalReaction: s.optional(s.string()), approvers: s.optional(s.array(s.string())), maxAmount: s.optional(s.number()), currency: s.optional(s.string()), reconcileBeforeRetry: s.boolean(), maxAttempts: s.number(), limits: s.optional(s.unknown()) },
-  handler: async (ctx: Ctx, policy: Policy) => {
+  handler: async (ctx: Ctx, policy: Partial<Policy> & { operation: string }) => {
     const [existing] = (await ctx.db.find(policies, { operation: policy.operation })) as Array<{ id: string }>;
     if (existing) await ctx.db.replace(policies, existing.id, policy);
     else await ctx.db.insert(policies, policy);

@@ -33,8 +33,8 @@ export const app = feltkit({
     ...["conversation.messages.get", "conversation.messages.reply"].map((name) => ({ name, versions: "1", optional: true, purpose: "read requests and answer where they were made" })),
     ...["finance.parties.find", "finance.accounts.find", "finance.documents.find", "finance.documents.create", "finance.documents.get"].map((name) => ({ name, versions: "1", optional: true, purpose: "record and verify documents in a ledger" })),
     ...["tracker.items.get", "tracker.items.find", "tracker.items.create", "tracker.items.comment"].map((name) => ({ name, versions: "1", optional: true, purpose: "read, file and answer work items" })),
-    ...["code.workspace.open", "code.workspace.list", "code.workspace.read", "code.workspace.search", "code.workspace.write", "code.workspace.run", "code.workspace.result", "code.workspace.diff"].map((name) => ({ name, versions: "1", optional: true, purpose: "investigate and change a working copy, and run its declared checks" })),
-    ...["code.changes.publish", "code.changes.get"].map((name) => ({ name, versions: "1", optional: true, purpose: "propose changes for review (never merge) and read them back" })),
+    ...["code.workspace.open", "code.workspace.status", "code.workspace.list", "code.workspace.read", "code.workspace.search", "code.workspace.write", "code.workspace.run", "code.workspace.result", "code.workspace.diff"].map((name) => ({ name, versions: "1", optional: true, purpose: "investigate and change a working copy, and run its declared checks" })),
+    ...["code.changes.publish", "code.changes.find", "code.changes.get"].map((name) => ({ name, versions: "1", optional: true, purpose: "propose changes for review (never merge) and read them back" })),
   ],
 });
 
@@ -80,7 +80,7 @@ export const executions = app.collection("executions", {
   at: s.string(),
   from: s.string(),
   to: s.string(),
-  kind: s.enum(["observe", "decide", "invoke", "verify", "report", "wait"] as const),
+  kind: s.enum(["observe", "decide", "invoke", "verify", "report", "wait", "recover"] as const),
   summary: s.string(),
   capability: s.optional(s.string()),
   idempotencyKey: s.optional(s.string()),
@@ -92,7 +92,7 @@ export const executions = app.collection("executions", {
 /** Facts Eve relies on, as captured: the source record, the approval, the target record, the verification, model usage. */
 export const evidence = app.collection("evidence", {
   taskId: s.string(),
-  kind: s.enum(["source_record", "approval", "target_record", "verification", "model_usage", "duplicate", "change", "decision", "observation", "finding", "check_result", "artifact"] as const),
+  kind: s.enum(["source_record", "approval", "target_record", "verification", "model_usage", "duplicate", "change", "decision", "observation", "finding", "check_result", "artifact", "checkpoint", "recovery"] as const),
   at: s.string(),
   digest: s.string(),
   data: s.unknown(),
@@ -114,3 +114,9 @@ export const policies = app.collection("policies", {
   /** Operation-specific bounds: repositories, how many decisions, issues or changed files, which paths are off limits. */
   limits: s.optional(s.unknown()),
 }, { unique: [["operation"]] });
+
+/**
+ * File contents Eve has written, by SHA-256: a workspace checkpoint is a base commit plus a map of paths to these. The
+ * provider's working copy can always be rebuilt from them; it is never the only place a change exists.
+ */
+export const blobs = app.collection("blobs", { sha256: s.string(), content: s.string() }, { unique: [["sha256"]] });
