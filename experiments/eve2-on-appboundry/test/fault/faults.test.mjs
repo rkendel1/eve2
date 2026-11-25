@@ -208,8 +208,11 @@ test("branch pushed, then the provider killed before the pull request: the branc
   try {
     const done = await runWorkflow(w);
     const rv = await assertExactlyOnce(w, done);
+    // Either Eve's reconcile found the pushed branch, or (if the provider was still restarting when Eve looked) the
+    // publish it sent again found the branch already at the same deterministic commit. Both are on record; neither pushes twice.
     const r = await recoveries(w, rv.task.id);
-    assert.ok(r.recover.some((s) => /exists at [0-9a-f]{12} with no pull request/.test(s)), `the pushed branch was found before publishing again: ${JSON.stringify(r.recover)}`);
+    const steps = rv.evidence.filter((e) => e.kind === "artifact" && e.data.kind === "pull_request").flatMap((e) => e.data.steps ?? []);
+    assert.ok(r.recover.some((s) => /exists at [0-9a-f]{12} with no pull request/.test(s)) || steps.some((s) => /already at [0-9a-f]{12}/.test(s)), `the pushed branch was reconciled, not pushed again: ${JSON.stringify({ recover: r.recover, steps })}`);
   } finally { w.stop(); }
 });
 
