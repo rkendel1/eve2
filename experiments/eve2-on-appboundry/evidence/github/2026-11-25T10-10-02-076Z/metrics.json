@@ -1,0 +1,20 @@
+{
+  "startedAt": "2026-11-25T10:10:03.501Z",
+  "resolve": {
+    "taskId": "mwvypq477697701a6a41",
+    "status": "blocked",
+    "seconds": 339,
+    "steps": 36,
+    "decisions": 25,
+    "model": {
+      "calls": 26,
+      "inputTokens": 36296,
+      "cacheWriteTokens": 24997,
+      "cacheReadTokens": 337754,
+      "outputTokens": 27572
+    },
+    "invocations": 64,
+    "report": null
+  },
+  "finishedAt": "2026-11-25T10:15:42.494Z"
+}

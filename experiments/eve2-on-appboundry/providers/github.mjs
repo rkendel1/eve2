@@ -227,7 +227,7 @@ const code = [
 const changes = [
   defineCapability({
     name: "code.changes.publish", version: 1, description: "Commit the working copy's changes on a new eve/ branch and open a pull request. Never merges.",
-    input: s.object({ workspace: s.string(), branch: s.string(), title: s.string(), body: s.string(), message: s.string() }), output: s.unknown(), authorization: [], idempotency: "required",
+    input: s.object({ workspace: s.string(), branch: s.string(), title: s.string(), body: s.string(), message: s.string() }), output: s.unknown(), authorization: [], idempotency: "supported",
     handler: async ({ workspace: id, branch, title, body, message }) => {
       const w = workspace(id);
       if (!/^eve\/[a-z0-9._/-]{1,80}$/.test(branch)) throw new AppPortError("INVALID_INPUT", "Branches are eve/<lowercase name>.");
