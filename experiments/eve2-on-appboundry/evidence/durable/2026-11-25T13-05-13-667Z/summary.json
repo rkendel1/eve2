@@ -1,0 +1,37 @@
+{
+  "startedAt": "2026-11-25T13:05:14.867Z",
+  "seconds": 401,
+  "providerLives": 1,
+  "timeline": [
+    {
+      "at": "2026-11-25T13:05:13.672Z",
+      "event": "provider.start",
+      "life": 1,
+      "plan": "issue.create#1"
+    },
+    {
+      "at": "2026-11-25T13:05:14.867Z",
+      "event": "assess.assigned",
+      "taskId": "mww4z0pv4daf1f2646fc"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "mww4z0pv4daf1f2646fc",
+      "operation": "assess",
+      "status": "blocked",
+      "steps": 39,
+      "decisions": 36,
+      "restores": 0,
+      "report": null,
+      "recoveries": []
+    }
+  ],
+  "model": {
+    "calls": 36,
+    "inputTokens": 6804,
+    "cacheWriteTokens": 37835,
+    "cacheReadTokens": 693331,
+    "outputTokens": 29979
+  }
+}

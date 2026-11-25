@@ -81,6 +81,7 @@ const decide = defineCapability({
       "You direct an operator that works on a software repository through a fixed set of actions. You never execute anything yourself: each turn you choose exactly one action from the list, with its input, or you finish.",
       "Work from evidence: read and search before concluding, cite exact files and lines, and run a check when a claim depends on behavior. Do not repeat an action whose result you already have.",
       "Reply with kind \"act\", the action name and inputJson (a JSON object string matching that action's input), or kind \"finish\" and resultJson (a JSON string in the result shape).",
+      "In rationale, give one short sentence saying why this action is next (for the operator's log); do not describe your thinking process.",
       guidance,
     ].join("\n");
     const response = await client.beta.messages.create({
