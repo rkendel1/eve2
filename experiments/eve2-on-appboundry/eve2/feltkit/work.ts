@@ -399,7 +399,7 @@ async function filing(ctx: Ctx, task: Task) {
   const limits = (await policyFor(ctx, task))!;
   const all = ((await ctx.db.find(evidence, { taskId: task.id, kind: "finding" })) as Array<{ data: FindingRecord }>).map((r) => r.data);
   const proven = all.filter((d) => d.proven).sort((a, b) => SEVERITY[a.finding.severity] - SEVERITY[b.finding.severity]);
-  const filed: Array<{ title: string; operation?: string; number?: number; url?: string; verified?: boolean; resolution?: string; skipped?: string }> = task.work.filed ?? [];
+  const filed: Array<{ title: string; operation?: string; number?: number; url?: string; unknown?: boolean; verified?: boolean; resolution?: string; skipped?: string }> = task.work.filed ?? [];
   const open = filed.find((f) => !f.skipped && (!f.verified || (limits.autoResolve && !f.resolution)));
   const created = filed.filter((f) => f.number).length;
   const nextFinding = proven.find((p) => !filed.some((f) => f.title === p.finding.title));
@@ -418,6 +418,22 @@ async function filing(ctx: Ctx, task: Task) {
     return stay(ctx, task, 0);
   }
   const record_ = proven.find((p) => p.finding.title === open.title)!;
+  if (!open.number && open.unknown) {
+    // An earlier create has an unknown outcome: nothing is sent again until the tracker has been asked, and has answered.
+    const found = await invoke(ctx, task, "tracker.items.find", { repository: repo(task), operation: open.operation }, `${task.id}:reconcile-issue:${task.steps}`);
+    if (found.outcome !== "succeeded") return unavailable(ctx, task, "tracker.items.find", found);
+    const [issue] = (found.value as { matches: Array<{ number: number; url: string }> }).matches;
+    if (issue) {
+      await keep(ctx, task, "recovery", { why: "issue creation had an unknown outcome", reconciled: "found by operation marker", number: issue.number });
+      await record(ctx, task, "recover", task.status, task.status, `Issue creation had an unknown outcome; found #${issue.number} by its operation marker. Not filed again.`);
+      await replace({ ...open, unknown: false, number: issue.number, url: issue.url });
+      return stay(ctx, task, 0);
+    }
+    await keep(ctx, task, "recovery", { why: "issue creation had an unknown outcome", reconciled: "the tracker answered: no issue carries the operation marker" });
+    await record(ctx, task, "recover", task.status, task.status, "Issue creation had an unknown outcome; the tracker answered that no issue carries its operation marker. Sending it again with the same key.");
+    await replace({ ...open, unknown: false });
+    return stay(ctx, task, 0);
+  }
   if (!open.number) {
     const made = await invoke(ctx, task, "tracker.items.create", { repository: repo(task), operation: open.operation, title: open.title, body: await issueBody(ctx, task, record_.finding, record_.verifications, record_.tests) }, `${task.id}:file:${open.operation}`);
     if (made.outcome === "succeeded") {
@@ -426,17 +442,7 @@ async function filing(ctx: Ctx, task: Task) {
       await replace({ ...open, number: issue.number, url: issue.url });
       return stay(ctx, task, 0);
     }
-    if (made.outcome !== "unknown") return unavailable(ctx, task, "tracker.items.create", made);
-    // Unknown: the issue may exist. Look for it by its operation marker before anything is sent again.
-    const found = await invoke(ctx, task, "tracker.items.find", { repository: repo(task), operation: open.operation }, `${task.id}:reconcile-issue:${task.steps}`);
-    if (found.outcome === "succeeded" && (found.value as { matches: unknown[] }).matches.length) {
-      const issue = (found.value as { matches: Array<{ number: number; url: string }> }).matches[0]!;
-      await keep(ctx, task, "recovery", { why: "issue creation had an unknown outcome", reconciled: "found by operation marker", number: issue.number });
-      await record(ctx, task, "recover", task.status, task.status, `Issue creation had an unknown outcome; found #${issue.number} by its operation marker. Not filed again.`);
-      await replace({ ...open, number: issue.number, url: issue.url });
-      return stay(ctx, task, 0);
-    }
-    await record(ctx, task, "recover", task.status, task.status, "Issue creation had an unknown outcome and no issue carries its operation marker; it will be sent again with the same key.");
+    if (made.outcome === "unknown") await replace({ ...open, unknown: true });
     return unavailable(ctx, task, "tracker.items.create", made);
   }
   if (!open.verified) {
@@ -559,6 +565,22 @@ async function publishing(ctx: Ctx, task: Task) {
     "### Not verified", "", "- CI on this branch (reported after it runs).", "- Behavior beyond the tests named above.", "",
     `Proposed by Eve2 (task \`${task.id}\`). Not merged: a person decides.`,
   ].join("\n");
+  if (task.work.publishUnknown) {
+    // An earlier publish did not finish cleanly: nothing is sent again until GitHub has been asked, and has answered.
+    const found = await invoke(ctx, task, "code.changes.find", { repository: repo(task), operation: publishOperation(task), branch: branchOf(task) }, `${task.id}:reconcile-publish:${task.steps}`);
+    if (found.outcome !== "succeeded") return unavailable(ctx, task, "code.changes.find", found);
+    const v = found.value as { branch: { sha: string } | null; pullRequest: { number: number; url: string; headSha: string } | null };
+    await keep(ctx, task, "recovery", { why: `publishing ${task.work.publishUnknownWas}`, branch: v.branch, pullRequest: v.pullRequest?.number ?? null });
+    await patchWork(ctx, task, { publishUnknown: null });
+    if (v.pullRequest) {
+      await record(ctx, task, "recover", task.status, task.status, `Publishing was ${task.work.publishUnknownWas}; #${v.pullRequest.number} exists for this operation. Not opened again.`);
+      await ctx.db.patch(tasks, task.id, { target: { id: String(v.pullRequest.number), kind: "change" } });
+      await keep(ctx, task, "artifact", { kind: "pull_request", number: v.pullRequest.number, url: v.pullRequest.url, headSha: v.pullRequest.headSha, steps: ["found after an uncertain outcome"], reconciled: true });
+      return move(ctx, task, "verifying", "decide", `Reconciled: #${v.pullRequest.number} exists; reading it back.`);
+    }
+    await record(ctx, task, "recover", task.status, task.status, `Publishing was ${task.work.publishUnknownWas}; GitHub answered: ${v.branch ? `${branchOf(task)} exists at ${v.branch.sha.slice(0, 12)} with no pull request` : "no branch and no pull request"}. Publishing again reconciles the branch by content.`);
+    return stay(ctx, task, 0);
+  }
   const published = await ws(ctx, task, "code.changes.publish", {
     operation: publishOperation(task), branch: branchOf(task), expectTree: task.work.verifiedTree,
     title: `Resolve #${item.number}: ${item.title}`.slice(0, 120), body, message: `Resolve #${item.number}: ${item.title}\n\n${task.work.summary}`,
@@ -571,21 +593,7 @@ async function publishing(ctx: Ctx, task: Task) {
     await keep(ctx, task, "artifact", { kind: "pull_request", number: pr.number, url: pr.url, headSha: pr.headSha, steps: pr.steps, reconciled: pr.reconciled });
     return move(ctx, task, "verifying", "invoke", `Pull request #${pr.number}: ${pr.steps.join("; ")}. Reading it back.`);
   }
-  if (published.outcome === "unknown" || published.outcome === "failed") {
-    // Before sending again, ask GitHub what exists for this operation.
-    const found = await invoke(ctx, task, "code.changes.find", { repository: repo(task), operation: publishOperation(task), branch: branchOf(task) }, `${task.id}:reconcile-publish:${task.steps}`);
-    if (found.outcome === "succeeded") {
-      const v = found.value as { branch: { sha: string } | null; pullRequest: { number: number; url: string; headSha: string } | null };
-      await keep(ctx, task, "recovery", { why: `publishing ${published.outcome}`, branch: v.branch, pullRequest: v.pullRequest?.number ?? null });
-      if (v.pullRequest) {
-        await record(ctx, task, "recover", task.status, task.status, `Publishing was ${published.outcome}; #${v.pullRequest.number} exists for this operation. Not opened again.`);
-        await ctx.db.patch(tasks, task.id, { target: { id: String(v.pullRequest.number), kind: "change" } });
-        await keep(ctx, task, "artifact", { kind: "pull_request", number: v.pullRequest.number, url: v.pullRequest.url, headSha: v.pullRequest.headSha, steps: ["found after an uncertain outcome"], reconciled: true });
-        return move(ctx, task, "verifying", "decide", `Reconciled: #${v.pullRequest.number} exists; reading it back.`);
-      }
-      await record(ctx, task, "recover", task.status, task.status, `Publishing was ${published.outcome}; ${v.branch ? `${branchOf(task)} exists at ${v.branch.sha.slice(0, 12)} with no pull request` : "no branch and no pull request exist"}. Publishing again reconciles the branch by content.`);
-    }
-  }
+  if (published.outcome === "unknown" || published.outcome === "failed") await patchWork(ctx, task, { publishUnknown: true, publishUnknownWas: published.outcome });
   return unavailable(ctx, task, "code.changes.publish", published);
 }
 

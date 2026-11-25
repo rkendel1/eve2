@@ -43,13 +43,13 @@ async function until(check, ms, what) {
 }
 
 /** Everything one scenario needs; `fault` is the provider's FAULT_EXIT_AFTER for its first life only. */
-async function world(name, { fault = "" } = {}) {
+async function world(name, { fault = "", restartDelayMs = 0, listLagMs = 0 } = {}) {
   const root = mkdtempSync(join(tmpdir(), `eve-fault-${name}-`));
   const logs = join(root, "logs"); mkdirSync(logs);
   const ports = { standin: portBase, reasoning: portBase + 1, github: portBase + 2, host: portBase + 3 };
   portBase += 10;
   createRepository(root, REPOSITORY, FIXTURE);
-  const standin = await startStandin({ root, port: ports.standin });
+  const standin = await startStandin({ root, port: ports.standin, listLagMs });
   const checks = join(root, "checks.json");
   writeFileSync(checks, JSON.stringify({ [REPOSITORY]: { prepare: { argv: ["true"], timeoutMs: 60_000 }, test: { argv: ["node", "--test"], target: "path", timeoutMs: 60_000 } } }));
   const tokens = { reasoning: randomBytes(16).toString("hex"), github: randomBytes(16).toString("hex") };
@@ -65,7 +65,7 @@ async function world(name, { fault = "" } = {}) {
     child.on("exit", (code) => {
       events.push({ at: Date.now(), process: key, exit: code });
       // The provider is disposable: when it dies at the injected fault, a fresh one (without the fault) takes its place.
-      if (restartWithout && code === 137 && !child.stopping) start(key, argv, { ...env, FAULT_EXIT_AFTER: "" });
+      if (restartWithout && code === 137 && !child.stopping) setTimeout(() => start(key, argv, { ...env, FAULT_EXIT_AFTER: "" }), restartDelayMs);
     });
     return child;
   };
@@ -180,6 +180,17 @@ test("issue created, answer lost (provider killed after creating it): reconciled
   } finally { w.stop(); }
 });
 
+test("issue created, answer lost, the provider still down when Eve reconciles and GitHub's list lagging: one issue, never re-sent blind", async () => {
+  const w = await world("issue-kill-lag", { fault: "issue.create#1", restartDelayMs: 4_000, listLagMs: 20_000 });
+  try {
+    const done = await runWorkflow(w);
+    await assertExactlyOnce(w, done);
+    const r = await recoveries(w, done.assessId);
+    assert.ok(r.recover.some((s) => /found #\d+ by its operation marker|already had #\d+ for this operation/.test(s)), `reconciled by marker: ${JSON.stringify(r.recover)}`);
+    assert.ok(!r.recover.some((s) => /no issue carries/.test(s)), `nothing was concluded while the tracker could not answer: ${JSON.stringify(r.recover)}`);
+  } finally { w.stop(); }
+});
+
 test("provider killed during implementation after the fix was checkpointed: rebuilt from the checkpoint at the same tree", async () => {
   // run.start occurrences: 1 assess repro, 2 prove, 3 resolve after the write — the fix is checkpointed by then.
   const w = await world("implement-kill", { fault: "run.start#3" });
@@ -218,6 +229,16 @@ test("branch pushed, then the provider killed before the pull request: the branc
 
 test("pull request created, answer lost (provider killed after creating it): found by its operation, not opened twice", async () => {
   const w = await world("pull-kill", { fault: "pull.create#1" });
+  try {
+    const done = await runWorkflow(w);
+    const rv = await assertExactlyOnce(w, done);
+    const r = await recoveries(w, rv.task.id);
+    assert.ok(r.recover.some((s) => /exists for this operation|already existed for this operation/.test(s)), `the pull request was reconciled: ${JSON.stringify(r.recover)}`);
+  } finally { w.stop(); }
+});
+
+test("pull request created, answer lost, the provider still down when Eve reconciles and GitHub's list lagging: one pull request", async () => {
+  const w = await world("pull-kill-lag", { fault: "pull.create#1", restartDelayMs: 4_000, listLagMs: 20_000 });
   try {
     const done = await runWorkflow(w);
     const rv = await assertExactlyOnce(w, done);

@@ -1,0 +1,888 @@
+{
+  "task": {
+    "sourceKey": "tracker:rkendel1/appboundry:102",
+    "source": {
+      "system": "tracker",
+      "conversation": "rkendel1/appboundry",
+      "message": "102"
+    },
+    "operation": "resolve",
+    "status": "implementing",
+    "reference": "EVE-E5379E3FB388",
+    "attempts": 0,
+    "steps": 12,
+    "work": {
+      "decisions": 8,
+      "gateAttempts": 0,
+      "restores": 0,
+      "objective": null,
+      "origin": {
+        "assessTask": "mww5a689032ad2811ec6",
+        "operation": "mww5a689032ad2811ec6:issue:54303c6d27b14f36",
+        "finding": "tenancy@1 commit reports any FeltDB failure, including an unconfirmed commit, as a CONFLICT where 'nothing was written'"
+      },
+      "seed": [
+        {
+          "path": "packages/appboundry-host/test/tenancy-commit-outcome.test.ts",
+          "content": "/**\n * A tenancy@1 commit whose outcome FeltDB could not confirm must not be reported as a conflict in which\n * nothing was written: the write may have landed, and a caller that retries a provision on that answer\n * creates a second organization (a fresh crypto.token id each time).\n */\nimport { describe, expect, it } from \"vitest\";\nimport { FeltDBErrorCode } from \"@feltdb/core\";\nimport { TenancyTransaction } from \"../src/tenancy.js\";\n\nfunction fakeDb() {\n  const written: unknown[] = [];\n  const db = {\n    collection: () => ({ get: async () => null }),\n    query: async () => ({ records: [], exhausted: true }),\n    // The authority applies the transaction, then the acknowledgement is lost.\n    transaction: async (request: { operations: unknown[] }) => {\n      written.push(...request.operations);\n      throw Object.assign(new Error(\"commit outcome unknown\"), { code: FeltDBErrorCode.COMMIT_OUTCOME_UNKNOWN });\n    }\n  };\n  return { db, written };\n}\n\ndescribe(\"tenancy@1 commit outcome\", () => {\n  it(\"does not report an unconfirmed commit as a conflict that wrote nothing\", async () => {\n    const { db, written } = fakeDb();\n    const tx = new TenancyTransaction(db as never);\n    expect(await tx.get(\"_feltkit_tenants\", \"t1\")).toBeNull();\n    tx.create(\"_feltkit_tenants\", \"t1\", { name: \"Acme\" });\n    const error = (await tx.commit().then(() => null, e => e)) as { code?: string; message?: string } | null;\n    expect(error).not.toBeNull();\n    expect(written.length).toBe(1);\n    // The record was written; the host must not tell the caller it was not.\n    expect(error!.code).not.toBe(\"CONFLICT\");\n    expect(error!.message).not.toMatch(/nothing was written/);\n  });\n});\n"
+        }
+      ],
+      "item": {
+        "number": 102,
+        "title": "tenancy@1 commit reports any FeltDB failure, including an unconfirmed commit, as a CONFLICT where 'nothing was written'",
+        "url": "https://github.com/rkendel1/appboundry/issues/102"
+      },
+      "checkpoint": {
+        "files": {
+          "packages/appboundry-host/test/tenancy-commit-outcome.test.ts": "7210b5a76637c5a726e1c12bfddee62051d21568cc5789a51af0049a9a0d81d4"
+        },
+        "seq": 0,
+        "tree": "f89a996022251bb101d03b723a53550084cca646",
+        "at": "2026-11-25T13:21:20.219Z"
+      },
+      "sha": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+      "base": "main",
+      "checks": [
+        "build",
+        "test"
+      ],
+      "transient": 1
+    },
+    "createdAt": "2026-11-25T13:21:16.137Z",
+    "updatedAt": "2026-11-25T13:22:27.542Z",
+    "id": "mww5jmgb39fbf886150e",
+    "__version": 13
+  },
+  "executions": [
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 0,
+      "at": "2026-11-25T13:21:17.753Z",
+      "from": "received",
+      "to": "received",
+      "kind": "invoke",
+      "summary": "tracker.items.get succeeded",
+      "capability": "tracker.items.get",
+      "idempotencyKey": "mww5jmgb39fbf886150e:item:0",
+      "outcome": "succeeded",
+      "outboundId": "out.4b07fce7324e049bf8aaf7ee9fab7189a593d547de2a39866d08bcdbae081541",
+      "id": "mww5jnp859d4d811bbe7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 0,
+      "at": "2026-11-25T13:21:20.217Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mww5jmgb39fbf886150e:open",
+      "outcome": "succeeded",
+      "outboundId": "out.8183799b700ac9e48c300381ba4646ede4e4fa238538fb58932fa6828ae34bd9",
+      "id": "mww5jplme037b7b7acf9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 0,
+      "at": "2026-11-25T13:21:20.225Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at cd32300380a6; preparing it.",
+      "id": "mww5jplu7fc552edb2a2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 1,
+      "at": "2026-11-25T13:21:36.175Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.status succeeded",
+      "capability": "code.workspace.status",
+      "idempotencyKey": "mww5jmgb39fbf886150e:status:1",
+      "outcome": "succeeded",
+      "outboundId": "out.9f33afb18bb5044aa18c3b3a9a80922ae168defb2e2d9fa45ebf078657abb2e6",
+      "id": "mww5k1wx15d09451aa64",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 2,
+      "at": "2026-11-25T13:21:47.198Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.status succeeded",
+      "capability": "code.workspace.status",
+      "idempotencyKey": "mww5jmgb39fbf886150e:status:2",
+      "outcome": "succeeded",
+      "outboundId": "out.2afc1ebe600ae72e179749addf705bbbf439f9a370e6b98bd2de364feca1b6ef",
+      "id": "mww5kaf4f2de83b07c44",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 2,
+      "at": "2026-11-25T13:21:47.200Z",
+      "from": "preparing",
+      "to": "implementing",
+      "kind": "observe",
+      "summary": "Working copy prepared.",
+      "id": "mww5kaf6ffa229375d8d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 3,
+      "at": "2026-11-25T13:21:50.430Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:0",
+      "outcome": "succeeded",
+      "outboundId": "out.d0307e723f2dbbd339127e8056d73bd5ad130ee1e6475045edeb81fc70aa50af",
+      "id": "mww5kcwy018cb164c111",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 3,
+      "at": "2026-11-25T13:21:51.796Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:1",
+      "outcome": "succeeded",
+      "outboundId": "out.2c552d640c9ef6a309bda72e1f7d4dd0837f8b23509bc16741c065d57b0f1940",
+      "id": "mww5kdyv324b88cf5301",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 4,
+      "at": "2026-11-25T13:21:54.425Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:1",
+      "outcome": "succeeded",
+      "outboundId": "out.a69f7b6c3adb945c06c9d37fdd116a3748e84595f031a621d61b26cb4226fd09",
+      "id": "mww5kfzvf58fcea9d7f0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 4,
+      "at": "2026-11-25T13:21:54.441Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:2",
+      "outcome": "succeeded",
+      "outboundId": "out.3bf12fd849a9bf414e424bdcb016bc3eba9ea6e39ffdb061abbe46a1216e6e39",
+      "id": "mww5kg0bd6c626a90cd9",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 5,
+      "at": "2026-11-25T13:21:57.298Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:2",
+      "outcome": "succeeded",
+      "outboundId": "out.67f022c19e710a446e4d500f8ab74aaa356e05c847471105b93262dcff971364",
+      "id": "mww5ki7o24187dfa1893",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 5,
+      "at": "2026-11-25T13:21:57.312Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:3",
+      "outcome": "succeeded",
+      "outboundId": "out.090ec5ef7d864414f6b1ca8117ce51b6976993f534adc828b0c2ec5fc970c621",
+      "id": "mww5ki819a07e74da214",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 6,
+      "at": "2026-11-25T13:22:00.585Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:3",
+      "outcome": "succeeded",
+      "outboundId": "out.fd1de6fbeb9b452d0a99b62bb2d840cb47ef454401b964d11780315b15d59a5e",
+      "id": "mww5kkqz63c0c282608b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 6,
+      "at": "2026-11-25T13:22:00.602Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:4",
+      "outcome": "succeeded",
+      "outboundId": "out.32eb8243d075ec756d972655e37f9470147194a99656965be26cb932c8df8f10",
+      "id": "mww5kkrj66dfbab0770c",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 7,
+      "at": "2026-11-25T13:22:03.170Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:4",
+      "outcome": "succeeded",
+      "outboundId": "out.00ea935908bb10969d4e52780f97e276d23addde64e6d29a0e10da36d5059bfa",
+      "id": "mww5kmqs3641db75853e",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 7,
+      "at": "2026-11-25T13:22:03.194Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:5",
+      "outcome": "succeeded",
+      "outboundId": "out.72a3c49c6796361df14ccf7f05da6cc991575213340d2099e1c1d985f6f734de",
+      "id": "mww5kmrgf05671d980d7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 8,
+      "at": "2026-11-25T13:22:06.318Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:5",
+      "outcome": "succeeded",
+      "outboundId": "out.018634ba2d0d287f6c2316c22725a5169fff224f128b6bb5e279cfbd090b50b0",
+      "id": "mww5kp69ab9c8dadfedd",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 8,
+      "at": "2026-11-25T13:22:06.340Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:6",
+      "outcome": "succeeded",
+      "outboundId": "out.3bfdec1e7b2fec2402e99c353eb13256c3a935cdcb9464b4ffaae4998b48321c",
+      "id": "mww5kp6ue795ad3577ea",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 9,
+      "at": "2026-11-25T13:22:15.122Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:6",
+      "outcome": "succeeded",
+      "outboundId": "out.3b9a94d3dcddc9e84105977a16350b9dd1a4940b90200590d0c3476102d5ab0e",
+      "id": "mww5kvys68964744fe4f",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 9,
+      "at": "2026-11-25T13:22:15.141Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:7",
+      "outcome": "succeeded",
+      "outboundId": "out.8f30592586665bba1ce2f351184bd73652b1369197420bd4dc84f29163504f64",
+      "id": "mww5kvzb0a3b9ed04420",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 10,
+      "at": "2026-11-25T13:22:24.611Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:7",
+      "outcome": "succeeded",
+      "outboundId": "out.5b4e9b19e92e532160ce73a3cc50097f15a3725c188f9428ac5cd30fe1451794",
+      "id": "mww5l3added39c01f1d2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 10,
+      "at": "2026-11-25T13:22:24.628Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mww5jmgb39fbf886150e:act:8",
+      "outcome": "succeeded",
+      "outboundId": "out.67c9836d8fbbadd65073e8bd3b318f4db5f1309e5916388fd66ed23f9b2449eb",
+      "id": "mww5l3atbc68f7a5fcc7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 11,
+      "at": "2026-11-25T13:22:27.539Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide: outcome unknown (The exchange with reasoning-claude failed after the request was sent (UND_ERR_SOCKET); the request may have taken effect.)",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww5jmgb39fbf886150e:decide:8",
+      "outcome": "unknown",
+      "outboundId": "out.a194a482089449d48e67af4bf97ef0b89732b3f4d320c2126cb0015d0036434a",
+      "id": "mww5l5jpf9119b883628",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "seq": 11,
+      "at": "2026-11-25T13:22:27.541Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "wait",
+      "summary": "reasoning.decide: it did not answer (The exchange with reasoning-claude failed after the request was sent (UND_ERR_SOCKET); the request may have taken effect.). Trying this step again (1 of 6).",
+      "id": "mww5l5jq99b39ecad0ca",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "source_record",
+      "at": "2026-11-25T13:21:17.756Z",
+      "digest": "07cb221c477dfee3",
+      "data": {
+        "number": 102,
+        "title": "tenancy@1 commit reports any FeltDB failure, including an unconfirmed commit, as a CONFLICT where 'nothing was written'",
+        "state": "open",
+        "url": "https://github.com/rkendel1/appboundry/issues/102",
+        "author": "rkendel1",
+        "labels": [],
+        "body": "TenancyTransaction.commit() catches every error from db.transaction() and rethrows it as HostError CONFLICT with the message 'nothing was written'. It does not look at the error. When FeltDB answers COMMIT_OUTCOME_UNKNOWN or DURABILITY_FAILURE, the transaction may already have been applied. ArtifactHost.tenancy() awaits tx.commit() (host.ts:463), so the caller is told the membership or tenant change did not happen and that retrying is safe. A retried provision mints a fresh crypto.token tenant id and creates a second organization or membership. The collections path maps the same FeltDB codes to OUTCOME_UNKNOWN (collections.ts commitError, lines 191-196); the tenancy path does not. The new test simulates an authority that applies the write and then loses the acknowledgement: the write lands, yet commit() rejects with code CONFLICT and 'nothing was written'.\n\n**Severity:** medium\n\n### Evidence\n\n1. [`packages/appboundry-host/src/tenancy.ts` lines 76–80](https://github.com/rkendel1/appboundry/blob/cd32300380a6ac5735b02891218f56814dfa8ac5/packages/appboundry-host/src/tenancy.ts#L76-L80):\n\n```\n    try {\n      await this.#db.transaction({ operations } as never);\n    } catch (error) {\n      throw new HostError(\"CONFLICT\", `The membership change conflicted with a concurrent one; nothing was written. (${(error as Error).message})`);\n    }\n```\n\n2. [`packages/appboundry-host/src/collections.ts` lines 191–192](https://github.com/rkendel1/appboundry/blob/cd32300380a6ac5735b02891218f56814dfa8ac5/packages/appboundry-host/src/collections.ts#L191-L192):\n\n```\n  if (error.code === FeltDBErrorCode.COMMIT_OUTCOME_UNKNOWN || error.code === FeltDBErrorCode.DURABILITY_FAILURE) {\n    return new HostError(\"OUTCOME_UNKNOWN\", `FeltDB could not confirm the commit (${error.code}); the mutation may or may not have been written.`, {\n```\n\n3. `test packages/appboundry-host/test/tenancy-commit-outcome.test.ts` fails on its assertions at cd32300380a6.\n\n### Reproduction\n\n<details><summary><code>packages/appboundry-host/test/tenancy-commit-outcome.test.ts</code> (fails today)</summary>\n\n```ts\n/**\n * A tenancy@1 commit whose outcome FeltDB could not confirm must not be reported as a conflict in which\n * nothing was written: the write may have landed, and a caller that retries a provision on that answer\n * creates a second organization (a fresh crypto.token id each time).\n */\nimport { describe, expect, it } from \"vitest\";\nimport { FeltDBErrorCode } from \"@feltdb/core\";\nimport { TenancyTransaction } from \"../src/tenancy.js\";\n\nfunction fakeDb() {\n  const written: unknown[] = [];\n  const db = {\n    collection: () => ({ get: async () => null }),\n    query: async () => ({ records: [], exhausted: true }),\n    // The authority applies the transaction, then the acknowledgement is lost.\n    transaction: async (request: { operations: unknown[] }) => {\n      written.push(...request.operations);\n      throw Object.assign(new Error(\"commit outcome unknown\"), { code: FeltDBErrorCode.COMMIT_OUTCOME_UNKNOWN });\n    }\n  };\n  return { db, written };\n}\n\ndescribe(\"tenancy@1 commit outcome\", () => {\n  it(\"does not report an unconfirmed commit as a conflict that wrote nothing\", async () => {\n    const { db, written } = fakeDb();\n    const tx = new TenancyTransaction(db as never);\n    expect(await tx.get(\"_feltkit_tenants\", \"t1\")).toBeNull();\n    tx.create(\"_feltkit_tenants\", \"t1\", { name: \"Acme\" });\n    const error = (await tx.commit().then(() => null, e => e)) as { code?: string; message?: string } | null;\n    expect(error).not.toBeNull();\n    expect(written.length).toBe(1);\n    // The record was written; the host must not tell the caller it was not.\n    expect(error!.code).not.toBe(\"CONFLICT\");\n    expect(error!.message).not.toMatch(/nothing was written/);\n  });\n});\n\n```\n</details>\n\n### Suggested fix\n\nIn TenancyTransaction.commit(), map FeltDB errors as commitError does. Only PRECONDITION_FAILED becomes CONFLICT ('nothing was written'). COMMIT_OUTCOME_UNKNOWN and DURABILITY_FAILURE become OUTCOME_UNKNOWN, with a hint to read before retrying. Contract violations and refusals keep their own codes, for example via feltdbRefusal/feltdbFailure. Also pass a stable transactionId so FeltDB can deduplicate a resend.\n\n### How this was verified\n\n- packages/appboundry-host/src/tenancy.ts:76-80 contains the quoted code\n- packages/appboundry-host/src/collections.ts:191-192 contains the quoted code\n- packages/appboundry-host/test/tenancy-commit-outcome.test.ts fails on its assertions at tree f89a99602225 (base cd32300380a6 plus tests)\n\nFound and verified by Eve2 (task `mww5a689032ad2811ec6`, rkendel1/appboundry@cd32300380a6): the quoted lines were re-read and the reproduction re-run before filing.\n\n<!-- eve2:operation=mww5a689032ad2811ec6:issue:54303c6d27b14f36 -->\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_",
+        "comments": []
+      },
+      "id": "mww5jnppe5019c6905e5",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "checkpoint",
+      "at": "2026-11-25T13:21:20.221Z",
+      "digest": "10447f290a70a64c",
+      "data": {
+        "seq": 0,
+        "base": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+        "tree": "f89a996022251bb101d03b723a53550084cca646",
+        "files": 1,
+        "seeded": [
+          "packages/appboundry-host/test/tenancy-commit-outcome.test.ts"
+        ]
+      },
+      "id": "mww5jplr48b9ddc36d2b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:21:20.223Z",
+      "digest": "e33926637eaf66ba",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main cd32300380a6, with packages/appboundry-host/test/tenancy-commit-outcome.test.ts from the finding; checks: build, test."
+      },
+      "id": "mww5jplt3cfe1ff7efa1",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:21:50.435Z",
+      "digest": "db94d053f77caa54",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 112,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1351,
+        "latencyMs": 2171,
+        "messageId": "msg_011ChPiWm4N4RDy2vGkfU66d"
+      },
+      "id": "mww5kcx06ce3325821ee",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:21:50.436Z",
+      "digest": "967bc646f7395899",
+      "data": {
+        "n": 1,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\": \"test\", \"target\": \"packages/appboundry-host/test/tenancy-commit-outcome.test.ts\", \"against\": \"change\"}",
+        "resultJson": null,
+        "rationale": "Confirm the reproduction test fails before changing code."
+      },
+      "id": "mww5kcx24ac46a3e3c56",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:21:51.799Z",
+      "digest": "23483afb78712604",
+      "data": {
+        "n": 1,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/tenancy-commit-outcome.test.ts",
+          "against": "change"
+        },
+        "summary": "test packages/appboundry-host/test/tenancy-commit-outcome.test.ts against change: exit 1 in 1 s\n(node:4059) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:4072) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n RUN  v3.2.7 /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/eve-mww5jmgb39fbf886150e\n\n(node:4107) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:4108) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:4114) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n ❯ packages/appboundry-host/test/tenancy-commit-outcome.test.ts (1 test | 1 failed) 10ms\n   × tenancy@1 commit outcome > does not report an unconfirmed commit as a conflict that wrote nothing 8ms\n     → expected 'CONFLICT' not to be 'CONFLICT' // Object.is equality\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  packages/appboundry-host/test/tenancy-commit-outcome.test.ts > tenancy@1 commit outcome > does not report an unconfirmed commit as a conflict that wrote nothing\nAssertionError: expected 'CONFLICT' not to be 'CONFLICT' // Object.is equality\n ❯ packages/appboundry-host/test/tenancy-commit-outcome.test.ts:34:29\n     32|     expect(written.length).toBe(1);\n     33|     // The record was written; the host must not tell the caller it wa…\n     34|     expect(error!.code).not.toBe(\"CONFLICT\");\n       |                             ^\n     35|     expect(error!.message).not.toMatch(/nothing was written/);\n     36|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  13:21:51\n   Duration  543ms (transform 118ms, setup 0ms, collect 197ms, tests 10ms, environment 0ms, prepare 69ms)\n\n(node:4171) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mww5kdz378dbfa85c9ce",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:21:54.427Z",
+      "digest": "d5e61b14d6df4867",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 101,
+        "cacheReadTokens": 1351,
+        "cacheWriteTokens": 1208,
+        "latencyMs": 2237,
+        "messageId": "msg_011ChPiX3mSdxDJuKwqcGsQ2"
+      },
+      "id": "mww5kfzxb61787245f57",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:21:54.429Z",
+      "digest": "ee61d2009d8a792f",
+      "data": {
+        "n": 2,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/tenancy.ts\", \"startLine\": 1, \"endLine\": 120}",
+        "resultJson": null,
+        "rationale": "Read the tenancy commit code that needs changing."
+      },
+      "id": "mww5kfzyc0c998eed88a",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:21:54.443Z",
+      "digest": "5bb3a6f0353bf809",
+      "data": {
+        "n": 2,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/tenancy.ts",
+          "startLine": 1,
+          "endLine": 120
+        },
+        "summary": "packages/appboundry-host/src/tenancy.ts lines 1-120 of 146:\n1\t/**\n2\t * Host interface `tenancy@1` (FK-GAP-013): organizations for an artifact that declares them.\n3\t *\n4\t * The guest owns the logic: it carries its producer's tenancy (FeltKit: tenants, memberships, roles,\n5\t * rank rules, claims) and runs it over the host operations answered here, on the reserved collections\n6\t * `_feltkit_tenants`, `_feltkit_memberships` and `_feltkit_invitations` (the producer's names, so an\n7\t * organization's records have one shape on every runtime). The host owns sessions: it stores which\n8\t * tenant a session selected, asks the guest for the caller's live membership there (`context`) on every\n9\t * request, and passes it as `principal.tenant`, whose role joins the principal's roles. No membership:\n10\t * no tenant, so tenant-scoped collections stay closed (the guest refuses them).\n11\t *\n12\t * Invocation: `{ tenancy: { op, input }, principal, permissions, operator?, requestId, environment }`.\n13\t * Host operations in a tenancy invocation (only on the three collections):\n14\t *   db.get, db.query                 reads, each recording the version it saw\n15\t *   db.create, db.replace, db.delete writes, committed together when the invocation returns, each\n16\t *                                    conditioned on absence or on the version read (a concurrent change\n17\t *                                    makes the whole operation a CONFLICT; nothing is half-written)\n18\t *   crypto.token                     random bytes for tenant ids\n19\t * In a function invocation: `tenancy.read` (get / query) for ctx.tenancy.members, never a write.\n20\t */\n21\timport type { StateFirstDB } from \"@feltdb/core\";\n22\timport { HostError } from \"./collections.js\";\n23\t\n\n…\nbytes ?? 32));\n87\t  const collection = tenancyCollection(call.collection);\n88\t  const record = (value: unknown): Record<string, unknown> => {\n89\t    if (!value || typeof value !== \"object\" || Array.isArray(value)) throw new HostError(\"INVALID_ARGUMENT\", `${String(call.op)}: value must be an object.`);\n90\t    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;\n91\t  };\n92\t  switch (call.op) {\n93\t    case \"db.get\":\n94\t      return tx.get(collection, String(call.key));\n95\t    case \"db.query\":\n96\t      return tx.query(collection, call.request);\n97\t    case \"db.create\":\n98\t      tx.create(collection, String(call.key), record(call.value));\n99\t      return null;\n100\t    case \"db.replace\":\n101\t      tx.replace(collection, String(call.key), record(call.value));\n102\t      return null;\n103\t    case \"db.delete\":\n104\t      tx.delete(collection, String(call.key));\n105\t      return null;\n106\t    default:\n107\t      throw new HostError(\"NOT_FOUND\", `tenancy@1 has no host operation \"${String(call.op)}\".`);\n108\t  }\n109\t}\n110\t\n111\t/** `tenancy.read` in a function invocation: reads only. */\n112\texport async function tenancyRead(call: Record<string, unknown>, db: StateFirstDB): Promise<unknown> {\n113\t  const collection = tenancyCollection(call.collection);\n114\t  if (call.read === \"get\") return (await db.collection<Record<string, unknown>>(collection).get(String(call.key))) ?? null;\n115\t  if (call.read === \"query\") return db.query({ ...((call.request as Record<string, unknown>) ?? {}), collection } as never);\n116\t  throw new HostError(\"INVALID_ARGUMENT\", `tenancy.read has no read \"${String(call.read)}\".`);\n117\t}\n118\t\n119\t/**\n120\t * The tenant a job was queued in, written in the same transaction as the job (AppPort Services' job"
+      },
+      "id": "mww5kg0ja2f306f0002b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:21:57.300Z",
+      "digest": "2ec33e7a78ba21bf",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 109,
+        "cacheReadTokens": 2559,
+        "cacheWriteTokens": 1386,
+        "latencyMs": 2116,
+        "messageId": "msg_011ChPiXGe6mungGyP4ntxDt"
+      },
+      "id": "mww5ki7pf720ab019ff7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:21:57.301Z",
+      "digest": "a32da7e261004027",
+      "data": {
+        "n": 3,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/tenancy.ts\", \"startLine\": 20, \"endLine\": 86}",
+        "resultJson": null,
+        "rationale": "Read the elided part of tenancy.ts, including commit() and its imports."
+      },
+      "id": "mww5ki7r491220d2cbda",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:21:57.313Z",
+      "digest": "2459b79e869a7721",
+      "data": {
+        "n": 3,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/tenancy.ts",
+          "startLine": 20,
+          "endLine": 86
+        },
+        "summary": "packages/appboundry-host/src/tenancy.ts lines 20-86 of 146:\n20\t */\n21\timport type { StateFirstDB } from \"@feltdb/core\";\n22\timport { HostError } from \"./collections.js\";\n23\t\n24\texport const TENANCY_COLLECTIONS = [\"_feltkit_tenants\", \"_feltkit_memberships\", \"_feltkit_invitations\"] as const;\n25\t\n26\texport function tenancyCollection(name: unknown): string {\n27\t  const collection = String(name);\n28\t  if (!(TENANCY_COLLECTIONS as readonly string[]).includes(collection)) throw new HostError(\"FORBIDDEN\", `tenancy@1 reaches only its own collections, not \"${collection}\".`);\n29\t  return collection;\n30\t}\n31\t\n32\ttype Write = { collection: string; id: string; kind: \"create\" | \"replace\" | \"delete\"; value?: Record<string, unknown> };\n33\t\n34\t/** One tenancy@1 operation's reads and writes over the host's FeltDB. */\n35\texport class TenancyTransaction {\n36\t  readonly #db: StateFirstDB;\n37\t  readonly #seen = new Map<string, number | null>();\n38\t  readonly #pending = new Map<string, Write>();\n39\t  constructor(db: StateFirstDB) {\n40\t    this.#db = db;\n41\t  }\n42\t  #key(collection: string, id: string): string {\n43\t    return `${collection}\\u0000${id}`;\n44\t  }\n45\t  async get(collection: string, id: string): Promise<Record<string, unknown> | null> {\n46\t    const pending = this.#pending.get(this.#key(collection, id));\n47\t    if (pending) return pending.kind === \"delete\" ? null : { ...pending.value, id };\n48\t    const record = ((await this.#db.collection<Record<string, unknown>>(collection).get(id)) ?? null) as (Record<string, unknown> & { __version?: number }) | null;\n49\t    this.#seen.set(this.#key(collection, id), record?.__version ?? null);\n50\t    return record;\n51\t  }\n52\t  query(collection: string, request: unknown): Promise<unknown> {\n53\t    c\n…\n, id: string, value: Record<string, unknown>): void {\n60\t    if (!this.#seen.get(this.#key(collection, id))) throw new HostError(\"FAILED_PRECONDITION\", `tenancy@1 replaces only a record it read first (${collection}/${id}).`);\n61\t    this.#pending.set(this.#key(collection, id), { collection, id, kind: \"replace\", value });\n62\t  }\n63\t  delete(collection: string, id: string): void {\n64\t    if (!this.#seen.get(this.#key(collection, id))) throw new HostError(\"FAILED_PRECONDITION\", `tenancy@1 deletes only a record it read first (${collection}/${id}).`);\n65\t    this.#pending.set(this.#key(collection, id), { collection, id, kind: \"delete\" });\n66\t  }\n67\t  async commit(): Promise<void> {\n68\t    if (!this.#pending.size) return;\n69\t    const operations = [...this.#pending.entries()].map(([key, w]) =>\n70\t      w.kind === \"create\"\n71\t        ? { collection: w.collection, id: w.id, requireAbsent: true, value: { ...w.value, id: w.id } }\n72\t        : w.kind === \"replace\"\n73\t          ? { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key), value: { ...w.value, id: w.id } }\n74\t          : { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key) }\n75\t    );\n76\t    try {\n77\t      await this.#db.transaction({ operations } as never);\n78\t    } catch (error) {\n79\t      throw new HostError(\"CONFLICT\", `The membership change conflicted with a concurrent one; nothing was written. (${(error as Error).message})`);\n80\t    }\n81\t  }\n82\t}\n83\t\n84\t/** Answer one host operation of a tenancy@1 invocation. */\n85\texport async function tenancyOperation(call: Record<string, unknown>, tx: TenancyTransaction, token: (bytes: number) => string): Promise<unknown> {\n86\t  if (call.op === \"crypto.token\") return token(Number(call.bytes ?? 32));"
+      },
+      "id": "mww5ki8a3d9152136a56",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:22:00.587Z",
+      "digest": "1dcb56483a770bb1",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 114,
+        "cacheReadTokens": 3944,
+        "cacheWriteTokens": 1507,
+        "latencyMs": 2391,
+        "messageId": "msg_011ChPiXVSnmFiuStEm7ANn9"
+      },
+      "id": "mww5kkr132b9da8a93f0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:22:00.589Z",
+      "digest": "3472502b926a99fa",
+      "data": {
+        "n": 4,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 160, \"endLine\": 240}",
+        "resultJson": null,
+        "rationale": "Read the existing commitError mapping in collections.ts so the tenancy commit can reuse it."
+      },
+      "id": "mww5kkr2a17e15db269b",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:22:00.607Z",
+      "digest": "db77b0151292fc88",
+      "data": {
+        "n": 4,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 160,
+          "endLine": 240
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 160-240 of 560:\n160\t  return new HostError(\"INTERNAL\", `FeltDB refused the request (${refusal.code}).`, { details });\n161\t}\n162\t\n163\t/**\n164\t * A FeltDB failure of a host operation outside the mutation's own commit (a service effect,\n165\t * which AppPort Services commits itself): an unknown outcome is reported as such, a refusal as\n166\t * a refusal. Null for anything else.\n167\t */\n168\texport function feltdbFailure(error: unknown): HostError | null {\n169\t  const code = (error as { code?: unknown } | null)?.code;\n170\t  if (code === FeltDBErrorCode.COMMIT_OUTCOME_UNKNOWN || code === FeltDBErrorCode.DURABILITY_FAILURE) {\n171\t    return new HostError(\"OUTCOME_UNKNOWN\", `FeltDB could not confirm a service's write (${String(code)}); it may or may not have been applied.`, {\n172\t      details: { feltdbCode: code },\n173\t      hint: \"Read what the service changed before acting again.\"\n174\t    });\n175\t  }\n176\t  return feltdbRefusal(error);\n177\t}\n178\t\n179\t/** FeltDB's REVISION_NOT_ACTIVE: a contract was promoted to the managed environment since this runtime's last request. */\n180\texport const CONTRACT_CHANGED = \"A FeltDB contract was promoted since this runtime's last request; nothing was read or written, and AppBoundry did not resend it.\";\n181\texport const CONTRACT_CHANGED_HINT = \"The call was made under the previous contract. If it still makes sense, call it again: it runs under the new contract.\";\n182\t\n183\tfunction commitError(error: unknown, transactionId: string): unknown {\n184\t  if (error instanceof HostError) return error;\n185\t  if (!(error instanceof FeltDBServiceError)) return error;\n186\t  const details = { transactionId, feltdbCode: error.code };\n187\t  if (error.code === Fel\n…\n cause: error });\n210\t    }\n211\t    return new HostError(\"VALIDATION_FAILED\", `${where}: ${violation.message ?? error.message} (FeltDB enforces the artifact's state contract). Nothing was written.`, { details: { ...details, violation }, cause: error });\n212\t  }\n213\t  if (error.code === \"UNKNOWN_COLLECTION\") return new HostError(\"FORBIDDEN\", `${error.message}. Nothing was written.`, { details, cause: error });\n214\t  if (classifyError(error.code) === \"retryable\") return new HostError(\"UNAVAILABLE\", `FeltDB refused the commit (${error.code}); nothing was written. AppBoundry did not resend it.`, { details, cause: error });\n215\t  return error;\n216\t}\n217\t\n218\t/** The artifact's declared collections, their schemas, and what the artifact may do with them. */\n219\texport class CollectionHost {\n220\t  readonly #db: StateFirstDB;\n221\t  readonly #schemas = new Map<string, Schema>();\n222\t  readonly #readable: ReadonlySet<string>;\n223\t  readonly #writable: ReadonlySet<string>;\n224\t\n225\t  constructor(db: StateFirstDB, manifest: ArtifactManifest) {\n226\t    this.#db = db;\n227\t    for (const collection of manifest.collections) this.#schemas.set(collection.name, fromJSONSchema(collection.schema as never));\n228\t    this.#readable = new Set(manifest.permissions.collections.read);\n229\t    this.#writable = new Set(manifest.permissions.collections.write);\n230\t  }\n231\t\n232\t  get db(): StateFirstDB {\n233\t    return this.#db;\n234\t  }\n235\t\n236\t  /** Create the change marker of every writable collection, so later marker writes are updates on every FeltDB authority. */\n237\t  async ensureMarkers(): Promise<void> {\n238\t    for (const name of this.#writable) {\n239\t      if (await this.#db.collection(COLLECTION_MARKERS).get(name)) continue;\n240\t      try {"
+      },
+      "id": "mww5kkrs32a876eb8d60",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:22:03.172Z",
+      "digest": "2c2d0db54dfa22b6",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 171,
+        "cacheReadTokens": 5451,
+        "cacheWriteTokens": 1440,
+        "latencyMs": 1982,
+        "messageId": "msg_011ChPiXiHi4y4HrQ469144j"
+      },
+      "id": "mww5kmqtbc7376d2ec63",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:22:03.174Z",
+      "digest": "79a80fac12938c5b",
+      "data": {
+        "n": 5,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":100,\"endLine\":216}",
+        "resultJson": null,
+        "rationale": "See how feltdbRefusal/feltdbFailure/commitError map FeltDB errors so the tenancy commit can reuse them."
+      },
+      "id": "mww5kmqv82e2e5aa9326",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:22:03.196Z",
+      "digest": "9f83279f3749d546",
+      "data": {
+        "n": 5,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 100,
+          "endLine": 216
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 100-216 of 560:\n100\t    const value = record[clause.field];\n101\t    if (\"eq\" in clause && clause.eq !== undefined && value !== clause.eq) return false;\n102\t    if (\"neq\" in clause && clause.neq !== undefined && value === clause.neq) return false;\n103\t    if (clause.lt !== undefined && !(compare(value, clause.lt) < 0)) return false;\n104\t    if (clause.lte !== undefined && !(compare(value, clause.lte) <= 0)) return false;\n105\t    if (clause.gt !== undefined && !(compare(value, clause.gt) > 0)) return false;\n106\t    if (clause.gte !== undefined && !(compare(value, clause.gte) >= 0)) return false;\n107\t    return true;\n108\t  });\n109\t}\n110\t\n111\tfunction sortRecords<T extends Record<string, unknown>>(records: T[], orderBy: OrderBy[] = []): T[] {\n112\t  return [...records].sort((a, b) => {\n113\t    for (const order of orderBy) {\n114\t      const c = compare(a[order.field], b[order.field]);\n115\t      if (c !== 0) return order.direction === \"desc\" ? -c : c;\n116\t    }\n117\t    return compare(a.id, b.id);\n118\t  });\n119\t}\n120\t\n121\tfunction equalityWhere(filter: Record<string, unknown> | undefined): WhereClause[] {\n122\t  return Object.entries(filter ?? {})\n123\t    .filter(([, value]) => value !== undefined)\n124\t    .map(([field, value]) => ({ field, eq: value }));\n125\t}\n126\t\n127\tfunction checkLimit(limit: unknown, name: string): void {\n128\t  if (limit !== undefined && (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > MAX_FIND)) {\n129\t    throw new HostError(\"INVALID_ARGUMENT\", `${name} limit must be an integer between 1 and ${MAX_FIND}.`);\n130\t  }\n131\t}\n132\t\n133\tfunction asOrderBy(value: unknown): OrderBy[] | undefined {\n134\t  if (value === undefined) return undefin\n…\nng; target?: { collection: string; id: string }; message?: string } }).violation;\n202\t  if (violation) {\n203\t    const where = `${violation.collection ?? \"?\"}${violation.id ? `/${violation.id}` : \"\"}${violation.field ? `.${violation.field}` : \"\"}`;\n204\t    if (violation.rule === \"unique\") {\n205\t      return new HostError(\"CONFLICT\", `${where} duplicates a value that must be unique (${violation.index ?? \"unique constraint\"}). Nothing was written.`, { details: { ...details, violation }, hint: \"Retrying the same record cannot succeed: change the value, or update the record that holds it.\", cause: error });\n206\t    }\n207\t    if (violation.rule === \"reference\") {\n208\t      const target = violation.target ? `${violation.target.collection}/${violation.target.id}` : \"the referenced record\";\n209\t      return new HostError(\"FAILED_PRECONDITION\", `${where} references ${target}, which does not exist or would no longer exist. Nothing was written.`, { details: { ...details, violation }, hint: \"A reference must name an existing record, and a record cannot be deleted while another references it.\", cause: error });\n210\t    }\n211\t    return new HostError(\"VALIDATION_FAILED\", `${where}: ${violation.message ?? error.message} (FeltDB enforces the artifact's state contract). Nothing was written.`, { details: { ...details, violation }, cause: error });\n212\t  }\n213\t  if (error.code === \"UNKNOWN_COLLECTION\") return new HostError(\"FORBIDDEN\", `${error.message}. Nothing was written.`, { details, cause: error });\n214\t  if (classifyError(error.code) === \"retryable\") return new HostError(\"UNAVAILABLE\", `FeltDB refused the commit (${error.code}); nothing was written. AppBoundry did not resend it.`, { details, cause: error });\n215\t  return error;\n216\t}"
+      },
+      "id": "mww5kmrt90da5755a7a5",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:22:06.321Z",
+      "digest": "e1054e4fdad1aece",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 157,
+        "cacheReadTokens": 6891,
+        "cacheWriteTokens": 1437,
+        "latencyMs": 1975,
+        "messageId": "msg_011ChPiXwhrBwVLSafaNYb2y"
+      },
+      "id": "mww5kp6c64f141b08b85",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:22:06.324Z",
+      "digest": "203c7c6b582dd5fe",
+      "data": {
+        "n": 6,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 136, \"endLine\": 200}",
+        "resultJson": null,
+        "rationale": "Need the full feltdbRefusal and commitError mappings to reuse them in the tenancy commit."
+      },
+      "id": "mww5kp6e95e4a14b1e93",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:22:06.342Z",
+      "digest": "bfa14270f2ef5cb9",
+      "data": {
+        "n": 6,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 136,
+          "endLine": 200
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 136-200 of 560:\n136\t    throw new HostError(\"INVALID_ARGUMENT\", \"orderBy must be a list of { field, direction: \\\"asc\\\" | \\\"desc\\\" }.\");\n137\t  }\n138\t  return value as OrderBy[];\n139\t}\n140\t\n141\tfunction asWhere(value: unknown): WhereClause[] | undefined {\n142\t  if (value === undefined) return undefined;\n143\t  if (!Array.isArray(value) || value.some(c => !isRecord(c) || typeof c.field !== \"string\")) throw new HostError(\"INVALID_ARGUMENT\", \"where must be a list of { field, eq | neq | lt | lte | gt | gte }.\");\n144\t  return value as WhereClause[];\n145\t}\n146\t\n147\tfunction asFilter(value: unknown): Record<string, unknown> {\n148\t  if (value === undefined || value === null) return {};\n149\t  if (!isRecord(value)) throw new HostError(\"INVALID_ARGUMENT\", \"A filter must be an object of field values.\");\n150\t  return value;\n151\t}\n152\t\n153\t/** A FeltDB refusal on a read, as an error the guest can branch on. FeltDB's message stays out. */\n154\texport function feltdbRefusal(error: unknown): HostError | null {\n155\t  if (!(error instanceof FeltDBServiceError) && !((error as Error)?.name === \"FeltDBServiceError\" && typeof (error as { code?: unknown }).code === \"string\")) return null;\n156\t  const refusal = error as FeltDBServiceError;\n157\t  const details = { feltdbCode: refusal.code };\n158\t  if (refusal.code === FeltDBErrorCode.REVISION_NOT_ACTIVE) return new HostError(\"CONFLICT\", CONTRACT_CHANGED, { details, hint: CONTRACT_CHANGED_HINT });\n159\t  if (classifyError(refusal.code) === \"retryable\") return new HostError(\"UNAVAILABLE\", `FeltDB refused the request (${refusal.code}); nothing was written. AppBoundry did not resend it.`, { details });\n160\t  return new HostError(\"INTERNAL\", `FeltDB refused\n…\n and AppBoundry did not resend it.\";\n181\texport const CONTRACT_CHANGED_HINT = \"The call was made under the previous contract. If it still makes sense, call it again: it runs under the new contract.\";\n182\t\n183\tfunction commitError(error: unknown, transactionId: string): unknown {\n184\t  if (error instanceof HostError) return error;\n185\t  if (!(error instanceof FeltDBServiceError)) return error;\n186\t  const details = { transactionId, feltdbCode: error.code };\n187\t  if (error.code === FeltDBErrorCode.PRECONDITION_FAILED) {\n188\t    // FeltDB names the first failing precondition (a sequence record: see transactions.ts).\n189\t    return new HostError(\"CONFLICT\", \"A record this mutation read changed before it could commit. Nothing was written; it is safe to retry.\", { details: { ...details, failure: (error as { failure?: unknown }).failure ?? null }, cause: error });\n190\t  }\n191\t  if (error.code === FeltDBErrorCode.COMMIT_OUTCOME_UNKNOWN || error.code === FeltDBErrorCode.DURABILITY_FAILURE) {\n192\t    return new HostError(\"OUTCOME_UNKNOWN\", `FeltDB could not confirm the commit (${error.code}); the mutation may or may not have been written.`, {\n193\t      details,\n194\t      hint: \"Read the records it writes before acting again. AppBoundry resent it under the same transaction id until FeltDB stopped answering; it never sends it under a new one.\",\n195\t      cause: error\n196\t    });\n197\t  }\n198\t  if (error.code === FeltDBErrorCode.REVISION_NOT_ACTIVE) return new HostError(\"CONFLICT\", CONTRACT_CHANGED, { details, hint: CONTRACT_CHANGED_HINT, cause: error });\n199\t  // The artifact's state contract refused the write (contract.ts). The codes are FeltKit's for the\n200\t  // same refusal, so an artifact answers as it does on a FeltKit server."
+      },
+      "id": "mww5kp760c32ba0f1c65",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:22:15.124Z",
+      "digest": "7eb6137922d2e224",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 863,
+        "cacheReadTokens": 8328,
+        "cacheWriteTokens": 1491,
+        "latencyMs": 7913,
+        "messageId": "msg_011ChPiY9zHVMN3yZXxjh9Zf"
+      },
+      "id": "mww5kvyu4ced9d5e05e2",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:22:15.126Z",
+      "digest": "943494d276d60d11",
+      "data": {
+        "n": 7,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/tenancy.ts\",\"startLine\":52,\"endLine\":60}",
+        "resultJson": null,
+        "rationale": "I need the elided lines 52-60 before rewriting the whole file."
+      },
+      "id": "mww5kvyy32c610f1bc48",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:22:15.143Z",
+      "digest": "7e54373b0c1ea136",
+      "data": {
+        "n": 7,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/tenancy.ts",
+          "startLine": 52,
+          "endLine": 60
+        },
+        "summary": "packages/appboundry-host/src/tenancy.ts lines 52-60 of 146:\n52\t  query(collection: string, request: unknown): Promise<unknown> {\n53\t    const rest = request && typeof request === \"object\" ? (request as Record<string, unknown>) : {};\n54\t    return this.#db.query({ ...rest, collection } as never);\n55\t  }\n56\t  create(collection: string, id: string, value: Record<string, unknown>): void {\n57\t    this.#pending.set(this.#key(collection, id), { collection, id, kind: \"create\", value });\n58\t  }\n59\t  replace(collection: string, id: string, value: Record<string, unknown>): void {\n60\t    if (!this.#seen.get(this.#key(collection, id))) throw new HostError(\"FAILED_PRECONDITION\", `tenancy@1 replaces only a record it read first (${collection}/${id}).`);"
+      },
+      "id": "mww5kvzd5ba06be62119",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "model_usage",
+      "at": "2026-11-25T13:22:24.613Z",
+      "digest": "35ea7f0ce451d84b",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 2161,
+        "outputTokens": 956,
+        "cacheReadTokens": 9819,
+        "cacheWriteTokens": 339,
+        "latencyMs": 9398,
+        "messageId": "msg_011ChPiYkEZURpgo3Nco6jNj"
+      },
+      "id": "mww5l3afb7af6343fac7",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "decision",
+      "at": "2026-11-25T13:22:24.615Z",
+      "digest": "2c354d193ebd181c",
+      "data": {
+        "n": 8,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/tenancy.ts\",\"startLine\":118,\"endLine\":146}",
+        "resultJson": null,
+        "rationale": "Need the rest of tenancy.ts to rewrite the file in full without losing content."
+      },
+      "id": "mww5l3ahd9887e3742d0",
+      "__version": 1
+    },
+    {
+      "taskId": "mww5jmgb39fbf886150e",
+      "kind": "observation",
+      "at": "2026-11-25T13:22:24.629Z",
+      "digest": "efeb544859aeb753",
+      "data": {
+        "n": 8,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/tenancy.ts",
+          "startLine": 118,
+          "endLine": 146
+        },
+        "summary": "packages/appboundry-host/src/tenancy.ts lines 118-146 of 146:\n118\t\n119\t/**\n120\t * The tenant a job was queued in, written in the same transaction as the job (AppPort Services' job\n121\t * `tenantId` is the application, not the tenant). Same collection and shape as FeltKit's runtime\n122\t * (`_feltkit_job_contexts`). At execution the job's principal joins that tenant only through its live\n123\t * membership; without one the run is refused.\n124\t */\n125\texport const JOB_CONTEXTS_COLLECTION = \"_feltkit_job_contexts\";\n126\t\n127\texport interface JobContextRecord {\n128\t  id: string;\n129\t  jobId: string;\n130\t  tenantId: string;\n131\t  principalId: string;\n132\t  requestId: string;\n133\t  createdAt: string;\n134\t}\n135\t\n136\texport function jobContextOperation(jobId: string, tenantId: string, principalId: string, requestId: string): Record<string, unknown> {\n137\t  const value: JobContextRecord = { id: jobId, jobId, tenantId, principalId, requestId, createdAt: new Date().toISOString() };\n138\t  return { collection: JOB_CONTEXTS_COLLECTION, id: jobId, requireAbsent: true, value };\n139\t}\n140\t\n141\t/** The job behind a run id (`<jobId>:<attempt>`). */\n142\texport function jobIdOfRun(runId: string): string {\n143\t  const at = runId.lastIndexOf(\":\");\n144\t  return at > 0 ? runId.slice(0, at) : runId;\n145\t}\n146\t"
+      },
+      "id": "mww5l3ayb76d7d4248d9",
+      "__version": 1
+    }
+  ]
+}

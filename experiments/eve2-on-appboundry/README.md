@@ -20,8 +20,8 @@ survives provider and host restarts at every stage without losing work or duplic
 |---|---|
 | Working copy gone (provider restarted) | rebuild it from base + checkpointed files. It must come back at the checkpointed tree, or Eve stops |
 | Check run lost | run it again. Results are bound to the tree they ran on |
-| Issue creation unknown | find the issue by its operation marker; send again only if none exists (same key) |
-| Publish unknown or failed | find the branch and pull request for the operation. A pull request found is used. Otherwise publishing again reconciles the branch by content |
+| Issue creation unknown | find the issue by its operation marker. Nothing is sent again until the tracker has answered; a failed lookup keeps the outcome unknown. Sent again (same key) only on an answer that none exists |
+| Publish unknown or failed | find the branch and pull request for the operation, again only on an answer. A pull request found is used. Otherwise publishing again reconciles the branch by content |
 | Report comment unknown | sent again with the same marker; the provider returns the existing comment |
 | Transient failure (`*.UNAVAILABLE`, `TIMEOUT`, `RATE_LIMITED`, unknown) | retry the step with bounded backoff (6 tries), re-reading what it needs |
 | Host restarted | in-flight outbound attempts become `unknown`. An operator `tasks:resume` re-queues the task, keeping its identity, and records it |
@@ -72,12 +72,37 @@ Defects found on the way, all fixed:
 - A lost update in Eve's step code.
 - Harness faults.
 
-### Live run: blocked
+### Live durable runs (real Claude, real GitHub, appboundry `cd32300`)
 
-`run-durable.mjs` runs the workflow on `rkendel1/appboundry` with real Claude and GitHub. It kills the provider after
-the issue is created, after a fix checkpoint, after the push, and after the pull request. It is blocked: the session's
-environment has no `BENCH_API_KEY` since its container restarted.
+`run-durable.mjs` runs the workflow on `rkendel1/appboundry`. It kills the provider after the issue is created, after a
+fix checkpoint, after the push, and after the pull request. Not yet completed end to end.
 
+| Run | Decisions | Time | Outcome |
+|---|---|---|---|
+| 1 | 39 | 642 s | no finding. A false negative on a real defect: Eve's test did not truly crash the host |
+| 2 | 31 | 280 s | found a real defect (`admin.ts` `#sessions()` reads all sessions unpaged; past 1000 it throws `QUERY_LIMIT_EXCEEDED`). Wrongly rejected: ANSI colour codes hid the failure count from the classifier. Fixed |
+| 3 | 36 | 401 s | blocked: the model declined a decision (`reasoning_extraction`). The rationale request was reworded |
+| 4 | 41 + 7 | ~500 s | found and proved a real defect, filed as [#101](https://github.com/rkendel1/appboundry/issues/101). **Filed it twice (#102)**: an Eve defect, below. Stopped before publishing |
+
+Run 4, independently verified:
+- #101 is real. Eve's reproduction, run on main by hand, fails on its assertion (`expected 'CONFLICT' not to be
+  'CONFLICT'`). `TenancyTransaction.commit()` reports an unconfirmed FeltDB commit as a conflict that wrote nothing.
+- The duplicate. GitHub created #101; the provider exited before answering (the injected fault). Two things then went wrong:
+  - Eve's reconcile lookup reached no provider (`ECONNREFUSED`). Eve read that as "no issue carries the marker" and sent
+    the create again.
+  - The restarted provider's own marker check used GitHub's issue list. 7 s after #101 was created, the list did not
+    include it.
+
+  Both issues carry the same operation marker. The fault suite had missed this: its provider came back before Eve
+  reconciled, and its stand-in list never lagged.
+- Fixed:
+  - Eve sends nothing again after an unknown outcome until a lookup has answered, for issues and for publishing.
+  - The provider reads issue numbers above the list's newest, one by one, until one does not exist.
+  - The suite gained two scenarios that reproduce run 4: the provider is still down when Eve reconciles, and lists lag
+    20 s. On the old code, the issue scenario fails with two issues.
+- Stopped early, by my own harness error: the stop condition matched an earlier run's line in the shared log. The run
+  ended during implementation, before the checkpoint kill. No branch or pull request was created.
+- Assumption: a read of an issue by number reflects a create at once. It is not measured; the list lag is.
 
 ## First live result (2026-11-25): issue → PR on a real repository
 

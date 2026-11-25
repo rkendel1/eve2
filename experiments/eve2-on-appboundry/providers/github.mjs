@@ -80,10 +80,23 @@ async function gh(method, path, body) {
 /* ------------------------------------------------------------------ tracker.items.* */
 
 const item = (i) => ({ number: i.number, title: i.title, state: i.state, url: i.html_url, author: i.user?.login, labels: (i.labels ?? []).map((l) => l.name ?? l), body: i.body ?? "" });
-/** Issues (not pull requests) carrying the marker, newest first. Recent issues are listed and their bodies read: immediate, unlike search. */
-async function issuesWithMarker(r, marker) {
-  const issues = await gh("GET", `/repos/${r}/issues?state=all&sort=created&direction=desc&per_page=100`);
-  return issues.filter((i) => !i.pull_request && (i.body ?? "").includes(marker)).map(item);
+/**
+ * Recent issues and pull requests (one numbering) carrying the marker, newest first. GitHub's list lags a just-created
+ * item by seconds (observed live: 7 s), so after the list, the numbers above its newest are read one by one until one
+ * does not exist.
+ */
+async function recentWithMarker(r, marker) {
+  const listed = await gh("GET", `/repos/${r}/issues?state=all&sort=created&direction=desc&per_page=100`);
+  const items = [...listed];
+  for (let n = Math.max(0, ...listed.map((i) => i.number)) + 1, probes = 0; probes < 20; n++, probes++) {
+    try { items.unshift(await gh("GET", `/repos/${r}/issues/${n}`)); } catch (error) { if (error.code === "NOT_FOUND") break; throw error; }
+  }
+  return items.filter((i) => (i.body ?? "").includes(marker));
+}
+const issuesWithMarker = async (r, marker) => (await recentWithMarker(r, marker)).filter((i) => !i.pull_request).map(item);
+async function pullWithMarker(r, marker) {
+  const [found] = (await recentWithMarker(r, marker)).filter((i) => i.pull_request);
+  return found ? gh("GET", `/repos/${r}/pulls/${found.number}`) : null;
 }
 
 const tracker = [
@@ -340,7 +353,7 @@ const changes = [
       const steps = [];
       // 1. A pull request for this operation already exists: that is the answer.
       const prs = await gh("GET", `/repos/${w.repository}/pulls?state=all&head=${owner}:${encodeURIComponent(branch)}`);
-      const mine = prs.find((p) => (p.body ?? "").includes(marker));
+      const mine = prs.find((p) => (p.body ?? "").includes(marker)) ?? await pullWithMarker(w.repository, marker);
       if (mine) { log("pull.reconciled", { operation, number: mine.number }); return { ...pr(mine), steps: ["pull request already open for this operation"], reconciled: true }; }
       if (prs.length) throw new AppPortError("CONFLICT", `${branch} already has pull request #${prs[0].number}, which is not this operation's.`);
       // 2. The exact content the consumer verified, as a deterministic commit.
@@ -383,7 +396,7 @@ const changes = [
     handler: async ({ repository: r, operation, branch }) => {
       const owner = repository(r).split("/")[0];
       const prs = await gh("GET", `/repos/${r}/pulls?state=all&head=${owner}:${encodeURIComponent(branch)}`);
-      const mine = prs.find((p) => (p.body ?? "").includes(markerOf(operation)));
+      const mine = prs.find((p) => (p.body ?? "").includes(markerOf(operation))) ?? await pullWithMarker(r, markerOf(operation));
       const dir = join(WORK, `.probe-${sha256(r).slice(0, 8)}`);
       if (!existsSync(join(dir, ".git"))) { mkdirSync(dir, { recursive: true }); await git(dir, ["init", "-q"]); await git(dir, ["remote", "add", "origin", GIT_URL.replace("{repository}", r)]); }
       const remote = (await git(dir, ["ls-remote", "origin", `refs/heads/${branch}`], 120_000)).split(/\s+/)[0] || null;

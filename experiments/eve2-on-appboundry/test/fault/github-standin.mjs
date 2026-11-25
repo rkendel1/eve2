@@ -26,7 +26,9 @@ export function createRepository(root, repository, files) {
   return bare;
 }
 
-export function startStandin({ root, port }) {
+/** listLagMs: lists leave out what was created in the last listLagMs, as GitHub's do for a few seconds; reads by number never lag. */
+export function startStandin({ root, port, listLagMs = 0 }) {
+  const settled = (x) => Date.now() - Date.parse(x.createdAt) >= listLagMs;
   const state = { issues: [], comments: [], pulls: [], next: 1, requests: [] };
   const git = (repository, ...args) => execFileSync("git", args, { cwd: join(root, `${repository}.git`), stdio: ["ignore", "pipe", "pipe"] }).toString().trim();
   const url = (repository, kind, n) => `https://standin.invalid/${repository}/${kind}/${n}`;
@@ -44,13 +46,17 @@ export function startStandin({ root, port }) {
     if (!m) return send(404, { message: "Not Found" });
     const [, repository, kind, id, sub] = m;
     try {
-      if (kind === "issues" && !id && req.method === "GET") return send(200, state.issues.filter((i) => i.repository === repository).sort((a, b) => b.number - a.number).map((i) => issueView(repository, i)));
+      if (kind === "issues" && !id && req.method === "GET") return send(200, [...state.issues.map((i) => ({ x: i, view: issueView(repository, i) })), ...state.pulls.map((p) => ({ x: p, view: { ...issueView(repository, p), pull_request: { url: url(repository, "pull", p.number) } } }))].filter(({ x }) => x.repository === repository && settled(x)).sort((a, b) => b.x.number - a.x.number).map(({ view }) => view));
       if (kind === "issues" && !id && req.method === "POST") {
         const issue = { repository, number: state.next++, title: body.title, body: body.body, state: "open", createdAt: new Date().toISOString() };
         state.issues.push(issue);
         return send(201, issueView(repository, issue));
       }
-      if (kind === "issues" && id && !sub) { const i = state.issues.find((x) => x.repository === repository && x.number === Number(id)); return i ? send(200, issueView(repository, i)) : send(404, { message: "Not Found" }); }
+      if (kind === "issues" && id && !sub) {
+        const i = state.issues.find((x) => x.repository === repository && x.number === Number(id));
+        const p = state.pulls.find((x) => x.repository === repository && x.number === Number(id));
+        return i ? send(200, issueView(repository, i)) : p ? send(200, { ...issueView(repository, p), pull_request: { url: url(repository, "pull", p.number) } }) : send(404, { message: "Not Found" });
+      }
       if (kind === "issues" && sub === "comments" && req.method === "GET") return send(200, state.comments.filter((c) => c.repository === repository && c.issue === Number(id)).map((c) => ({ id: c.id, body: c.body, user: { login: "standin-user" }, html_url: url(repository, "issues", `${id}#c${c.id}`), created_at: c.createdAt })));
       if (kind === "issues" && sub === "comments" && req.method === "POST") {
         const c = { repository, issue: Number(id), id: state.comments.length + 1000, body: body.body, createdAt: new Date().toISOString() };
@@ -59,13 +65,13 @@ export function startStandin({ root, port }) {
       }
       if (kind === "pulls" && !id && req.method === "GET") {
         const head = u.searchParams.get("head")?.split(":")[1];
-        return send(200, state.pulls.filter((p) => p.repository === repository && (!head || p.head === head)).map((p) => pullView(repository, p)));
+        return send(200, state.pulls.filter((p) => p.repository === repository && settled(p) && (!head || p.head === head)).map((p) => pullView(repository, p)));
       }
       if (kind === "pulls" && !id && req.method === "POST") {
         let headSha;
         try { headSha = git(repository, "rev-parse", `refs/heads/${body.head}`); } catch { return send(422, { message: "Validation Failed: head branch does not exist" }); }
         if (state.pulls.some((p) => p.repository === repository && p.head === body.head && p.state === "open")) return send(422, { message: `A pull request already exists for ${body.head}.` });
-        const p = { repository, number: state.next++, title: body.title, body: body.body, state: "open", head: body.head, headSha, base: body.base };
+        const p = { repository, number: state.next++, title: body.title, body: body.body, state: "open", head: body.head, headSha, base: body.base, createdAt: new Date().toISOString() };
         state.pulls.push(p);
         return send(201, pullView(repository, p));
       }
