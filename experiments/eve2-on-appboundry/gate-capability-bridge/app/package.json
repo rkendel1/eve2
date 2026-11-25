@@ -1,0 +1,9 @@
+{
+  "name": "ledgerbridge",
+  "private": true,
+  "type": "module",
+  "description": "Gate proof: a minimal FeltKit application that discovers and invokes another application's capability through AppBoundry capabilities@1.",
+  "dependencies": {
+    "@feltdb/feltkit": "file:../../../../../feltkit/packages/sdk"
+  }
+}

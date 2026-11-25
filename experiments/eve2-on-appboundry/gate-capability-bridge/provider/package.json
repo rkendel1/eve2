@@ -1,0 +1,12 @@
+{
+  "name": "books-provider",
+  "private": true,
+  "type": "module",
+  "description": "Gate proof: an independently running AppPort application that provides books.invoices.create and books.invoices.void.",
+  "dependencies": {
+    "@appport/core": "1.7.1",
+    "@appport/protocol": "1.5.0",
+    "@appport/schema": "1.1.6",
+    "@appport/server": "1.3.2"
+  }
+}
