@@ -1,6 +1,6 @@
 {
   "name": "@appport/eve-world-feltdb",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "eve's Workflow World on FeltDB: durable runs, events, queue, hooks, streams and payloads with no SQL database",
   "keywords": [
     "eve",
