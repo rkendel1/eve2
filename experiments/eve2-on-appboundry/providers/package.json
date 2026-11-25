@@ -1,0 +1,17 @@
+{
+  "name": "eve2-providers",
+  "private": true,
+  "type": "module",
+  "description": "AppPort providers for the Eve2 experiment: each is its own process, holds its own access to one system, and serves generic capability contracts.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.14.0",
+    "@appport/core": "1.7.1",
+    "@appport/protocol": "1.5.0",
+    "@appport/schema": "1.1.6",
+    "@appport/server": "1.3.2"
+  },
+  "devDependencies": {
+    "@appport/client": "^1.1.8",
+    "@appport/transport-http": "^1.1.8"
+  }
+}
