@@ -56,7 +56,12 @@ export const advance = app.mutation({
     if (task.steps >= MAX_STEPS) return halt(ctx, task, "blocked", `I stopped after ${MAX_STEPS} steps without finishing; an operator needs to look at this task.`);
     const run = (task.operation === "assess" ? ASSESS_STEPS : task.operation === "resolve" ? RESOLVE_STEPS : STEPS)[task.status];
     if (!run) return halt(ctx, task, "blocked", `Unknown status ${task.status}.`);
-    return run(ctx, task);
+    try {
+      return await run(ctx, task);
+    } catch (error) {
+      // A defect in a step must not leave the task silently stuck: it stops, with the error on record for an operator.
+      return halt(ctx, task, "blocked", `I stopped at ${task.status} because of an internal error (${String((error as Error)?.message ?? error)}); an operator needs to look at this task.`);
+    }
   },
 });
 

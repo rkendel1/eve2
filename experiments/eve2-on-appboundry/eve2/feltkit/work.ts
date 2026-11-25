@@ -51,7 +51,11 @@ async function policyFor(ctx: Ctx, task: Task): Promise<Limits | null> {
   return limits.repositories?.includes(task.source.conversation) ? limits : null;
 }
 
-const patchWork = (ctx: Ctx, task: Task, work: Record<string, unknown>) => ctx.db.patch(tasks, task.id, { work: { ...task.work, ...work }, updatedAt: now() });
+/** Successive patches in one step build on each other: the task's working state is updated in place, then written. */
+const patchWork = (ctx: Ctx, task: Task, work: Record<string, unknown>) => {
+  task.work = { ...task.work, ...work };
+  return ctx.db.patch(tasks, task.id, { work: task.work, updatedAt: now() });
+};
 const later = (ctx: Ctx, task: Task, ms: number) => ctx.afterCommit.jobs.enqueue("eve.advance", { taskId: task.id }, { maxAttempts: 3, runAt: new Date(Date.now() + ms).toISOString() });
 
 async function open(ctx: Ctx, task: Task) {
