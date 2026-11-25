@@ -1,0 +1,2626 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:assess-1795600166759",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "assess-1795600166759"
+    },
+    "operation": "assess",
+    "status": "blocked",
+    "reference": "EVE-B934F021D4AE",
+    "attempts": 0,
+    "steps": 33,
+    "work": {
+      "objective": "Review rkendel1/appboundry for unresolved reliability gaps, starting with packages/appboundry-host (the artifact host: guest execution, collections and transactions, identity, backups). Find problems you can substantiate, with evidence.",
+      "decisions": 30,
+      "gateAttempts": 0,
+      "workspace": "ws_102c58288daf",
+      "sha": "ec75dbd921ef327ea9a2cb9a599beae5d48d6193",
+      "base": "main",
+      "checks": [
+        "prepare",
+        "build",
+        "test"
+      ],
+      "pending": null
+    },
+    "createdAt": "2026-11-25T09:49:26.764Z",
+    "updatedAt": "2026-11-25T09:53:10.849Z",
+    "openQuestion": "I used my 30 decisions without finishing; an operator needs to look at this task before I continue.",
+    "id": "mwvxz7u7c03ca901ba74",
+    "__version": 34
+  },
+  "executions": [
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 0,
+      "at": "2026-11-25T09:49:43.896Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:open",
+      "outcome": "succeeded",
+      "outboundId": "out.378d066c8dd8d9a4c8aa4780af026f63f3e2b5d7b9e6d306daef5bd5aca835af",
+      "id": "mwvxzl225d866ab04c87",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 0,
+      "at": "2026-11-25T09:49:43.901Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at ec75dbd921ef; preparing it (install and build).",
+      "id": "mwvxzl27bd4692ad2d5f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 1,
+      "at": "2026-11-25T09:49:44.709Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:result:run_f4f266a2:1",
+      "outcome": "succeeded",
+      "outboundId": "out.507d58dd7de57c835533d5ec5ae6405ee772a0459d378f7eced978e1a762a19a",
+      "id": "mwvxzlon6f2a764d547c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 1,
+      "at": "2026-11-25T09:49:44.733Z",
+      "from": "preparing",
+      "to": "investigating",
+      "kind": "observe",
+      "summary": "Working copy prepared in 15 s.",
+      "id": "mwvxzlpb1952a47dbc1f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 2,
+      "at": "2026-11-25T09:49:49.007Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:0",
+      "outcome": "succeeded",
+      "outboundId": "out.67268b94f1b4c0746754fdc53255c098a1f4175af1825ebea84747f40b8cfee6",
+      "id": "mwvxzp016356bd3e6844",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 2,
+      "at": "2026-11-25T09:49:49.025Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:1",
+      "outcome": "succeeded",
+      "outboundId": "out.f27337cdffdbc58a536b42dfd3a7f674229a62f83dc7c4d544903d20ea5fbc94",
+      "id": "mwvxzp0j273768c25153",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 3,
+      "at": "2026-11-25T09:49:51.880Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:1",
+      "outcome": "succeeded",
+      "outboundId": "out.23d0949cedb0f57cac207087f45ec5451b268954408e2d598c0f684b241edc6b",
+      "id": "mwvxzr8223b4eb84ee93",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 3,
+      "at": "2026-11-25T09:49:51.906Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:2",
+      "outcome": "succeeded",
+      "outboundId": "out.7a6c68425c62160a9371ee4eeab70cd3ad97d87c8bf87ecda2afee51729e0b85",
+      "id": "mwvxzr8ke6c40c6b5a4f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 4,
+      "at": "2026-11-25T09:49:55.747Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:2",
+      "outcome": "succeeded",
+      "outboundId": "out.01335501eb98def635cb322953a6c37eb75358e4e22dfe671dd48c58bab38861",
+      "id": "mwvxzu78ddbe476bb87c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 4,
+      "at": "2026-11-25T09:49:55.775Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:3",
+      "outcome": "succeeded",
+      "outboundId": "out.026354555dcbb3ab0ee83b75db488750d17c985ae2fea74773a74e40e0e3f4fd",
+      "id": "mwvxzu81d4400019c938",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 5,
+      "at": "2026-11-25T09:50:01.905Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:3",
+      "outcome": "succeeded",
+      "outboundId": "out.68eb66edbb56878d10c1ee9e38cbef3583f6f4f5c4966d546d00aa1187afc3b9",
+      "id": "mwvxzyyb4c58a0b2bc61",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 5,
+      "at": "2026-11-25T09:50:01.924Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:4",
+      "outcome": "succeeded",
+      "outboundId": "out.58f4a2fb5aac1a91d30561ede9afa5e05dcfb1900854d80babef76c867d09468",
+      "id": "mwvxzyyucc95b7ddaff7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 6,
+      "at": "2026-11-25T09:50:07.610Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:4",
+      "outcome": "succeeded",
+      "outboundId": "out.9804f7dbb6eb596175e969458b0bcc26a0b724eb3ec4376c75bd2fb39c580322",
+      "id": "mwvy03csc132d7fc398d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 6,
+      "at": "2026-11-25T09:50:07.631Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:5",
+      "outcome": "succeeded",
+      "outboundId": "out.73b5c00ce7a1ca38964b0319593ffc6f39810a18dbcdb35c97ee0f7951e902f3",
+      "id": "mwvy03deb47e79e154be",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 7,
+      "at": "2026-11-25T09:50:14.272Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:5",
+      "outcome": "succeeded",
+      "outboundId": "out.011529a40a0bac3e40b97e84da2504ab5a431cfe03dc55ec8df8963f635a1e6a",
+      "id": "mwvy08hub899c526e738",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 7,
+      "at": "2026-11-25T09:50:14.311Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:6",
+      "outcome": "succeeded",
+      "outboundId": "out.d4bf3eab6a187fb9555c8ba9279392080b13b197c79c104caf76862786cb7052",
+      "id": "mwvy08j309ff34061f87",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 8,
+      "at": "2026-11-25T09:50:19.169Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:6",
+      "outcome": "succeeded",
+      "outboundId": "out.6c216819a51dc44f9273298bcc6be61b955bc31bd34c81826508958d5af27a15",
+      "id": "mwvy0c9vd3024a255d50",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 8,
+      "at": "2026-11-25T09:50:19.193Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:7",
+      "outcome": "succeeded",
+      "outboundId": "out.79f441c01a45eade3a1475f90e3ed443a6fd237591d603f004d99d2ab5e9bb88",
+      "id": "mwvy0cak4b6ba0a66107",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 9,
+      "at": "2026-11-25T09:50:23.931Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:7",
+      "outcome": "succeeded",
+      "outboundId": "out.4c733afba5b4a23d221d014a9d2ec1eb30e1520144c481037217c1b9ebdf5225",
+      "id": "mwvy0fy5f174cd155aef",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 9,
+      "at": "2026-11-25T09:50:23.969Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:8",
+      "outcome": "succeeded",
+      "outboundId": "out.44662e68ebb19b1c5ce6de4a2a391af0c295884b47792a86adb5e1f20c4a6873",
+      "id": "mwvy0fz72eeb281054d7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 10,
+      "at": "2026-11-25T09:50:30.820Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:8",
+      "outcome": "succeeded",
+      "outboundId": "out.974f82c346f1c4678ff76bd92d95244b6a887ea922e79150c1c86aeef4715605",
+      "id": "mwvy0l9hcc9f845fdf7e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 10,
+      "at": "2026-11-25T09:50:30.836Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:9",
+      "outcome": "succeeded",
+      "outboundId": "out.341586ad0d0cfd3b019985f28c5cf260dc8b09da63924faba03c4f8f85a4785c",
+      "id": "mwvy0l9y9fc40c42c55f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 11,
+      "at": "2026-11-25T09:50:38.013Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:9",
+      "outcome": "succeeded",
+      "outboundId": "out.4c6183476d6e3b4c278078de28dc1fbc2506dcce59d8c91badeeb793b4256289",
+      "id": "mwvy0qtb9e5950d7a1d4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 11,
+      "at": "2026-11-25T09:50:38.039Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:10",
+      "outcome": "succeeded",
+      "outboundId": "out.8a9cf28284d29386310b8068149438dc90cd15b6612a53d38cfc2ff7eaceb4ad",
+      "id": "mwvy0qu05fcb687ff17f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 12,
+      "at": "2026-11-25T09:50:45.311Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:10",
+      "outcome": "succeeded",
+      "outboundId": "out.33cf5215c9a2f07f971c30c686886ea598c2483c14b897952908fbf76f94ccda",
+      "id": "mwvy0wg1a5e8ad4dbe13",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 12,
+      "at": "2026-11-25T09:50:45.334Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:11",
+      "outcome": "succeeded",
+      "outboundId": "out.c1360b8caa5ddf2726151642299a8b4a7d40c097d3a396fa848022b012835abe",
+      "id": "mwvy0wgoc9857739ed8d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 13,
+      "at": "2026-11-25T09:50:52.604Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:11",
+      "outcome": "succeeded",
+      "outboundId": "out.52135eb2f021bd3045b78f95849f8099181100f1d34d5ed4aaa6969a78f2d22e",
+      "id": "mwvy122m9b2f6a19e80d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 13,
+      "at": "2026-11-25T09:50:52.619Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:12",
+      "outcome": "succeeded",
+      "outboundId": "out.bd2902df642be205ee4c1d698f3d6a5c755039f03ad0e3da50da0b1a7705e13a",
+      "id": "mwvy1231ab6212a0b3e4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 14,
+      "at": "2026-11-25T09:50:59.024Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:12",
+      "outcome": "succeeded",
+      "outboundId": "out.042e53bd9a3f9271ebfb299c2c30b7a2c56a16b43cd13a4955e31408532f57cc",
+      "id": "mwvy170y494be9a653b7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 14,
+      "at": "2026-11-25T09:50:59.049Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:13",
+      "outcome": "succeeded",
+      "outboundId": "out.28ecfc07b2862a9e18a2c30d89c2ee7bb9e9fd6d1e785a02f88589237c0baca0",
+      "id": "mwvy171n7292a5fcfb10",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 15,
+      "at": "2026-11-25T09:51:05.855Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:13",
+      "outcome": "succeeded",
+      "outboundId": "out.a21d36e92ee6e0a5cb024d3e374d68bdd6b95d38db93e4df9c3e9ecd6f45d577",
+      "id": "mwvy1capfabbb8b1d508",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 15,
+      "at": "2026-11-25T09:51:05.868Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:14",
+      "outcome": "succeeded",
+      "outboundId": "out.cce852a4891f0d3d1725c87ceec6a9a50a3bcba187c33139b865d41481083564",
+      "id": "mwvy1cb2ac17935da2cc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 16,
+      "at": "2026-11-25T09:51:12.719Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:14",
+      "outcome": "succeeded",
+      "outboundId": "out.2cd00b1025eb26acf871c944fdd90a20996813df1c3bd8810c9d4d52f44b1515",
+      "id": "mwvy1hld8ccc6323dc8a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 16,
+      "at": "2026-11-25T09:51:12.735Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:15",
+      "outcome": "succeeded",
+      "outboundId": "out.93a92523c0eb7ca35624a863fc2c5da28bfd6c8aa9b191726f8c9c7f6a292ffd",
+      "id": "mwvy1hlt6e00df839c03",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 17,
+      "at": "2026-11-25T09:51:20.439Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:15",
+      "outcome": "succeeded",
+      "outboundId": "out.3c32b1e0ba5f8e25b5baf1c44c85c22f09da472a557bb09b0958ff6dd34ae48c",
+      "id": "mwvy1njta9d49e50bff2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 17,
+      "at": "2026-11-25T09:51:20.473Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:16",
+      "outcome": "succeeded",
+      "outboundId": "out.58ff7dbce9afcd138ed057d7d38abb1e3c47a91797b6e2326a1378c03a60efeb",
+      "id": "mwvy1nkrb06d0c4b0434",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 18,
+      "at": "2026-11-25T09:51:28.149Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:16",
+      "outcome": "succeeded",
+      "outboundId": "out.cf05ed7754a50adb7082cccdac0520817589649f87cc5311feda8507c731a62e",
+      "id": "mwvy1thz44d9140068c1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 18,
+      "at": "2026-11-25T09:51:28.163Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:17",
+      "outcome": "succeeded",
+      "outboundId": "out.7af596a1829af1d45643bbc1737475a065454d9234221fdbbc6b8c11945a199d",
+      "id": "mwvy1tid975ee0fc5138",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 19,
+      "at": "2026-11-25T09:51:34.691Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:17",
+      "outcome": "succeeded",
+      "outboundId": "out.def763e812792fd8585d4089035fa7660f03c867b63314237c9ea98c70acefdb",
+      "id": "mwvy1yjp253228b955ba",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 19,
+      "at": "2026-11-25T09:51:34.756Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:18",
+      "outcome": "succeeded",
+      "outboundId": "out.a2dd6b08aacc9c96fdbc288357c596834b8fb76ab1d087dec79ec7c30006d234",
+      "id": "mwvy1ylj92d5ede330d1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 20,
+      "at": "2026-11-25T09:51:42.246Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:18",
+      "outcome": "succeeded",
+      "outboundId": "out.60a97be8856e3b042076dea31a5b9322d77211535a036af73cf7e67e6ee7d1fb",
+      "id": "mwvy24dk1f272dba3135",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 20,
+      "at": "2026-11-25T09:51:42.268Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:19",
+      "outcome": "succeeded",
+      "outboundId": "out.49e1588e8015ccbb21d9f674b5b0dcacd83b327bb7c993a6e6c34a6e975dd2e8",
+      "id": "mwvy24e6d0c89ba0394d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 21,
+      "at": "2026-11-25T09:51:51.460Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:19",
+      "outcome": "succeeded",
+      "outboundId": "out.c401845985be832e4fc82d93e272192e97fc0d64b0ee78b3b90fa9fe2e372fe2",
+      "id": "mwvy2bhia8150abd6f97",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 21,
+      "at": "2026-11-25T09:51:51.477Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:20",
+      "outcome": "succeeded",
+      "outboundId": "out.02bd41fce650c598c0ac6b9ee6834cf87cd40f5a3a16bd38a0184a0f648016bb",
+      "id": "mwvy2bhz5193cb137c67",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 22,
+      "at": "2026-11-25T09:52:04.499Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:20",
+      "outcome": "succeeded",
+      "outboundId": "out.a9cd15c799a2ad20105fa558da1f08b8821ee739b4f7817320ad1557d6b7983a",
+      "id": "mwvy2ljp3f148e96c9f9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 22,
+      "at": "2026-11-25T09:52:04.541Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:21",
+      "outcome": "succeeded",
+      "outboundId": "out.2b9c0c213e28b27c3de64a1b0b0f0a4fc8d739abb4d9b587aff6961c2e256c26",
+      "id": "mwvy2lku296b39d7267f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 23,
+      "at": "2026-11-25T09:52:14.940Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:21",
+      "outcome": "succeeded",
+      "outboundId": "out.f8f92124f9c33fb4074b3f83cb0265f57a07c206a6155df3d9ee33246d3f81c7",
+      "id": "mwvy2tlqbf4ee73de9a8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 23,
+      "at": "2026-11-25T09:52:14.954Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list failed: NOT_FOUND node_modules/@appport/services is not a directory.",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:22",
+      "outcome": "failed",
+      "outboundId": "out.486d0b162662063d327a1d51cb3df4bccf063ea2ae6133d5ea55087494cc7860",
+      "detail": {
+        "code": "NOT_FOUND",
+        "message": "node_modules/@appport/services is not a directory."
+      },
+      "id": "mwvy2tm401ac3c97f78d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 24,
+      "at": "2026-11-25T09:52:20.402Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:22",
+      "outcome": "succeeded",
+      "outboundId": "out.978d1b88a004716b9f938825ba74f17dfb60a6bb4de16bd763cd768d565e7263",
+      "id": "mwvy2xtgec4cd9457c73",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 24,
+      "at": "2026-11-25T09:52:20.419Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:23",
+      "outcome": "succeeded",
+      "outboundId": "out.89df5f155df914d97262116583e53585a91b00f9420be496914db7d7aa4cb4e1",
+      "id": "mwvy2xtwd1a370f3a751",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 25,
+      "at": "2026-11-25T09:52:28.860Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:23",
+      "outcome": "succeeded",
+      "outboundId": "out.ad00a270eecfc5c9519c558e7168109e18372eecd01dd75b0bf7fdf107ff7e85",
+      "id": "mwvy34cdf107e6796c8d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 25,
+      "at": "2026-11-25T09:52:28.878Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:24",
+      "outcome": "succeeded",
+      "outboundId": "out.09af2dfe58865523000fb792d019b5671d08e8e157c667354c7bf96d0de7eb00",
+      "id": "mwvy34cw381f0fea1072",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 26,
+      "at": "2026-11-25T09:52:38.746Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:24",
+      "outcome": "succeeded",
+      "outboundId": "out.461fe2831d4caa233bfee7590d8313905208cfdde29926fe245518e8fd319f34",
+      "id": "mwvy3bz09e599f680153",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 26,
+      "at": "2026-11-25T09:52:38.774Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:25",
+      "outcome": "succeeded",
+      "outboundId": "out.93ea633610b7af8bde81242cefc32b02381fd8a9fc5404655baf3272a0b9d31c",
+      "id": "mwvy3bzs43fd1fbfb5cc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 27,
+      "at": "2026-11-25T09:52:46.391Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:25",
+      "outcome": "succeeded",
+      "outboundId": "out.74db9bd53c269c0d55ada7ad52b2759bcf7510cee01e3deb31f5178510d05f5b",
+      "id": "mwvy3hve4784e9ff37f8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 27,
+      "at": "2026-11-25T09:52:46.409Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:26",
+      "outcome": "succeeded",
+      "outboundId": "out.b40e8cb5c6025d65cd8c8784ce7958285ea080b197eb5f71291075b7949df7f9",
+      "id": "mwvy3hvv2e4e9af79d11",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 28,
+      "at": "2026-11-25T09:52:52.161Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:26",
+      "outcome": "succeeded",
+      "outboundId": "out.068a6ae28cfa6c3ade7e62d0b5bb47a23dc8fdb157b475a5e17eb4c86dbf8b43",
+      "id": "mwvy3mbm893813a3e119",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 28,
+      "at": "2026-11-25T09:52:52.177Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:27",
+      "outcome": "succeeded",
+      "outboundId": "out.3553278b26c8339b98c864799bffd82380613854995ff03a2de197275435941d",
+      "id": "mwvy3mc2bf9ccdbe678d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 29,
+      "at": "2026-11-25T09:52:57.600Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:27",
+      "outcome": "succeeded",
+      "outboundId": "out.ec802e79103c0c5281766250212f4369d1cddedf673ec294329317122239d594",
+      "id": "mwvy3qiqcdcfd71738dd",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 29,
+      "at": "2026-11-25T09:52:57.623Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:28",
+      "outcome": "succeeded",
+      "outboundId": "out.1bae65bbd0a892614ed48464489de1778b2a2c9e6ff67e0b81d1312bbac6fd1e",
+      "id": "mwvy3qjc75a533a95fbc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 30,
+      "at": "2026-11-25T09:53:03.964Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:28",
+      "outcome": "succeeded",
+      "outboundId": "out.067e6a61c9841f0c03ade1610994fab213eb39a3a5641cf3b6eab5eaae598225",
+      "id": "mwvy3vfi5fa2776ce5e1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 30,
+      "at": "2026-11-25T09:53:03.982Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:29",
+      "outcome": "succeeded",
+      "outboundId": "out.d94cdc19429e31a6463713ed3c567bbea54712eb0446b5ba03afb1a1d54ef87f",
+      "id": "mwvy3vfze85841ec7f21",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 31,
+      "at": "2026-11-25T09:53:10.109Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:decide:29",
+      "outcome": "succeeded",
+      "outboundId": "out.d8ff236a8c1684171c71689b779a5f1bb5b22ba3afd5d918e09cd235a368cf76",
+      "id": "mwvy4067356f9948f9b2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 31,
+      "at": "2026-11-25T09:53:10.125Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvxz7u7c03ca901ba74:act:30",
+      "outcome": "succeeded",
+      "outboundId": "out.11c8a3bf118883439a52a5f5c6ec3fda162e4ee78c7ee0f2332485f39eddb993",
+      "id": "mwvy406m90281154b9c5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "seq": 32,
+      "at": "2026-11-25T09:53:10.848Z",
+      "from": "investigating",
+      "to": "blocked",
+      "kind": "wait",
+      "summary": "I used my 30 decisions without finishing; an operator needs to look at this task before I continue.",
+      "id": "mwvy40qp2d2b15ce338b",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:49:43.898Z",
+      "digest": "ddbf6f0d3e0f7d54",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main ec75dbd921ef; checks: prepare, build, test."
+      },
+      "id": "mwvxzl24c75e86728cc7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "check_result",
+      "at": "2026-11-25T09:49:44.711Z",
+      "digest": "494eac2983b35fb8",
+      "data": {
+        "run": "run_f4f266a2",
+        "purpose": "prepare",
+        "check": "prepare",
+        "target": null,
+        "exitCode": 0,
+        "durationMs": 14668,
+        "output": "te/workspaces/ws_102c58288daf/packages/appboundry-route/node_modules/.bin/appboundry-host. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/packages/appboundry-route/node_modules/@appport/appboundry-host/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/appboundry/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/appboundry/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/application-capabilities/invoicing/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/application-capabilities/invoicing/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/contract-first-taskboard/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/contract-first-taskboard/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/application-capabilities/commerce/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/application-capabilities/commerce/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/documents/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/documents/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/materialization-reference/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/materialization-reference/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/todos/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/examples/todos/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/packages/appboundry/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/packages/appboundry/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/packages/appboundry/node_modules/.bin/appboundry-host. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf/packages/appboundry/node_modules/@appport/appboundry-host/dist/bin.js'\nDone in 2.4s using pnpm v10.33.0\n(node:9463) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:9474) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n> appport-monorepo@1.0.0 build /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_102c58288daf\n> tsc -b tsconfig.build.json\n\n"
+      },
+      "id": "mwvxzlp8c76a44c69a1d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:49:49.010Z",
+      "digest": "a43268305103ebb5",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 70,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1352,
+        "latencyMs": 3282,
+        "messageId": "msg_011ChPSLwSZJYMfhXgTPFt2z"
+      },
+      "id": "mwvxzp0410be669ab007",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:49:49.012Z",
+      "digest": "131909bc2321c02b",
+      "data": {
+        "n": 1,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host\"}",
+        "resultJson": null,
+        "rationale": "Start by listing the host package to see its structure."
+      },
+      "id": "mwvxzp05bf341a64edff",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:49:49.027Z",
+      "digest": "cc200957b9f17998",
+      "data": {
+        "n": 1,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host"
+        },
+        "summary": "packages/appboundry-host: README.md  package.json  src/  test/  tsconfig.json  tsconfig.tsbuildinfo"
+      },
+      "id": "mwvxzp0l0e31d78363f3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:49:51.890Z",
+      "digest": "800084c9fc520072",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 90,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1420,
+        "latencyMs": 2157,
+        "messageId": "msg_011ChPSMDrH11Yatt4cLjXxT"
+      },
+      "id": "mwvxzr8452dcf2f4293f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:49:51.892Z",
+      "digest": "7fb405e354edf74a",
+      "data": {
+        "n": 2,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "I'm listing the source files to find the modules for guest execution, collections/transactions, identity and backups."
+      },
+      "id": "mwvxzr86d43f4a1e0a6a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:49:51.908Z",
+      "digest": "5f232709b3a43618",
+      "data": {
+        "n": 2,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src: admin-channel.ts  admin.ts  appport.ts  archive.ts  artifact.ts  authority-fence.ts  backup.ts  bin.ts  capabilities.ts  cli.ts  collections.ts  contract.ts  guest.ts  host.ts  http.ts  identity.ts  index.ts  integrity.ts  invocations.ts  isolation-verify.ts  managed.ts  manifest.ts  mcp.ts  memory-policy.ts  paged-read.ts  routing.ts  services.ts  state.ts  tenancy.ts  transactions.ts  verify.ts"
+      },
+      "id": "mwvxzr8mff4d8629c82e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:49:55.749Z",
+      "digest": "9f2277cef7eedfd7",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 142,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1661,
+        "latencyMs": 3029,
+        "messageId": "msg_011ChPSMSbzaFwYxkQFb3arz"
+      },
+      "id": "mwvxzu7adb05a15ead84",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:49:55.750Z",
+      "digest": "67ac2d7c31b177c9",
+      "data": {
+        "n": 3,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 1, \"endLine\": 200}",
+        "resultJson": null,
+        "rationale": "Transactions are a likely source of data loss or corruption, so I'm reading the transaction implementation first."
+      },
+      "id": "mwvxzu7cfb2aeffd76f8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:49:55.777Z",
+      "digest": "a0ea739a509b82a9",
+      "data": {
+        "n": 3,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 1,
+          "endLine": 200
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 1-200 of 259:\n1\t/**\n2\t * Host interface transactions@1: `db.sequence` and `outbox.stage`, the guest operations behind a\n3\t * producer's transactional sequences and after-commit effects (FeltKit: ctx.db.sequence,\n4\t * ctx.afterCommit). The contract is FeltKit's docs/TRANSACTIONS.md, implemented here on the\n5\t * host's own FeltDB transaction (collections.ts) with host-owned collections:\n6\t *\n7\t *   sequence      per stream (its name): strictly increasing and gapless in commit order, written\n8\t *                 in the mutation's transaction guarded on the version read, so a concurrent\n9\t *                 commit of the same stream refuses the whole transaction (CONFLICT) and a\n10\t *                 failed mutation consumes nothing; independent streams never contend\n11\t *   outbox        one record per effect, committed with the mutation or not at all; performed\n12\t *                 after the commit as the caller (claimed pending → performing, version-checked),\n13\t *                 then done (with its result) or failed (with the error); stale pending and\n14\t *                 performing records are recovered by the worker after a restart; a failed one\n15\t *                 is retried only by an operator. A job or webhook event is created in the same\n16\t *                 FeltDB transaction that records it done (AppPort Services' transaction context,\n17\t *                 @appport/services 0.13.1), so it is created once per committed effect; a\n18\t *                 notification carries the record id as its idempotency key. Creation, not\n19\t *                 delivery: a job's run or a webhook's delivery to its endpoint is the services'\n20\t *                 own (at least o\n…\nr failed with the error. `perform` may instead commit\n173\t * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\n174\t * then nothing more is written. Never throws: the mutation has committed. `skipped`: gone,\n175\t * settled, or claimed by another performer.\n176\t */\n177\texport async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => {}): Promise<\"done\" | \"failed\" | \"skipped\"> {\n178\t  const get = async () => ((await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null) ?? null;\n179\t  const current = await get();\n180\t  if (!current || current.state === \"done\" || current.state === \"failed\") return \"skipped\";\n181\t  try {\n182\t    await put(db, id, current.__version, { ...current, state: \"performing\", attempts: (current.attempts ?? 0) + 1, updatedAt: Date.now() });\n183\t  } catch {\n184\t    return \"skipped\";\n185\t  }\n186\t  const claim = await get();\n187\t  if (!claim || claim.state !== \"performing\") return \"skipped\";\n188\t  let next: OutboxRecord;\n189\t  let completed = false;\n190\t  const complete = (result: Record<string, unknown>) => {\n191\t    completed = true;\n192\t    return completion(claim, result);\n193\t  };\n194\t  try {\n195\t    const result = await perform(claim, complete);\n196\t    // Committed with the effect: done is already recorded.\n197\t    if (completed) return \"done\";\n198\t    const { error: _e, ...rest } = claim;\n199\t    next = { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) };\n200\t  } catch (error) {"
+      },
+      "id": "mwvxzu8a5f438b3f43be",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:01.907Z",
+      "digest": "8328763ebb4afbef",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 321,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 2970,
+        "latencyMs": 5181,
+        "messageId": "msg_011ChPSMjh9jSmMhu4AYYnVj"
+      },
+      "id": "mwvxzyydf81d5de18ee3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:01.909Z",
+      "digest": "4797b5dc51de4ee1",
+      "data": {
+        "n": 4,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":200,\"endLine\":259}",
+        "resultJson": null,
+        "rationale": "Read the rest of performOutbox to see how failures and the done write are handled after the claim. Line 178 swallows store errors as 'skipped' and line 197 trusts a flag."
+      },
+      "id": "mwvxzyyf1dfd7da2a8ff",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:01.926Z",
+      "digest": "2cb3aebef340bb53",
+      "data": {
+        "n": 4,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 200,
+          "endLine": 259
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 200-259 of 259:\n200\t  } catch (error) {\n201\t    const e = error as { code?: string; message?: string };\n202\t    next = { ...claim, state: \"failed\", updatedAt: Date.now(), error: { code: e?.code ?? \"INTERNAL\", message: e?.message ?? String(error) } };\n203\t    warn(`after-commit ${claim.effect.service}.${claim.effect.method} from ${claim.function} failed: ${next.error!.message}`);\n204\t  }\n205\t  try {\n206\t    await put(db, id, claim.__version, next);\n207\t  } catch (error) {\n208\t    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n209\t  }\n210\t  return next.state as \"done\" | \"failed\";\n211\t}\n212\t\n213\t/** The service call an effect is. */\n214\texport function serviceCall(record: OutboxRecord): { service: string; method: string; input: Record<string, unknown> } {\n215\t  const effect = record.effect;\n216\t  if (effect.service === \"notifications\") return { service: \"notifications\", method: \"send\", input: { ...effect.input, idempotencyKey: effect.input.idempotencyKey ?? record.id } };\n217\t  if (effect.service === \"jobs\") return { service: \"jobs\", method: \"enqueue\", input: { type: effect.type, payload: effect.payload, ...(effect.options ? { options: effect.options } : {}) } };\n218\t  return { service: \"webhooks\", method: \"emit\", input: { type: effect.type, payload: effect.payload } };\n219\t}\n220\t\n221\t/** What an effect produced, as recorded on its outbox record. */\n222\texport function effectResult(record: OutboxRecord, value: unknown): Record<string, unknown> {\n223\t  const v = (value ?? {}) as Record<string, unknown>;\n224\t  if (record.effect.service === \"notifications\") return typeof v.id === \"string\" ? { notificationId: v.id } : {};\n225\t  if (reco\n…\nlicts: n as number };\n237\t}\n238\t\n239\t/** After-commit effects in `db`, newest first (optionally only one state). */\n240\texport async function listOutbox(db: { collection(name: string): { find(filter: Record<string, unknown>): Promise<unknown[]> } }, filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\n241\t  if (filter.state !== undefined && ![\"pending\", \"performing\", \"done\", \"failed\"].includes(filter.state)) throw new HostError(\"INVALID_ARGUMENT\", \"state is pending, performing, done or failed.\");\n242\t  const rows = (await db.collection(OUTBOX_COLLECTION).find(filter.state ? { state: filter.state } : {})) as Array<OutboxRecord & { __version?: number }>;\n243\t  return rows.map(r => strip(r)).sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.min(Math.max(Number(filter.limit) || 100, 1), 1000));\n244\t}\n245\t\n246\t/** Move a failed record back to pending (an operator's retry); a running host then performs it. */\n247\texport async function retryOutboxRecord(db: Store, id: unknown, by: string): Promise<OutboxRecord> {\n248\t  if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"Name the after-commit effect to retry (see `appboundry admin outbox list --status failed`).\");\n249\t  const record = (await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null;\n250\t  if (!record) throw new HostError(\"NOT_FOUND\", `No after-commit effect ${id}.`);\n251\t  const next = retried(record, by);\n252\t  try {\n253\t    await put(db, id, record.__version, next);\n254\t  } catch {\n255\t    throw new HostError(\"CONFLICT\", `After-commit effect ${id} changed while it was being retried. Nothing was changed; read it again.`);\n256\t  }\n257\t  return next;\n258\t}\n259\t"
+      },
+      "id": "mwvxzyz4c64a640bc849",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:07.612Z",
+      "digest": "2fcdd55549e09d84",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 399,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 4422,
+        "latencyMs": 4855,
+        "messageId": "msg_011ChPSNBMErJiEYDryK5uT1"
+      },
+      "id": "mwvy03cu3ea9d79d7bde",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:07.614Z",
+      "digest": "fe2460fbe02e6fd6",
+      "data": {
+        "n": 5,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 20, \"endLine\": 172}",
+        "resultJson": null,
+        "rationale": "The earlier read cut off lines 20-172 of transactions.ts, which hold `put`, `completion`, `retried` and the recovery logic. I need them to judge whether performOutbox's version handling and its return value at line 210 (it reports done/failed even when the final put fails) are real defects."
+      },
+      "id": "mwvy03cxb88deaf615a4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:07.634Z",
+      "digest": "d67ba712850047a9",
+      "data": {
+        "n": 5,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 20,
+          "endLine": 172
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 20-172 of 259:\n20\t *                 own (at least once).\n21\t *\n22\t * No second transaction system: the records are extra operations of the mutation's FeltDB\n23\t * transaction.\n24\t */\n25\timport { HostError } from \"./collections.js\";\n26\t\n27\texport const SEQUENCES_COLLECTION = \"_appboundry_sequences\";\n28\texport const OUTBOX_COLLECTION = \"_appboundry_outbox\";\n29\t/** A pending record not performed after this long is recovered (its runtime likely stopped). */\n30\texport const OUTBOX_RECOVER_AFTER_MS = 30_000;\n31\t/** A record left performing this long (its performer stopped mid-way) is recovered too. */\n32\texport const OUTBOX_PERFORMING_STALE_MS = OUTBOX_RECOVER_AFTER_MS * 10;\n33\t/** The most re-runs a function's manifest may ask for on sequence contention. */\n34\texport const MAX_SEQUENCE_RETRIES = 10;\n35\t\n36\tconst SEQUENCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;\n37\tconst RECORD_ID = /^[A-Za-z0-9._-]{1,128}$/;\n38\t\n39\t/**\n40\t * The record id a stream is stored under: the name itself when it is a valid FeltDB id, else \"_\"\n41\t * + the name with \".\" written \".d\" and \":\" written \".c\" (injective, never equal to a name).\n42\t */\n43\texport function sequenceRecordId(name: unknown): string {\n44\t  if (typeof name !== \"string\" || !SEQUENCE_NAME.test(name)) {\n45\t    throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} must be 1-128 letters, digits, \"_\", \".\", \":\" or \"-\", starting with a letter or digit.`);\n46\t  }\n47\t  if (RECORD_ID.test(name)) return name;\n48\t  const id = `_${name.replace(/\\./g, \".d\").replace(/:/g, \".c\")}`;\n49\t  if (!RECORD_ID.test(id)) throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} is too long to store (${id.len\n…\nord, by: string, now = Date.now()): OutboxRecord {\n149\t  if (record.state !== \"failed\") throw new HostError(\"FAILED_PRECONDITION\", `After-commit effect ${record.id} is ${record.state}; only a failed effect can be retried.`);\n150\t  return { ...strip(record), state: \"pending\", updatedAt: now, retriedBy: by };\n151\t}\n152\t\n153\ttype Store = { collection(name: string): { get(id: string): Promise<unknown>; find(filter: Record<string, unknown>): Promise<unknown[]> }; transaction(request: never): Promise<unknown> };\n154\t\n155\t/** Write `value` only if the record is still at `version` (throws otherwise; nothing written). */\n156\tasync function put(db: Store, id: string, version: number, value: OutboxRecord): Promise<void> {\n157\t  await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\n158\t}\n159\t\n160\t/**\n161\t * The write that records `claim` done with `result`, guarded on the claim's version: an effect\n162\t * that commits it in its own transaction (a job, webhook deliveries) is created exactly when the\n163\t * record says done, and a stale claim creates nothing.\n164\t */\n165\texport function completion(claim: OutboxRecord & { __version: number }, result: Record<string, unknown>): Record<string, unknown> {\n166\t  const { error: _e, ...rest } = strip(claim);\n167\t  return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\n168\t}\n169\t\n170\t/**\n171\t * Perform one record: claim it (version-checked, so two performers never both perform it),\n172\t * perform, record done with its result or failed with the error. `perform` may instead commit"
+      },
+      "id": "mwvy03dp1f87b7d25213",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:14.274Z",
+      "digest": "90eac9556598044c",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 435,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 5965,
+        "latencyMs": 6538,
+        "messageId": "msg_011ChPSNYjN5pUrszsCaHiVT"
+      },
+      "id": "mwvy08hw5a596dcba78f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:14.276Z",
+      "digest": "f6ba7021f5398e62",
+      "data": {
+        "n": 6,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\": \"expectedVersion|ifVersion\", \"path\": \"packages\"}",
+        "resultJson": null,
+        "rationale": "In transactions.ts, `put` guards the write with `ifVersion` (line 157), but `completion` uses `expectedVersion` (line 167). If FeltDB only honours one of these names, either the claim or the done record is written without its version check. Searching for both names should show which one the store actually reads."
+      },
+      "id": "mwvy08hz9053bd2b04a0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:14.319Z",
+      "digest": "eab7264d51d4fcf8",
+      "data": {
+        "n": 6,
+        "action": "search",
+        "input": {
+          "pattern": "expectedVersion|ifVersion",
+          "path": "packages"
+        },
+        "summary": "packages/appboundry-host/src/admin.ts:103:     return sessions.map(s => ({ collection: SESSIONS_COLLECTION, id: s.id, ifVersion: s.__version }));\npackages/appboundry-host/src/admin.ts:125:       existing ? { collection: OPERATORS_COLLECTION, id, ifVersion: existing.__version, value: record } : { collection: OPERATORS_COLLECTION, id, requireAbsent: true, value: record },\npackages/appboundry-host/src/admin.ts:169:       { collection: OPERATORS_COLLECTION, id, ifVersion: operator.__version, value: { ...stripVersion(operator), disabled: true, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) } },\npackages/appboundry-host/src/admin.ts:204:     await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.set-roles\", id, { from: user.roles, to: roles })]);\npackages/appboundry-host/src/admin.ts:214:       { collection: USERS_COLLECTION, id, ifVersion: user.__version, value: { ...stripVersion(user), disabled: true, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) } },\npackages/appboundry-host/src/admin.ts:225:     await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.enable\", id)]);\npackages/appboundry-host/src/authority-fence.ts:118:     const guards: Array<Record<string, unknown>> = [{ collection: AUTHORITY_COLLECTION, id: grant.id, ifVersion: grant.__version }];\npackages/appboundry-host/src/authority-fence.ts:123:       guards.push(p ? { collection: AUTHORITY_COLLECTION, id: p.id, ifVersion: p.__version } : { collection: AUTHORITY_COLLECTION, id: principalFenceId(side.applicationId, side.incarnation), requireAbsent: true });\npackages/appboundry-host/src/backup.ts:187:\n…\nndry-host/src/transactions.ts:157:   await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\npackages/appboundry-host/src/transactions.ts:167:   return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\npackages/appboundry-host/test/production-ops.test.ts:343:     await db.transaction({ operations: [{ collection: STATE_COLLECTION, id: \"restore\", ifVersion: marker.__version, value: { id: \"restore\", status: \"in-progress\", backupSha256: \"x\", startedAt: new Date().toISOString() } }] } as never);\npackages/appboundry-runtime/src/provider-contract.ts:42:   | { readonly operation: \"write\"; readonly collection: string; readonly id: string; readonly value: JsonValue; readonly expectedVersion?: number }\npackages/appboundry-runtime/src/provider-contract.ts:43:   | { readonly operation: \"delete\"; readonly collection: string; readonly id: string; readonly expectedVersion?: number };\npackages/appboundry/portal/app.js:77: const withVersion = (body, version) => typeof version === \"number\" ? { ...body, expectedVersion: version } : body;\npackages/appboundry/test/artifact-durable-writes.test.ts:7:  * it as done. The artifact now forwards the caller's expectedVersion when given\npackages/appboundry/test/artifact-durable-writes.test.ts:32:       expect(writeStep(plan(name, { id: \"x\", expectedVersion: 3 }))).toMatchObject({ operation: \"write\", expectedVersion: \"$input.expectedVersion\" });\npackages/appboundry/test/artifact-durable-writes.test.ts:33:       expect(writeStep(plan(name, { id: \"x\" }))).not.toHaveProperty(\"expectedVersion\");"
+      },
+      "id": "mwvy08jc094858616ee9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:19.171Z",
+      "digest": "44ca7944dc76ea57",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 306,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 7493,
+        "latencyMs": 4435,
+        "messageId": "msg_011ChPSP4ktRGB1k5wmD8Zcf"
+      },
+      "id": "mwvy0c9x5fb3693f3702",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:19.173Z",
+      "digest": "e8e267cbf028fa00",
+      "data": {
+        "n": 7,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"completion\\\\(|complete\\\\(|expectedVersion|ifVersion\",\"path\":\"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "completion() in transactions.ts:167 guards with `expectedVersion`, but put() at line 157 guards with `ifVersion`. Next I need to see which field the consumer of the completion op honours. If it ignores expectedVersion, a stale claim could still record done and create the effect twice."
+      },
+      "id": "mwvy0c9z64f4b2e5989d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:19.196Z",
+      "digest": "034112d59dea7036",
+      "data": {
+        "n": 7,
+        "action": "search",
+        "input": {
+          "pattern": "completion\\(|complete\\(|expectedVersion|ifVersion",
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src/admin.ts:103:     return sessions.map(s => ({ collection: SESSIONS_COLLECTION, id: s.id, ifVersion: s.__version }));\npackages/appboundry-host/src/admin.ts:125:       existing ? { collection: OPERATORS_COLLECTION, id, ifVersion: existing.__version, value: record } : { collection: OPERATORS_COLLECTION, id, requireAbsent: true, value: record },\npackages/appboundry-host/src/admin.ts:169:       { collection: OPERATORS_COLLECTION, id, ifVersion: operator.__version, value: { ...stripVersion(operator), disabled: true, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) } },\npackages/appboundry-host/src/admin.ts:204:     await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.set-roles\", id, { from: user.roles, to: roles })]);\npackages/appboundry-host/src/admin.ts:214:       { collection: USERS_COLLECTION, id, ifVersion: user.__version, value: { ...stripVersion(user), disabled: true, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) } },\npackages/appboundry-host/src/admin.ts:225:     await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.enable\", id)]);\npackages/appboundry-host/src/authority-fence.ts:118:     const guards: Array<Record<string, unknown>> = [{ collection: AUTHORITY_COLLECTION, id: grant.id, ifVersion: grant.__version }];\npackages/appboundry-host/src/authority-fence.ts:123:       guards.push(p ? { collection: AUTHORITY_COLLECTION, id: p.id, ifVersion: p.__version } : { collection: AUTHORITY_COLLECTION, id: principalFenceId(side.applicationId, side.incarnation), requireAbsent: true });\npackages/appboundry-host/src/backup.ts:187:\n…\nx.addOperation(completion(result) as never);\npackages/appboundry-host/src/services.ts:439:     if (row) await this.#db.transaction({ operations: [{ collection: FILE_CONTENT_COLLECTION, id, ifVersion: row.__version }] } as never);\npackages/appboundry-host/src/state.ts:204:     ? { collection: STATE_COLLECTION, id: \"artifact\", ifVersion: previous.__version, value: next }\npackages/appboundry-host/src/tenancy.ts:73:           ? { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key), value: { ...w.value, id: w.id } }\npackages/appboundry-host/src/tenancy.ts:74:           : { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key) }\npackages/appboundry-host/src/transactions.ts:76:       out.push(s.version === null ? { collection: SEQUENCES_COLLECTION, id: s.id, requireAbsent: true, value } : { collection: SEQUENCES_COLLECTION, id: s.id, ifVersion: s.version, value });\npackages/appboundry-host/src/transactions.ts:157:   await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\npackages/appboundry-host/src/transactions.ts:165: export function completion(claim: OutboxRecord & { __version: number }, result: Record<string, unknown>): Record<string, unknown> {\npackages/appboundry-host/src/transactions.ts:167:   return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\npackages/appboundry-host/src/transactions.ts:173:  * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\npackages/appboundry-host/src/transactions.ts:192:     return completion(claim, result);"
+      },
+      "id": "mwvy0catdb06427cb4d1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:23.933Z",
+      "digest": "444682d4b8d0e4a5",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 263,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 9055,
+        "latencyMs": 4192,
+        "messageId": "msg_011ChPSPS8Wi1cnidDwgr3Bu"
+      },
+      "id": "mwvy0fy6f555b169d617",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:23.934Z",
+      "digest": "417013f803d01d93",
+      "data": {
+        "n": 8,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"addOperation\",\"path\":\"packages\"}",
+        "resultJson": null,
+        "rationale": "completion() emits `expectedVersion` while every other host transaction operation uses `ifVersion`. I need to see how the services consume that operation and whether `expectedVersion` is honored as a guard."
+      },
+      "id": "mwvy0fy8485a67391806",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:23.971Z",
+      "digest": "69f3c4ff074307a6",
+      "data": {
+        "n": 8,
+        "action": "search",
+        "input": {
+          "pattern": "addOperation",
+          "path": "packages"
+        },
+        "summary": "packages/appboundry-host/src/services.ts:349:             tx.addOperation(jobContextOperation(jobId, tenant.id, caller.id, context.requestId) as never);\npackages/appboundry-host/src/services.ts:399:         if (context.principal?.tenant) tx.addOperation(jobContextOperation(jobId, context.principal.tenant.id, context.principal.id, context.requestId) as never);\npackages/appboundry-host/src/services.ts:400:         tx.addOperation(completion(result) as never);\npackages/appboundry-host/src/services.ts:411:         tx.addOperation(completion(result) as never);"
+      },
+      "id": "mwvy0fzafc0a4d5de650",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:30.821Z",
+      "digest": "3913dc7a60515b4b",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 304,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 9294,
+        "latencyMs": 6078,
+        "messageId": "msg_011ChPSPoVuSF9SVJy3DvrcN"
+      },
+      "id": "mwvy0l9j8c2b5e25ce89",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:30.823Z",
+      "digest": "6689cdab88a25c98",
+      "data": {
+        "n": 9,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/services.ts\",\"startLine\":370,\"endLine\":420}",
+        "resultJson": null,
+        "rationale": "completion() builds its guard as `expectedVersion`, while every other host transaction operation, including put() in the same file, uses `ifVersion`. Before claiming anything I need to see how the services transaction context consumes the operation passed to tx.addOperation."
+      },
+      "id": "mwvy0l9l1a2da1e3d8d3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:30.838Z",
+      "digest": "e66ecdeecee78d93",
+      "data": {
+        "n": 9,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/services.ts",
+          "startLine": 370,
+          "endLine": 420
+        },
+        "summary": "packages/appboundry-host/src/services.ts lines 370-420 of 465:\n370\t  }\n371\t\n372\t  /**\n373\t   * An after-commit job or webhook event, created in one FeltDB transaction with `completion`:\n374\t   * the caller's record that the effect is done (transactions.ts). AppPort Services' transaction\n375\t   * context writes the job, or the deliveries to the endpoints subscribed to the event, with their\n376\t   * audit record and authority evidence; all of it commits with the completion, or none of it.\n377\t   * Authorized as `principal`, with the same checks as the direct call.\n378\t   */\n379\t  async performInTransaction(call: ServiceCall, context: { principal: Principal | null; requestId: string }, completion: (result: Record<string, unknown>) => Record<string, unknown>): Promise<Record<string, unknown>> {\n380\t    const input = isRecord(call.input) ? call.input : {};\n381\t    const service = call.service as ServiceName;\n382\t    if (!this.#granted.has(service)) throw new HostError(\"FORBIDDEN\", `The artifact is not permitted to use service ${JSON.stringify(service)} (granted: ${[...this.#granted].join(\", \") || \"none\"}).`);\n383\t    const verified = this.#verified(context.principal, context.requestId);\n384\t    if (call.service === \"jobs\" && call.method === \"enqueue\") {\n385\t      const type = input.type;\n386\t      if (typeof type !== \"string\" || !type) throw new HostError(\"INVALID_ARGUMENT\", \"enqueue() needs a job type.\");\n387\t      if (!this.#jobHandlers[type]) throw new HostError(\"INVALID_ARGUMENT\", `No handler for job type \"${type}\". The artifact declares: ${Object.keys(this.#jobHandlers).join(\", \") || \"none\"}.`);\n388\t      const options = isRecord(input.options) ? input.options : {};\n389\t      const authorized = await this.#record(this.#o\n…\nnAt: options.runAt } : {}),\n396\t          ...(typeof options.maxAttempts === \"number\" ? { maxAttempts: options.maxAttempts } : {})\n397\t        }, authorized);\n398\t        const result = { jobId };\n399\t        if (context.principal?.tenant) tx.addOperation(jobContextOperation(jobId, context.principal.tenant.id, context.principal.id, context.requestId) as never);\n400\t        tx.addOperation(completion(result) as never);\n401\t        return result;\n402\t      }));\n403\t    }\n404\t    if (call.service === \"webhooks\" && call.method === \"emit\") {\n405\t      const type = String(input.type);\n406\t      const authorized = await this.#record(this.#official.authorize(\"webhooks.emit\", verified, { type: \"webhook_event\", attributes: { eventType: type } } as never));\n407\t      const endpoints = (await this.#official.webhooks.listWebhookEndpoints(this.#tenantId)).filter(e => e.applicationId === this.#manifest.application.id && !e.disabledAt && e.events.includes(type));\n408\t      return this.#record(this.#official.transaction(async tx => {\n409\t        if (endpoints.length) await tx.queueWebhookDeliveries(endpoints.map(e => e.id), { tenantId: this.#tenantId, type, payload: isRecord(input.payload) ? input.payload : {} }, authorized);\n410\t        const result = { deliveries: endpoints.length };\n411\t        tx.addOperation(completion(result) as never);\n412\t        return result;\n413\t      }));\n414\t    }\n415\t    throw new HostError(\"INVALID_ARGUMENT\", `${String(call.service)}.${String(call.method)} is not created in a transaction.`);\n416\t  }\n417\t\n418\t  async #storeContent(bytes: Uint8Array): Promise<{ storageKey: string; checksum: string }> {\n419\t    const checksum = createHash(\"sha256\").update(bytes).digest(\"hex\");\n420\t    const id = randomUUID();"
+      },
+      "id": "mwvy0la823feb84b454e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:38.015Z",
+      "digest": "ae887e63c88c1f86",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 354,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 10676,
+        "latencyMs": 6274,
+        "messageId": "msg_011ChPSQKUwo4FekLK49FboX"
+      },
+      "id": "mwvy0qtcb0612636ede3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:38.017Z",
+      "digest": "c57356a646f4bd69",
+      "data": {
+        "n": 10,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"function jobContextOperation|addOperation|expectedVersion\",\"path\":\"packages/appboundry-host\"}",
+        "resultJson": null,
+        "rationale": "completion() guards with `expectedVersion`, but every other host FeltDB write uses `ifVersion`. I need the shape of jobContextOperation and how tx.addOperation is consumed to tell whether the done-guard is honored or silently dropped."
+      },
+      "id": "mwvy0qtffe4124ff56f6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:38.040Z",
+      "digest": "81523bb7eef0faa8",
+      "data": {
+        "n": 10,
+        "action": "search",
+        "input": {
+          "pattern": "function jobContextOperation|addOperation|expectedVersion",
+          "path": "packages/appboundry-host"
+        },
+        "summary": "packages/appboundry-host/src/collections.ts:76:   expectedVersion?: number;\npackages/appboundry-host/src/collections.ts:535:         writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });\npackages/appboundry-host/src/collections.ts:538:         writes.push({ collection: pending.collection, id: pending.id, op: \"delete\", expectedVersion: pending.baseVersion! });\npackages/appboundry-host/src/contract.ts:284:         const guard = version === undefined ? { requireAbsent: true } : { expectedVersion: version };\npackages/appboundry-host/src/services.ts:349:             tx.addOperation(jobContextOperation(jobId, tenant.id, caller.id, context.requestId) as never);\npackages/appboundry-host/src/services.ts:399:         if (context.principal?.tenant) tx.addOperation(jobContextOperation(jobId, context.principal.tenant.id, context.principal.id, context.requestId) as never);\npackages/appboundry-host/src/services.ts:400:         tx.addOperation(completion(result) as never);\npackages/appboundry-host/src/services.ts:411:         tx.addOperation(completion(result) as never);\npackages/appboundry-host/src/tenancy.ts:136: export function jobContextOperation(jobId: string, tenantId: string, principalId: string, requestId: string): Record<string, unknown> {\npackages/appboundry-host/src/transactions.ts:167:   return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };"
+      },
+      "id": "mwvy0qu5c7a21465cbb1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:45.313Z",
+      "digest": "d4b9f64975853f7c",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 387,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 11335,
+        "latencyMs": 6552,
+        "messageId": "msg_011ChPSQqS1iPXbW822Ef2mL"
+      },
+      "id": "mwvy0wg2b0090b10be5c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:45.314Z",
+      "digest": "2d5d0c4340886b90",
+      "data": {
+        "n": 11,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/contract.ts\", \"startLine\": 270, \"endLine\": 300}",
+        "resultJson": null,
+        "rationale": "`completion()` in transactions.ts:167 guards the done write with `expectedVersion`, while the outbox put at line 157 and most other FeltDB transaction operations use `ifVersion`. Before claiming the guard is ignored, I need to see how contract.ts:284 passes `expectedVersion` to FeltDB, to learn which key the transaction API actually honors."
+      },
+      "id": "mwvy0wg51cf00aa84ad6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:45.336Z",
+      "digest": "d799804fe1bc8004",
+      "data": {
+        "n": 11,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/contract.ts",
+          "startLine": 270,
+          "endLine": 300
+        },
+        "summary": "packages/appboundry-host/src/contract.ts lines 270-300 of 345:\n270\t    from,\n271\t    to: { version: next.version, hash: next.hash },\n272\t    changes,\n273\t    migrations: pending,\n274\t    writes,\n275\t    authorizedBy: options.authorizedBy ?? \"startup\",\n276\t    artifact: { id: manifest.application.id, version: manifest.application.version, manifestSha256: artifact.manifestSha256 },\n277\t    appliedAt: new Date().toISOString()\n278\t  };\n279\t  type Tx = { collection(name: string): { set(id: string, value: unknown, guard?: unknown): void; delete(id: string, guard?: unknown): void } };\n280\t  const stageWrites = (tx: Tx) => {\n281\t    for (const [collection, changesFor] of overlay) {\n282\t      for (const [id, value] of changesFor) {\n283\t        const version = versions.get(collection)?.get(id);\n284\t        const guard = version === undefined ? { requireAbsent: true } : { expectedVersion: version };\n285\t        if (value === null) {\n286\t          if (version !== undefined) tx.collection(collection).delete(id, guard);\n287\t        } else tx.collection(collection).set(id, value, guard);\n288\t      }\n289\t    }\n290\t  };\n291\t  const history = (tx: Tx) => tx.collection(CONTRACT_HISTORY).set(record.id, record);\n292\t  try {\n293\t    if (same) {\n294\t      // Data-only migrations: the contract is unchanged.\n295\t      await db.transaction(((tx: Tx) => { stageWrites(tx); history(tx); }) as never);\n296\t    } else if (intermediate) {\n297\t      // The migrations are recorded with the step that commits their writes, so a stop between\n298\t      // the two steps never runs them again; the next start only drops the emptied collections.\n299\t      const step = intermediate;\n300\t      await db.stateContract.evolve(step, tx => {"
+      },
+      "id": "mwvy0wgt09f2c3742010",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:52.606Z",
+      "digest": "07c1f58a68449cdb",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 341,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 12036,
+        "latencyMs": 6846,
+        "messageId": "msg_011ChPSRMSJczJmxpMqWC7Ju"
+      },
+      "id": "mwvy122o37fcb4bf7e9e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:52.608Z",
+      "digest": "9a751f69b0003f00",
+      "data": {
+        "n": 12,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/tenancy.ts\", \"startLine\": 60, \"endLine\": 150}",
+        "resultJson": null,
+        "rationale": "The completion() write passed to tx.addOperation uses `expectedVersion`, while every other host write uses `ifVersion` (the operations-array transaction shape). If addOperation ignores `expectedVersion`, the done write would be unguarded and a stale claim could still create the effect. jobContextOperation is the other operation passed to addOperation; reading it shows which keys that API takes."
+      },
+      "id": "mwvy122q4bd6df20cc4e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:52.621Z",
+      "digest": "aa90717dc4c72648",
+      "data": {
+        "n": 12,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/tenancy.ts",
+          "startLine": 60,
+          "endLine": 150
+        },
+        "summary": "packages/appboundry-host/src/tenancy.ts lines 60-146 of 146:\n60\t    if (!this.#seen.get(this.#key(collection, id))) throw new HostError(\"FAILED_PRECONDITION\", `tenancy@1 replaces only a record it read first (${collection}/${id}).`);\n61\t    this.#pending.set(this.#key(collection, id), { collection, id, kind: \"replace\", value });\n62\t  }\n63\t  delete(collection: string, id: string): void {\n64\t    if (!this.#seen.get(this.#key(collection, id))) throw new HostError(\"FAILED_PRECONDITION\", `tenancy@1 deletes only a record it read first (${collection}/${id}).`);\n65\t    this.#pending.set(this.#key(collection, id), { collection, id, kind: \"delete\" });\n66\t  }\n67\t  async commit(): Promise<void> {\n68\t    if (!this.#pending.size) return;\n69\t    const operations = [...this.#pending.entries()].map(([key, w]) =>\n70\t      w.kind === \"create\"\n71\t        ? { collection: w.collection, id: w.id, requireAbsent: true, value: { ...w.value, id: w.id } }\n72\t        : w.kind === \"replace\"\n73\t          ? { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key), value: { ...w.value, id: w.id } }\n74\t          : { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key) }\n75\t    );\n76\t    try {\n77\t      await this.#db.transaction({ operations } as never);\n78\t    } catch (error) {\n79\t      throw new HostError(\"CONFLICT\", `The membership change conflicted with a concurrent one; nothing was written. (${(error as Error).message})`);\n80\t    }\n81\t  }\n82\t}\n83\t\n84\t/** Answer one host operation of a tenancy@1 invocation. */\n85\texport async function tenancyOperation(call: Record<string, unknown>, tx: TenancyTransaction, token: (bytes: number) => string): Promise<unknown> {\n86\t  if (call.op === \"crypto.token\") return token(Number(call.bytes ?\n…\nction tenancyRead(call: Record<string, unknown>, db: StateFirstDB): Promise<unknown> {\n113\t  const collection = tenancyCollection(call.collection);\n114\t  if (call.read === \"get\") return (await db.collection<Record<string, unknown>>(collection).get(String(call.key))) ?? null;\n115\t  if (call.read === \"query\") return db.query({ ...((call.request as Record<string, unknown>) ?? {}), collection } as never);\n116\t  throw new HostError(\"INVALID_ARGUMENT\", `tenancy.read has no read \"${String(call.read)}\".`);\n117\t}\n118\t\n119\t/**\n120\t * The tenant a job was queued in, written in the same transaction as the job (AppPort Services' job\n121\t * `tenantId` is the application, not the tenant). Same collection and shape as FeltKit's runtime\n122\t * (`_feltkit_job_contexts`). At execution the job's principal joins that tenant only through its live\n123\t * membership; without one the run is refused.\n124\t */\n125\texport const JOB_CONTEXTS_COLLECTION = \"_feltkit_job_contexts\";\n126\t\n127\texport interface JobContextRecord {\n128\t  id: string;\n129\t  jobId: string;\n130\t  tenantId: string;\n131\t  principalId: string;\n132\t  requestId: string;\n133\t  createdAt: string;\n134\t}\n135\t\n136\texport function jobContextOperation(jobId: string, tenantId: string, principalId: string, requestId: string): Record<string, unknown> {\n137\t  const value: JobContextRecord = { id: jobId, jobId, tenantId, principalId, requestId, createdAt: new Date().toISOString() };\n138\t  return { collection: JOB_CONTEXTS_COLLECTION, id: jobId, requireAbsent: true, value };\n139\t}\n140\t\n141\t/** The job behind a run id (`<jobId>:<attempt>`). */\n142\texport function jobIdOfRun(runId: string): string {\n143\t  const at = runId.lastIndexOf(\":\");\n144\t  return at > 0 ? runId.slice(0, at) : runId;\n145\t}\n146\t"
+      },
+      "id": "mwvy123add9a2f4d3cac",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:50:59.026Z",
+      "digest": "a4649e2940980b50",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 515,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 13541,
+        "latencyMs": 6208,
+        "messageId": "msg_011ChPSRsjhnmTghb8nwZPpZ"
+      },
+      "id": "mwvy17104c7c0b954ea9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:50:59.028Z",
+      "digest": "f254d396061c6729",
+      "data": {
+        "n": 13,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"completion\\\\(|performOutbox|stale claim\",\"path\":\"packages/appboundry-host/test\"}",
+        "resultJson": null,
+        "rationale": "completion() in transactions.ts:167 guards with `expectedVersion`, but every other raw operation handed to db.transaction uses `ifVersion` (transactions.ts:157, tenancy.ts:73, admin.ts). If the operation format ignores `expectedVersion`, the done write for a job or webhook is unguarded. A stale claim could then create a duplicate effect. Next I'll look for tests that exercise this guard."
+      },
+      "id": "mwvy171365184a6cbb1d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:50:59.051Z",
+      "digest": "d797a3d11814dd54",
+      "data": {
+        "n": 13,
+        "action": "search",
+        "input": {
+          "pattern": "completion\\(|performOutbox|stale claim",
+          "path": "packages/appboundry-host/test"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy171o9be35bc218be",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:05.857Z",
+      "digest": "1c701d029fffbc75",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 448,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 13591,
+        "latencyMs": 6083,
+        "messageId": "msg_011ChPSSPEyG84HSgkMuXpna"
+      },
+      "id": "mwvy1caq74c3b9b67608",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:05.859Z",
+      "digest": "374226588ed16419",
+      "data": {
+        "n": 14,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 60, \"endLine\": 100}",
+        "resultJson": null,
+        "rationale": "The completion() operation passed to tx.addOperation uses the key `expectedVersion`, but every other raw FeltDB transaction operation in the host uses `ifVersion`. Before claiming the done-write is unguarded, I need to see which guard key the host's write type actually uses."
+      },
+      "id": "mwvy1cat1b21024e13e1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:05.870Z",
+      "digest": "55a1753d4c1f220e",
+      "data": {
+        "n": 14,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 60,
+          "endLine": 100
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 60-100 of 560:\n60\t  field: string;\n61\t  direction: \"asc\" | \"desc\";\n62\t}\n63\t\n64\tinterface Pending {\n65\t  collection: string;\n66\t  id: string;\n67\t  op: \"insert\" | \"update\" | \"delete\";\n68\t  value?: Record<string, unknown>;\n69\t  baseVersion?: number;\n70\t}\n71\t\n72\texport interface CommittedWrite {\n73\t  collection: string;\n74\t  id: string;\n75\t  op: \"insert\" | \"update\" | \"delete\";\n76\t  expectedVersion?: number;\n77\t}\n78\t\n79\texport function newId(): string {\n80\t  return `${Date.now().toString(36)}${randomBytes(6).toString(\"hex\")}`;\n81\t}\n82\t\n83\tconst isRecord = (value: unknown): value is Record<string, unknown> => typeof value === \"object\" && value !== null && !Array.isArray(value);\n84\t\n85\tfunction stripSystem(value: Record<string, unknown>): Record<string, unknown> {\n86\t  const { id: _id, __version: _v, ...rest } = value;\n87\t  return rest;\n88\t}\n89\t\n90\tfunction compare(a: unknown, b: unknown): number {\n91\t  if (a === b) return 0;\n92\t  if (a === undefined || a === null) return -1;\n93\t  if (b === undefined || b === null) return 1;\n94\t  if (typeof a === \"number\" && typeof b === \"number\") return a - b;\n95\t  return String(a) < String(b) ? -1 : 1;\n96\t}\n97\t\n98\tfunction matchesWhere(record: Record<string, unknown>, where: WhereClause[]): boolean {\n99\t  return where.every(clause => {\n100\t    const value = record[clause.field];"
+      },
+      "id": "mwvy1cb6e36ccd1bb68a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:12.721Z",
+      "digest": "90f9faa499192f17",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 487,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 14223,
+        "latencyMs": 5952,
+        "messageId": "msg_011ChPSSuB35JnvWSfwzED1m"
+      },
+      "id": "mwvy1hlfa63aa0779438",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:12.723Z",
+      "digest": "4b7e764e660f9ddf",
+      "data": {
+        "n": 15,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 490, \"endLine\": 560}",
+        "resultJson": null,
+        "rationale": "completion() in transactions.ts:167 guards with `expectedVersion`, while every other raw operation passed to db.transaction uses `ifVersion`. Before claiming the done write is unguarded, I need to see the operation shape collections.ts sends when it commits."
+      },
+      "id": "mwvy1hlhb5f0c6f0bb1a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:12.737Z",
+      "digest": "a49bd2ca5012501b",
+      "data": {
+        "n": 15,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 490,
+          "endLine": 560
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 490-560 of 560:\n490\t  }\n491\t\n492\t  async replace(collection: unknown, id: unknown, value: unknown): Promise<AnyDoc> {\n493\t    const name = this.#write(collection);\n494\t    const { pending, base } = await this.#existing(name, id);\n495\t    const fields = stripSystem(isRecord(value) ? value : {});\n496\t    this.host.validate(name, fields);\n497\t    this.#pending.set(this.#key(name, id as string), { collection: name, id: id as string, op: pending?.op === \"insert\" ? \"insert\" : \"update\", value: fields, ...(base !== undefined ? { baseVersion: base } : {}) });\n498\t    return { ...fields, id: id as string, __version: pending?.op === \"insert\" ? 1 : (base ?? 0) + 1 };\n499\t  }\n500\t\n501\t  async delete(collection: unknown, id: unknown): Promise<null> {\n502\t    const name = this.#write(collection);\n503\t    const { pending, base } = await this.#existing(name, id);\n504\t    const key = this.#key(name, id as string);\n505\t    if (pending?.op === \"insert\") {\n506\t      this.#pending.delete(key);\n507\t      return null;\n508\t    }\n509\t    this.#pending.set(key, { collection: name, id: id as string, op: \"delete\", ...(base !== undefined ? { baseVersion: base } : {}) });\n510\t    return null;\n511\t  }\n512\t\n513\t  /** Discard every pending write (the handler failed). */\n514\t  abandon(): void {\n515\t    this.#closed = true;\n516\t    this.#pending.clear();\n517\t  }\n518\t\n519\t  /**\n520\t   * Commit every pending write in one FeltDB transaction. `extra` operations (the host's\n521\t   * own bookkeeping, such as an idempotency record) commit in the same transaction.\n522\t   */\n523\t  /** `guards`: records this transaction does not write but whose version must be unchanged at commit (FeltDB preconditions). */\n524\t  asyn\n…\nion, value: { ...pending.value, id: pending.id } });\n535\t        writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });\n536\t      } else {\n537\t        operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion });\n538\t        writes.push({ collection: pending.collection, id: pending.id, op: \"delete\", expectedVersion: pending.baseVersion! });\n539\t      }\n540\t    }\n541\t    if (operations.length === 0 && extra.length === 0) return { transactionId, writes: [] };\n542\t    for (const collection of new Set(writes.map(w => w.collection))) {\n543\t      operations.push({ collection: COLLECTION_MARKERS, id: collection, value: { id: collection, transactionId, changedAt: Date.now() } });\n544\t    }\n545\t    operations.push(...extra);\n546\t    const preconditions: Array<Record<string, unknown>> = [...guards];\n547\t    for (const [key, observed] of this.#observed) {\n548\t      if (this.#pending.has(key)) continue;\n549\t      preconditions.push(observed.version === null ? { collection: observed.collection, id: observed.id, requireAbsent: true } : { collection: observed.collection, id: observed.id, ifVersion: observed.version });\n550\t    }\n551\t    try {\n552\t      const fences = [...this.#fences.values()];\n553\t      const result = await this.host.db.transaction({ transactionId, operations, ...(preconditions.length ? { preconditions } : {}), ...(fences.length ? { fences } : {}) } as never);\n554\t      return { transactionId: result.transactionId, writes, ...(result.commitRevision !== undefined ? { commitRevision: result.commitRevision } : {}) };\n555\t    } catch (error) {\n556\t      throw commitError(error, transactionId);\n557\t    }\n558\t  }\n559\t}\n560\t"
+      },
+      "id": "mwvy1hm406426b5d8eba",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:20.441Z",
+      "digest": "ba0d493a84208505",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 495,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 15618,
+        "latencyMs": 6659,
+        "messageId": "msg_011ChPSTRCaDowWJfZTWDoff"
+      },
+      "id": "mwvy1nk0e036daea7342",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:20.448Z",
+      "digest": "8f388940d039720d",
+      "data": {
+        "n": 16,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"outbox|afterCommit|performInTransaction\",\"path\":\"packages/appboundry-host/test\"}",
+        "resultJson": null,
+        "rationale": "completion() at transactions.ts:167 guards with `expectedVersion`. Every other raw FeltDB operation in the host guards with `ifVersion` (transactions.ts:157, tenancy.ts:73, collections.ts:537). If tx.addOperation ignores `expectedVersion`, a stale claim could still create a job and record it done. Before claiming that, I need to see whether any test exercises the outbox completion path."
+      },
+      "id": "mwvy1nk3fc01add37467",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:20.475Z",
+      "digest": "cbca9ac174e21284",
+      "data": {
+        "n": 16,
+        "action": "search",
+        "input": {
+          "pattern": "outbox|afterCommit|performInTransaction",
+          "path": "packages/appboundry-host/test"
+        },
+        "summary": "packages/appboundry-host/test/helpers.ts:89:   /** Require host interface transactions@<n> (db.sequence, outbox.stage). */\npackages/appboundry-host/test/helpers.ts:109: let pending = new Map(), outbox = [], next = 1, result = null;\npackages/appboundry-host/test/helpers.ts:110: const host = (op, payload) => new Promise((resolve, reject) => { const id = next++; pending.set(id, { resolve, reject }); outbox.push({ id, op, ...payload }); });\npackages/appboundry-host/test/helpers.ts:129:   poll() { if (result) { const r = result; result = null; pending = new Map(); outbox = []; return JSON.stringify(r); } const calls = outbox; outbox = []; return JSON.stringify({ state: \"suspended\", calls, logs: [] }); },\npackages/appboundry-host/test/tenancy-work.test.ts:86:     const staged = (id: string, principalId: string) => ({ collection: \"_appboundry_outbox\", id, requireAbsent: true, value: { id, requestId: `req_${id}`, function: \"notes:queueTally\", principalId, tenantId: o.acme, effect: { service: \"jobs\npackages/appboundry-host/test/tenancy-work.test.ts:92:     const failed = (await host.collections.db.collection(\"_appboundry_outbox\").get(\"ob_max\")) as { state: string };\npackages/appboundry-host/test/transactional-effects.test.ts:3:  * their outbox effect done (AppPort Services' transaction context, @appport/services 0.13.1), on\npackages/appboundry-host/test/transactional-effects.test.ts:30:       await host(\"outbox.stage\", { effects: [\npackages/appboundry-host/test/transactional-effects.test.ts:31:         { id: \"outbox_\" + a.number + \"_job\", effect: { service: \"jobs\", method: \"enqueue\", type: \"ship\", payload: { invoice: a.number }, ...(a.maxAttempts ? { options: { maxAttempts: a.maxAttempts } } : {}) } },\npackages/appboundry-host/te\n…\ntoMatchObject({ id: \"outbox_C_1\", state: \"failed\", error: { code: \"FORBIDDEN\" } });\npackages/appboundry-host/test/transactions.test.ts:178:     const listed = JSON.parse(execFileSync(process.execPath, [BIN, \"admin\", \"outbox\", \"list\", \"--state\", state, \"--status\", \"failed\", \"--json\"], { encoding: \"utf8\" })) as OutboxRecord[];\npackages/appboundry-host/test/transactions.test.ts:179:     expect(listed.map(r => [r.id, r.error?.code])).toEqual([[\"outbox_C_1\", \"FORBIDDEN\"]]);\npackages/appboundry-host/test/transactions.test.ts:180:     expect(((await adminRequest(target, \"outbox.list\", { state: \"failed\" })) as OutboxRecord[]).map(r => r.id)).toEqual([\"outbox_C_1\"]);\npackages/appboundry-host/test/transactions.test.ts:181:     expect(await adminRequest(target, \"outbox.retry\", { id: \"outbox_C_1\" })).toMatchObject({ state: \"pending\", attempts: 1, error: { code: \"FORBIDDEN\" } });\npackages/appboundry-host/test/transactions.test.ts:182:     await expect(adminRequest(target, \"outbox.retry\", { id: \"outbox_C_1\" })).rejects.toMatchObject({ code: \"FAILED_PRECONDITION\" });\npackages/appboundry-host/test/transactions.test.ts:188:       expect(await second.host.listOutbox()).toMatchObject([{ id: \"outbox_C_1\", state: \"done\", attempts: 2, retriedBy: expect.any(String) }]);\npackages/appboundry-host/test/transactions.test.ts:190:       await second.host.collections.db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id: \"outbox_D_1\", requireAbsent: true, value: { ...failed, id: \"outbox_D_1\", effect: { ...failed!.effect, input: { recipient: \"dev\", type: \"p\npackages/appboundry-host/test/transactions.test.ts:191:       expect(await second.host.retryOutbox(\"outbox_D_1\", \"ops\")).toMatchObject({ state: \"done\", retriedBy: \"ops\", attempts: 2 });"
+      },
+      "id": "mwvy1nl3f2bac76562f1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:28.151Z",
+      "digest": "5988f6ef9ae44d40",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 578,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 17193,
+        "latencyMs": 7366,
+        "messageId": "msg_011ChPSTwBccf4NQKAWzPug1"
+      },
+      "id": "mwvy1ti145f8a7aeda46",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:28.153Z",
+      "digest": "3ac73c4e38f6dd25",
+      "data": {
+        "n": 17,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/test/transactional-effects.test.ts\",\"startLine\":1,\"endLine\":200}",
+        "resultJson": null,
+        "rationale": "completion() (transactions.ts:167) guards the done write with `expectedVersion`, but every other raw FeltDB transaction operation in the host uses `ifVersion` (transactions.ts:157, tenancy.ts:73, collections.ts:537). If tx.addOperation ignores `expectedVersion`, the stale-claim guard is a no-op. Next step is to see whether the tests cover a stale claim and what operation shape addOperation takes."
+      },
+      "id": "mwvy1ti318623d9722a9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:28.165Z",
+      "digest": "197aa1b3cb5a859e",
+      "data": {
+        "n": 17,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/test/transactional-effects.test.ts",
+          "startLine": 1,
+          "endLine": 200
+        },
+        "summary": "packages/appboundry-host/test/transactional-effects.test.ts lines 1-148 of 148:\n1\t/**\n2\t * After-commit jobs and webhook events are created in the same FeltDB transaction that records\n3\t * their outbox effect done (AppPort Services' transaction context, @appport/services 0.13.1), on\n4\t * persisted state whose contract FeltDB enforces: created exactly once per committed effect,\n5\t * across a restart and a recovery; a refused creation leaves neither the effect nor a done mark.\n6\t */\n7\timport { mkdtemp, rm } from \"node:fs/promises\";\n8\timport { tmpdir } from \"node:os\";\n9\timport { join } from \"node:path\";\n10\timport { afterAll, describe, expect, it } from \"vitest\";\n11\timport { defineStateContract, field } from \"@feltdb/core\";\n12\timport { ArtifactHost, loadArtifact, type Principal } from \"@appport/appboundry-host\";\n13\timport { OUTBOX_COLLECTION, OUTBOX_PERFORMING_STALE_MS, type OutboxRecord } from \"../src/transactions.js\";\n14\timport { syntheticArtifact, type SyntheticFunction } from \"./helpers.js\";\n15\t\n16\tconst scratch: string[] = [];\n17\tafterAll(async () => { await Promise.all(scratch.map(dir => rm(dir, { recursive: true, force: true }))); });\n18\tconst dev: Principal = { id: \"dev\", type: \"user\", roles: [\"member\"] } as Principal;\n19\t\n20\tconst object = (properties: Record<string, unknown>, required: string[]) => ({ type: \"object\", properties, required, additionalProperties: false });\n21\tconst COLLECTIONS = [{ name: \"invoices\", schema: object({ number: { type: \"string\" } }, [\"number\"]) }];\n22\tconst CONTRACT = defineStateContract({ name: \"ledger\", version: 1, collections: { invoices: { fields: { number: field.string({ required: true }) } } } } as never).document;\n23\tconst FUNCTIONS: SyntheticFunction[] = [\n24\t  {\n25\t    name: \"led\n…\nt.\n122\t    const old = Date.now() - OUTBOX_PERFORMING_STALE_MS - 1;\n123\t    const claimed = (id: string, effect: OutboxRecord[\"effect\"]): OutboxRecord => ({ id, requestId: \"req_lost\", function: \"ledger:pay\", principalId: \"dev\", effect, state: \"performing\", createdAt: old, updatedAt: old, attempts: 1 });\n124\t    await first.db.transaction({ operations: [\n125\t      { collection: OUTBOX_COLLECTION, id: \"outbox_C_job\", requireAbsent: true, value: claimed(\"outbox_C_job\", { service: \"jobs\", method: \"enqueue\", type: \"ship\", payload: { invoice: \"C\" } }) },\n126\t      { collection: OUTBOX_COLLECTION, id: \"outbox_C_hook\", requireAbsent: true, value: claimed(\"outbox_C_hook\", { service: \"webhooks\", method: \"emit\", type: \"invoice.paid\", payload: { invoice: \"C\" } }) }\n127\t    ] } as never);\n128\t    await first.call({ number: \"warm\" }); // dev is a known user, as the effect's caller must be\n129\t    await first.host.close();\n130\t\n131\t    const second = await open(path, state);\n132\t    try {\n133\t      const before = await second.persisted();\n134\t      const [a, b] = await Promise.all([second.host.recoverOutbox(), second.host.recoverOutbox()]);\n135\t      expect(a + b).toBe(2);\n136\t      const after = await second.persisted();\n137\t      expect(after.jobs.length - before.jobs.length).toBe(1);\n138\t      expect(after.deliveries.length - before.deliveries.length).toBe(1);\n139\t      expect(after.outbox).toContain(\"outbox_C_job:done\");\n140\t      expect(after.outbox).toContain(\"outbox_C_hook:done\");\n141\t      expect(await second.host.recoverOutbox(Date.now() + OUTBOX_PERFORMING_STALE_MS * 2)).toBe(0);\n142\t      expect(await second.persisted()).toEqual(after);\n143\t    } finally {\n144\t      await second.host.close();\n145\t    }\n146\t  });\n147\t});\n148\t"
+      },
+      "id": "mwvy1tin3eb162fa9ded",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:34.693Z",
+      "digest": "9362680c8cc67f0d",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 466,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 18714,
+        "latencyMs": 5892,
+        "messageId": "msg_011ChPSUXQAB4JG1tfg3y3Ks"
+      },
+      "id": "mwvy1yjr46fb8d94595d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:34.695Z",
+      "digest": "52b17346adc1dbb1",
+      "data": {
+        "n": 18,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"addOperation|ifVersion\\\\??:|expectedVersion\\\\??:\"}",
+        "resultJson": null,
+        "rationale": "Check whether FeltDB/AppPort transaction operations honor `expectedVersion` (used by completion()) or only `ifVersion` (used everywhere else in raw operations). That decides whether the stale-claim guard is real."
+      },
+      "id": "mwvy1yjubd615d7811bb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:34.759Z",
+      "digest": "763066a3bfa195f0",
+      "data": {
+        "n": 18,
+        "action": "search",
+        "input": {
+          "pattern": "addOperation|ifVersion\\??:|expectedVersion\\??:"
+        },
+        "summary": "apps/cloud-portal/src/hosting-store.ts:986:         { type: \"set\", collection: STATE_COLLECTION, id: gid, value: envelope(record) as never, ...(current ? { expectedVersion: current.revision } : { requireAbsent: true }) },\napps/cloud-portal/src/hosting-store.ts:987:         { type: \"set\", collection: STATE_COLLECTION, id: grantOfferRecordId(offerId), value: envelope(accepted) as never, expectedVersion: found.revision }\napps/cloud-portal/src/hosting-store.ts:1288:           { type: \"set\", collection: STATE_COLLECTION, id: gateId, value: envelope(next), ...(gate ? { expectedVersion: gate.revision } : { requireAbsent: true }) },\napps/cloud-portal/src/tenant-directory.ts:77:     const required: Array<(typeof mutations)[number] & { requireAbsent?: boolean; expectedVersion?: number }> = [];\napps/cloud-portal/src/tenant-directory.ts:84:         required.push({ ...mutation, expectedVersion: current.revision });\napps/cloud-portal/src/tenant-directory.ts:173:       { type: \"set\", collection: \"AppPortState\", id: organizationKey(organization.id), value: replacement, expectedVersion: direct!.revision },\napps/cloud-portal/src/tenant-directory.ts:174:       ...(tenant ? [{ type: \"set\" as const, collection: \"AppPortState\", id: tenantKey(organization.slug), value: replacement, expectedVersion: tenant.revision }] : []),\napps/cloud-portal/src/tenant-directory.ts:251:       { type: \"set\", collection: \"AppPortState\", id: organizationKey(organization.id), value: replacement, expectedVersion: direct!.revision },\napps/cloud-portal/src/tenant-directory.ts:252:       ...(tenant ? [{ type: \"set\" as const, collection: \"AppPortState\", id: tenantKey(organization.slug), value: replacement, expectedVersion: tenant.revision }] : []),\napps/cloud-portal/sr\n…\n, ifVersion: this.#seen.get(key) }\npackages/appboundry-host/src/transactions.ts:76:       out.push(s.version === null ? { collection: SEQUENCES_COLLECTION, id: s.id, requireAbsent: true, value } : { collection: SEQUENCES_COLLECTION, id: s.id, ifVersion: s.version, value });\npackages/appboundry-host/src/transactions.ts:157:   await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\npackages/appboundry-host/src/transactions.ts:167:   return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\npackages/appboundry-host/test/production-ops.test.ts:343:     await db.transaction({ operations: [{ collection: STATE_COLLECTION, id: \"restore\", ifVersion: marker.__version, value: { id: \"restore\", status: \"in-progress\", backupSha256: \"x\", startedAt: new Date().toISOString() } }] } as never);\npackages/appboundry-runtime/src/provider-contract.ts:42:   | { readonly operation: \"write\"; readonly collection: string; readonly id: string; readonly value: JsonValue; readonly expectedVersion?: number }\npackages/appboundry-runtime/src/provider-contract.ts:43:   | { readonly operation: \"delete\"; readonly collection: string; readonly id: string; readonly expectedVersion?: number };\npackages/appboundry/portal/app.js:77: const withVersion = (body, version) => typeof version === \"number\" ? { ...body, expectedVersion: version } : body;\npackages/appboundry/test/artifact-durable-writes.test.ts:32:       expect(writeStep(plan(name, { id: \"x\", expectedVersion: 3 }))).toMatchObject({ operation: \"write\", expectedVersion: \"$input.expectedVersion\" });"
+      },
+      "id": "mwvy1yls86d77728e2ab",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:42.248Z",
+      "digest": "10752efe393c6a01",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 559,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 20228,
+        "latencyMs": 6442,
+        "messageId": "msg_011ChPSV3LEcWCVayVhc64uB"
+      },
+      "id": "mwvy24dm4885af27e7fe",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:42.250Z",
+      "digest": "26ab68b9dd20ab6e",
+      "data": {
+        "n": 19,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"addOperation\\\\s*\\\\(|interface .*Transaction.*\\\\{|expectedVersion\",\"path\":\"node_modules/@appport/services\"}",
+        "resultJson": null,
+        "rationale": "The outbox completion op handed to AppPort Services' tx.addOperation uses `expectedVersion`, while every direct FeltDB transaction op in the host uses `ifVersion`. I need to see which guard key addOperation actually honours before claiming the stale-claim guard is ignored."
+      },
+      "id": "mwvy24dp3972cae22bf1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:42.270Z",
+      "digest": "72359f9df7afa93c",
+      "data": {
+        "n": 19,
+        "action": "search",
+        "input": {
+          "pattern": "addOperation\\s*\\(|interface .*Transaction.*\\{|expectedVersion",
+          "path": "node_modules/@appport/services"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy24e86ee3f0a79cb2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:51:51.462Z",
+      "digest": "726f9cb8d6d88317",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 819,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 20292,
+        "latencyMs": 8643,
+        "messageId": "msg_011ChPSVZQF8aCkhczQUPgCM"
+      },
+      "id": "mwvy2bhk875334244e3e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:51:51.464Z",
+      "digest": "6b023d5564222320",
+      "data": {
+        "n": 20,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/backup.ts\", \"startLine\": 1, \"endLine\": 300}",
+        "resultJson": null,
+        "rationale": "I can't verify the outbox completion guard key (expectedVersion vs ifVersion) without the AppPort Services addOperation API, which git grep can't reach. Moving on to backup.ts, where restore and backup paths are likely to lose data."
+      },
+      "id": "mwvy2bhm95b1bf94ecda",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:51:51.479Z",
+      "digest": "e18a5becc539b3cd",
+      "data": {
+        "n": 20,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/backup.ts",
+          "startLine": 1,
+          "endLine": 300
+        },
+        "summary": "packages/appboundry-host/src/backup.ts lines 1-193 of 193:\n1\t/**\n2\t * Backups of an installation's data (`appboundry.backup/1`), separate from the artifact:\n3\t * code and data have independent lifecycles.\n4\t *\n5\t * A backup is newline-delimited JSON:\n6\t *\n7\t *   {\"format\":\"appboundry.backup/1\",\"application\":{…},\"artifact\":{…},\"collections\":[…],…}\n8\t *   {\"c\":\"tasks\",\"r\":{…record…}}                 one line per record, by collection then id\n9\t *   {\"end\":true,\"records\":N,\"sha256\":\"…\"}         SHA-256 over every preceding line\n10\t *\n11\t * It holds every collection in the state (the application's, AppPort Services', and the\n12\t * host's users, operators, audit and idempotency records) except sessions: tokens are\n13\t * never carried across, so a restored installation issues new ones.\n14\t *\n15\t * Consistency. A backup is taken by the process that holds the state: through the\n16\t * running runtime, which stops admitting new calls and waits for the ones in flight to\n17\t * finish before reading (host.ts, `exclusive`), or directly on a stopped state under\n18\t * FeltDB's lock. Every mutation commits as one FeltDB transaction, so the backup holds\n19\t * each transaction entirely or not at all.\n20\t *\n21\t * Restore writes into an empty directory only, after verifying the whole file. It marks\n22\t * the state \"restore in progress\" first and \"complete\" last; a state whose restore did\n23\t * not complete is refused by the runtime. Record contents and ids are kept; FeltDB\n24\t * assigns new record versions.\n25\t */\n26\timport type { StateFirstDB } from \"@feltdb/core\";\n27\timport { createHash } from \"node:crypto\";\n28\timport { RUNTIME_COLLECTION, type ManagedConfig } from \"./managed.js\";\n29\timport { readAll } from \"./paged-read.js\";\n30\timport { H\n…\np.header.collections.map(c => c.name)])) {\n174\t        const existing = (await db.collection(name).find({}, { limit: 1 } as never)) as unknown[];\n175\t        if (existing.length) throw new HostError(\"CONFLICT\", `The managed environment ${opened.binding.kind === \"managed\" ? `${opened.binding.applicationId}/${opened.binding.environment}` : \"\"} already has records in ${name}. Restore only into an empty environment; existing data is never overwritten.`);\n176\t      }\n177\t    }\n178\t    const startedAt = new Date().toISOString();\n179\t    const marker: RestoreRecord = { id: \"restore\", status: \"in-progress\", backupSha256: backup.sha256, startedAt };\n180\t    await db.transaction({ operations: [{ collection: STATE_COLLECTION, id: \"restore\", requireAbsent: true, value: marker }] } as never);\n181\t    for (let i = 0; i < backup.records.length; i += RESTORE_BATCH) {\n182\t      const batch = backup.records.slice(i, i + RESTORE_BATCH).filter(({ collection, record }) => !(collection === STATE_COLLECTION && record.id === \"restore\"));\n183\t      if (!batch.length) continue;\n184\t      await db.transaction({ operations: batch.map(({ collection, record }) => ({ collection, id: record.id, requireAbsent: true, value: record })) } as never);\n185\t    }\n186\t    const current = (await db.collection<RestoreRecord>(STATE_COLLECTION).get(\"restore\")) as RestoreRecord;\n187\t    await db.transaction({ operations: [{ collection: STATE_COLLECTION, id: \"restore\", ifVersion: current.__version, value: { ...marker, status: \"complete\", completedAt: new Date().toISOString() } }] } as never);\n188\t    return { header: backup.header, records: backup.records.length, skippedInternal: backup.skippedInternal };\n189\t  } finally {\n190\t    await db.close();\n191\t  }\n192\t}\n193\t"
+      },
+      "id": "mwvy2bia1da34b8fc8ba",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:04.501Z",
+      "digest": "953189f48341d9db",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 769,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 21703,
+        "latencyMs": 12678,
+        "messageId": "msg_011ChPSWDvW8LJjEJ4VXkHof"
+      },
+      "id": "mwvy2ljrba78fda8b56f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:04.503Z",
+      "digest": "c2d2673dd8a68e8a",
+      "data": {
+        "n": 21,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"ifVersion\\\\?:|requireAbsent\\\\?:\"}",
+        "resultJson": null,
+        "rationale": "completion() (transactions.ts:167) guards with `expectedVersion`, while every other raw FeltDB transaction operation in the host uses `ifVersion`. Searching for where the operation shape is declared (ifVersion?/requireAbsent?) tells me whether `expectedVersion` is even a recognized key there. If it isn't, the stale-claim guard is silently dropped."
+      },
+      "id": "mwvy2ljub79b298e0acf",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:04.542Z",
+      "digest": "db3df4068cd875c1",
+      "data": {
+        "n": 21,
+        "action": "search",
+        "input": {
+          "pattern": "ifVersion\\?:|requireAbsent\\?:"
+        },
+        "summary": "apps/cloud-portal/src/tenant-directory.ts:77:     const required: Array<(typeof mutations)[number] & { requireAbsent?: boolean; expectedVersion?: number }> = [];\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:69:   | { readonly type: \"set\"; readonly collection: string; readonly id: string; readonly value: Record<string, unknown>; readonly requireAbsent?: boolean; readonly expectedVersion?: number }"
+      },
+      "id": "mwvy2lkx4a409c4344d8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:14.942Z",
+      "digest": "0e6fb19f8259a72e",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 670,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 21909,
+        "latencyMs": 10122,
+        "messageId": "msg_011ChPSXBZPXiYqdB9LQ7iug"
+      },
+      "id": "mwvy2tlr1c5351b30d1d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:14.943Z",
+      "digest": "2fecf118fc6ab1f9",
+      "data": {
+        "n": 22,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"node_modules/@appport/services\"}",
+        "resultJson": null,
+        "rationale": "The outbox `completion` operation (transactions.ts:167) guards with `expectedVersion`. The host's raw FeltDB operations everywhere else use `ifVersion`. Before claiming the guard is ignored, I need to see the shape AppPort Services' `tx.addOperation` accepts, so I am checking whether the package is installed and readable."
+      },
+      "id": "mwvy2tluf44e3c919514",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:14.956Z",
+      "digest": "36bca32e732fde35",
+      "data": {
+        "n": 22,
+        "action": "list",
+        "input": {
+          "path": "node_modules/@appport/services"
+        },
+        "summary": "failed: NOT_FOUND node_modules/@appport/services is not a directory."
+      },
+      "id": "mwvy2tm5406c12266ec0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:20.404Z",
+      "digest": "3d583cdae48eaa25",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 365,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 21959,
+        "latencyMs": 4545,
+        "messageId": "msg_011ChPSXzXQSpyhgxU8up4Sa"
+      },
+      "id": "mwvy2xtib21de73d5831",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:20.406Z",
+      "digest": "fc8489c83ae52b91",
+      "data": {
+        "n": 23,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages\"}",
+        "resultJson": null,
+        "rationale": "The done mark from `completion()` (transactions.ts:167) is guarded with `expectedVersion`. The host's own FeltDB writes use `ifVersion` (transactions.ts:157, tenancy.ts:73). If AppPort Services' `tx.addOperation` passes ops straight to FeltDB, the stale-claim guard may be silently ignored. `@appport/services` is not at the root node_modules, so I need to find where it lives to see how `addOperation` handles guards."
+      },
+      "id": "mwvy2xtl493638922359",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:20.421Z",
+      "digest": "1db77c726ad684cb",
+      "data": {
+        "n": 23,
+        "action": "list",
+        "input": {
+          "path": "packages"
+        },
+        "summary": "packages: ab_black.PNG  ab_white.PNG  appboundry-agent/  appboundry-companion/  appboundry-host/  appboundry-route/  appboundry-runtime/  appboundry/  cli/  hetzner-deploy/"
+      },
+      "id": "mwvy2xty2bcb67e76eb8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:28.861Z",
+      "digest": "18e8dcec6968e5d5",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 644,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 22058,
+        "latencyMs": 8027,
+        "messageId": "msg_011ChPSYMrHojkyoMG7SWnx5"
+      },
+      "id": "mwvy34cf449665d763a9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:28.863Z",
+      "digest": "acf0d788f96f67c9",
+      "data": {
+        "n": 24,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/paged-read.ts\"}",
+        "resultJson": null,
+        "rationale": "Backups and listings rely on readAll; pagination bugs there would silently drop records from backups. Check it before going further, since the outbox expectedVersion question can't be verified without the services library source."
+      },
+      "id": "mwvy34cid43844e59094",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:28.880Z",
+      "digest": "8df76d32f7278bc5",
+      "data": {
+        "n": 24,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/paged-read.ts"
+        },
+        "summary": "packages/appboundry-host/src/paged-read.ts lines 1-75 of 75:\n1\t/**\n2\t * Whole-result reads from FeltDB, one page at a time.\n3\t *\n4\t * FeltDB refuses an unpaged `collection.find()` that matches more than 1,000 records (QUERY_LIMIT_EXCEEDED). An\n5\t * artifact's `find`, `count`, a mutation's view of its own writes, and a backup must not fail where the same\n6\t * application works on FeltKit, whose runtime reads whole results this way (FeltKit `runtime/paged-read.ts`). The\n7\t * host keeps its own copy: AppBoundry does not depend on FeltKit.\n8\t *\n9\t * A page that says more records remain without a cursor to them, or a cursor that does not move, is refused rather\n10\t * than returned as a complete result.\n11\t */\n12\timport type { StateFirstDB } from \"@feltdb/core\";\n13\t// HostError is used only inside functions, so the import cycle with collections.ts is safe.\n14\timport { HostError } from \"./collections.js\";\n15\t\n16\t/** The largest page FeltDB's `db.query` answers. */\n17\texport const PAGE_LIMIT = 1_000;\n18\t\n19\ttype AnyDoc = Record<string, unknown> & { id: string; __version: number };\n20\t\n21\texport interface PagedRead {\n22\t  collection: string;\n23\t  where?: ReadonlyArray<Record<string, unknown>>;\n24\t  orderBy?: ReadonlyArray<{ field: string; direction: \"asc\" | \"desc\" }>;\n25\t}\n26\t\n27\texport async function* queryPages(db: StateFirstDB, request: PagedRead, pageSize = PAGE_LIMIT): AsyncGenerator<AnyDoc[]> {\n28\t  let cursor: string | undefined;\n29\t  const seen = new Set<string>();\n30\t  for (;;) {\n31\t    const page = await db.query<AnyDoc>({\n32\t      collection: request.collection,\n33\t      ...(request.where?.length ? { where: request.where } : {}),\n34\t      ...(request.orderBy?.length ? { orderBy: request.orderBy } : {}),\n35\t      limit:\n…\nthrow new HostError(\"INTERNAL\", `FeltDB reported more \"${request.collection}\" records without a cursor to them; the read was stopped rather than returned incomplete.`);\n41\t      return;\n42\t    }\n43\t    if (seen.has(page.nextCursor)) throw new HostError(\"INTERNAL\", `FeltDB returned the same cursor twice while reading \"${request.collection}\"; the read was stopped rather than repeated.`);\n44\t    seen.add(page.nextCursor);\n45\t    cursor = page.nextCursor;\n46\t  }\n47\t}\n48\t\n49\t/** Every matching record (or the first `limit`), read in pages. */\n50\texport async function readAll(db: StateFirstDB, request: PagedRead, limit?: number): Promise<AnyDoc[]> {\n51\t  const out: AnyDoc[] = [];\n52\t  for await (const page of queryPages(db, request, limit !== undefined ? Math.min(limit, PAGE_LIMIT) : PAGE_LIMIT)) {\n53\t    for (const record of page) {\n54\t      if (limit !== undefined && out.length >= limit) return out;\n55\t      out.push(record);\n56\t    }\n57\t    if (limit !== undefined && out.length >= limit) return out;\n58\t  }\n59\t  return out;\n60\t}\n61\t\n62\t/** How many records match, counted page by page; no page is kept. */\n63\texport async function countAll(db: StateFirstDB, request: PagedRead): Promise<number> {\n64\t  let n = 0;\n65\t  for await (const page of queryPages(db, request)) n += page.length;\n66\t  return n;\n67\t}\n68\t\n69\t/** As FeltDB's own `find()` does: a server reports a record's key as `recordId` beside its `id`. */\n70\tfunction storedDocument(record: AnyDoc): AnyDoc {\n71\t  if (!record || typeof record !== \"object\" || !(\"recordId\" in record) || (record as Record<string, unknown>).recordId !== record.id) return record;\n72\t  const { recordId: _key, ...document } = record as Record<string, unknown>;\n73\t  return document as AnyDoc;\n74\t}\n75\t"
+      },
+      "id": "mwvy34d6b3717c1d7fd8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:38.748Z",
+      "digest": "905e8ff9f74dd218",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 780,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 23567,
+        "latencyMs": 8908,
+        "messageId": "msg_011ChPSZ2NZPLFCPjzpzeoyH"
+      },
+      "id": "mwvy3bz2305177cb8466",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:38.750Z",
+      "digest": "7fdf70520b91cfe1",
+      "data": {
+        "n": 25,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"expectedVersion|ifVersion\",\"path\":\"integrations/feltdb/src\"}",
+        "resultJson": null,
+        "rationale": "The outbox `completion()` operation (transactions.ts:167) guards on `expectedVersion`, while every other FeltDB operation in the host guards on `ifVersion`. The FeltDB adapter should show which guard key FeltDB's transaction honours, which tells me whether a stale claim's done write is actually version-checked."
+      },
+      "id": "mwvy3bz4afc81a50c205",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:38.776Z",
+      "digest": "6ee546db359057a8",
+      "data": {
+        "n": 25,
+        "action": "search",
+        "input": {
+          "pattern": "expectedVersion|ifVersion",
+          "path": "integrations/feltdb/src"
+        },
+        "summary": "integrations/feltdb/src/adapter.ts:37:   putIfVersion?<Value>(collection: string, id: string, value: Value, expectedVersion?: number): Promise<boolean>;\nintegrations/feltdb/src/application-data-store.ts:288:           ...(typeof this.#observed.get(key) === \"number\" ? { expectedVersion: this.#observed.get(key)! } : {})\nintegrations/feltdb/src/application-data-store.ts:294:           ...(typeof this.#observed.get(key) === \"number\" ? { expectedVersion: this.#observed.get(key)! } : {})\nintegrations/feltdb/src/application-implementation-store.ts:4: type ConditionalDb = FeltDbLike & { putIfVersion<Value>(collection: string, id: string, value: Value, expectedVersion?: number): Promise<boolean> };\nintegrations/feltdb/src/application-lifecycle-store.ts:4: type ConditionalDb = FeltDbLike & { putIfVersion<Value>(collection: string, id: string, value: Value, expectedVersion?: number): Promise<boolean> };\nintegrations/feltdb/src/application-source-store.ts:4: type ConditionalDb = FeltDbLike & { putIfVersion<Value>(collection: string, id: string, value: Value, expectedVersion?: number): Promise<boolean> };\nintegrations/feltdb/src/authorization-store.ts:85:         ? { type: \"set\", collection: COLLECTION, id, value: value as unknown as Record<string, unknown>, expectedVersion: existing.value.__version }\nintegrations/feltdb/src/execution-ledger.ts:35:       type: \"set\", collection: COLLECTION, id, expectedVersion: 1,\nintegrations/feltdb/src/execution-ledger.ts:47:     await atomic.commitWith([{ type: \"set\", collection: COLLECTION, id, expectedVersion: 1, value: completed }]);\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:69:   | { readonly type: \"set\"; readonly collection: string; readonly id: string; readonly value: Record<string, unknown>; readonly requireAbsent?: boolean; readonly expectedVersion?: number }\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:70:   | { readonly type: \"delete\"; readonly collection: string; readonly id: string; readonly expectedVersion?: number };\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:160:             expectedVersion: mutation.expectedVersion,\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:162:         : { collection: mutation.collection, id: mutation.id, expectedVersion: mutation.expectedVersion })\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:249:         expectedVersion: existing?.revision,\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:258:   async putIfVersion<Value>(collection: string, id: string, value: Value, expectedVersion?: number): Promise<boolean> {\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:260:     if (expectedVersion === undefined) return (await target.putIfAbsent(id, value as Value)).inserted;\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:261:     return (await target.updateIfVersion(id, expectedVersion, value as Partial<Value>)).updated;\nintegrations/feltdb/src/feltdb-runtime-adapter.ts:274:       { type: \"delete\", collection, id, expectedVersion: current.revision }\nintegrations/feltdb/src/provider.ts:27:       const committed = await this.runtime.putIfVersion(collection, input.id, input.value, input.expectedVersion);\nintegrations/feltdb/src/provider.ts:35:       if (input.expectedVersion !== undefined && current?.revision !== input.expectedVersion) {"
+      },
+      "id": "mwvy3c02394b1460e92b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:46.394Z",
+      "digest": "da8990225c3f587f",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 523,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 24988,
+        "latencyMs": 7506,
+        "messageId": "msg_011ChPSZh2zCd9joaauG6oyD"
+      },
+      "id": "mwvy3hvh8595e118c772",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:46.397Z",
+      "digest": "46ea1bf672069e65",
+      "data": {
+        "n": 26,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":400,\"endLine\":535}",
+        "resultJson": null,
+        "rationale": "The outbox claim path looks guarded, so I am moving to the mutation transaction: read how pending writes, observed reads and commit are built in collections.ts. The earlier read of lines 524-535 was cut off."
+      },
+      "id": "mwvy3hvj17564d830845",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:46.411Z",
+      "digest": "f1953b206ec8286f",
+      "data": {
+        "n": 26,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 400,
+          "endLine": 535
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 400-535 of 560:\n400\t    }\n401\t    return [...byId.values()];\n402\t  }\n403\t\n404\t  override async get(collection: unknown, id: unknown): Promise<AnyDoc | null> {\n405\t    this.#assertOpen();\n406\t    const name = this.track(collection);\n407\t    if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"get() needs a record id.\");\n408\t    const pending = this.#pending.get(this.#key(name, id));\n409\t    if (pending?.op === \"insert\") return this.#overlayOne(pending, null);\n410\t    return this.#overlayOne(pending, await this.#committedGet(name, id));\n411\t  }\n412\t\n413\t  override async find(collection: unknown, filter?: unknown, options?: unknown): Promise<AnyDoc[]> {\n414\t    this.#assertOpen();\n415\t    const name = this.host.resolve(collection, \"read\");\n416\t    const where = equalityWhere(asFilter(filter));\n417\t    await this.#fence(name, where);\n418\t    if (this.#pendingFor(name).length === 0) return super.find(collection, filter, options);\n419\t    this.track(collection);\n420\t    const opts = isRecord(options) ? options : {};\n421\t    checkLimit(opts.limit, \"find()\");\n422\t    const matched = sortRecords(await this.#overlayAll(name, where), asOrderBy(opts.orderBy));\n423\t    return opts.limit ? matched.slice(0, opts.limit as number) : matched;\n424\t  }\n425\t\n426\t  /** As `find(...).length`, with the same fence and this mutation's own writes; counted in pages when there are none. */\n427\t  override async count(collection: unknown, filter?: unknown): Promise<number> {\n428\t    this.#assertOpen();\n429\t    const name = this.host.resolve(collection, \"read\");\n430\t    const where = equalityWhere(asFilter(filter));\n431\t    await this.#fence(name, where);\n432\t    if (this.#pending\n…\n  return null;\n508\t    }\n509\t    this.#pending.set(key, { collection: name, id: id as string, op: \"delete\", ...(base !== undefined ? { baseVersion: base } : {}) });\n510\t    return null;\n511\t  }\n512\t\n513\t  /** Discard every pending write (the handler failed). */\n514\t  abandon(): void {\n515\t    this.#closed = true;\n516\t    this.#pending.clear();\n517\t  }\n518\t\n519\t  /**\n520\t   * Commit every pending write in one FeltDB transaction. `extra` operations (the host's\n521\t   * own bookkeeping, such as an idempotency record) commit in the same transaction.\n522\t   */\n523\t  /** `guards`: records this transaction does not write but whose version must be unchanged at commit (FeltDB preconditions). */\n524\t  async commit(transactionId: string, extra: Array<Record<string, unknown>> = [], guards: Array<Record<string, unknown>> = []): Promise<{ transactionId: string; writes: CommittedWrite[]; commitRevision?: number }> {\n525\t    this.#assertOpen();\n526\t    this.#closed = true;\n527\t    const writes: CommittedWrite[] = [];\n528\t    const operations: Array<Record<string, unknown>> = [];\n529\t    for (const pending of this.#pending.values()) {\n530\t      if (pending.op === \"insert\") {\n531\t        operations.push({ collection: pending.collection, id: pending.id, requireAbsent: true, value: { ...pending.value, id: pending.id } });\n532\t        writes.push({ collection: pending.collection, id: pending.id, op: \"insert\" });\n533\t      } else if (pending.op === \"update\") {\n534\t        operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion, value: { ...pending.value, id: pending.id } });\n535\t        writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });"
+      },
+      "id": "mwvy3hw72ab5a735e5a3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:52.162Z",
+      "digest": "967cd381f572421e",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 429,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 26400,
+        "latencyMs": 5279,
+        "messageId": "msg_011ChPSaHMEqG6eNY5iVmQLR"
+      },
+      "id": "mwvy3mbo74a2d651ddad",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:52.164Z",
+      "digest": "1c9ba54be39d69a8",
+      "data": {
+        "n": 27,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/node_modules/@appport\"}",
+        "resultJson": null,
+        "rationale": "completion() (transactions.ts:167) guards the done write with `expectedVersion`, while every other raw FeltDB operation in the host uses `ifVersion`. I need the AppPort Services transaction's addOperation shape to know whether that guard is honored or silently dropped. The root node_modules lookup failed, so I'm checking the package-local install."
+      },
+      "id": "mwvy3mbq7e2450b21eab",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:52.178Z",
+      "digest": "8d294dea1fa67407",
+      "data": {
+        "n": 27,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/node_modules/@appport"
+        },
+        "summary": "packages/appboundry-host/node_modules/@appport: authorization  client  core  mcp  protocol  schema  server  services  transport-http"
+      },
+      "id": "mwvy3mc455c2682f6c0c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:52:57.602Z",
+      "digest": "cb3500de12344315",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 273,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 26477,
+        "latencyMs": 4714,
+        "messageId": "msg_011ChPSaj7H8BU6ksFr3Bgvw"
+      },
+      "id": "mwvy3qisb2fe5d0de298",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:52:57.604Z",
+      "digest": "457e4b048e99ee9f",
+      "data": {
+        "n": 28,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"addOperation|ifVersion|expectedVersion\",\"path\":\"packages/appboundry-host/node_modules/@appport/services\"}",
+        "resultJson": null,
+        "rationale": "completion() builds its done-write with `expectedVersion`, while every other host operation uses FeltDB's `ifVersion`. I need to see what tx.addOperation in @appport/services accepts. If the key is ignored, a stale claim's done-write is unguarded and the job or webhook could be created twice."
+      },
+      "id": "mwvy3qiue5b9deadbe21",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:52:57.624Z",
+      "digest": "38ee6c2d717bfd20",
+      "data": {
+        "n": 28,
+        "action": "search",
+        "input": {
+          "pattern": "addOperation|ifVersion|expectedVersion",
+          "path": "packages/appboundry-host/node_modules/@appport/services"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy3qjd7198c0a0c973",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:53:03.966Z",
+      "digest": "46c0d15f2596ec80",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 548,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 26536,
+        "latencyMs": 6073,
+        "messageId": "msg_011ChPSb6Jz2nwwQrQuc9mwK"
+      },
+      "id": "mwvy3vfl7b362acde05a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:53:03.969Z",
+      "digest": "9dc7fca954e67986",
+      "data": {
+        "n": 29,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/node_modules/@feltdb\"}",
+        "resultJson": null,
+        "rationale": "Every host write passed straight to db.transaction uses `ifVersion`. `completion()` (transactions.ts:167) uses `expectedVersion`. I need FeltDB's transaction operation type to tell whether `expectedVersion` is honoured or silently ignored. If it is ignored, the done-write that guards against a stale claim is unguarded. git grep skips node_modules, so I'll locate the package and read its type definitions directly."
+      },
+      "id": "mwvy3vfn5f44a806a2d6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:53:03.983Z",
+      "digest": "76e15c4ea122c79f",
+      "data": {
+        "n": 29,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/node_modules/@feltdb"
+        },
+        "summary": "packages/appboundry-host/node_modules/@feltdb: core"
+      },
+      "id": "mwvy3vg177a79258eed5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:53:10.111Z",
+      "digest": "074ec0cb7ed03642",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 490,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 26591,
+        "latencyMs": 5226,
+        "messageId": "msg_011ChPSbcPVEjNFeR7fUbTVy"
+      },
+      "id": "mwvy4068b29ebe929228",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "decision",
+      "at": "2026-11-25T09:53:10.112Z",
+      "digest": "14cf2b6414e11fb5",
+      "data": {
+        "n": 30,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/node_modules/@feltdb/core\"}",
+        "resultJson": null,
+        "rationale": "I need to know whether FeltDB transaction operations honour `expectedVersion`. `completion()` in transactions.ts:167 uses it, while every direct db.transaction call in the host uses `ifVersion`. git grep skips node_modules, so I will read the package files directly."
+      },
+      "id": "mwvy406a1ddeeb82aaef",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxz7u7c03ca901ba74",
+      "kind": "observation",
+      "at": "2026-11-25T09:53:10.126Z",
+      "digest": "78d67dd97cba0894",
+      "data": {
+        "n": 30,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/node_modules/@feltdb/core"
+        },
+        "summary": "packages/appboundry-host/node_modules/@feltdb/core: LICENSE  README.md  bin/  package.json"
+      },
+      "id": "mwvy406s272bb0faeb73",
+      "__version": 1
+    }
+  ]
+}

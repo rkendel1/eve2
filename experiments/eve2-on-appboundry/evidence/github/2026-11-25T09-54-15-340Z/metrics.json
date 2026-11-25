@@ -1,0 +1,36 @@
+{
+  "startedAt": "2026-11-25T09:54:16.457Z",
+  "assess": {
+    "taskId": "mwvy5fde3b87b4b4a9b3",
+    "status": "completed",
+    "seconds": 323,
+    "steps": 39,
+    "decisions": 30,
+    "model": {
+      "calls": 31,
+      "inputTokens": 124,
+      "cacheWriteTokens": 430358,
+      "cacheReadTokens": 0,
+      "outputTokens": 21765
+    },
+    "invocations": 69,
+    "report": {
+      "filed": [
+        {
+          "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+          "number": 99,
+          "url": "https://github.com/rkendel1/appboundry/issues/99"
+        }
+      ],
+      "skipped": [],
+      "notFiled": [],
+      "rejected": [],
+      "decisions": 30
+    }
+  },
+  "resolve": {
+    "taskId": "mwvycczse07901acf8ac",
+    "status": "stalled at publishing"
+  },
+  "finishedAt": "2026-11-25T10:09:07.871Z"
+}

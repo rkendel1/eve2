@@ -1,0 +1,2284 @@
+{
+  "task": {
+    "sourceKey": "tracker:rkendel1/appboundry:99",
+    "source": {
+      "system": "tracker",
+      "conversation": "rkendel1/appboundry",
+      "message": "99"
+    },
+    "operation": "resolve",
+    "status": "publishing",
+    "reference": "EVE-DCE978AAFA41",
+    "attempts": 0,
+    "steps": 32,
+    "work": {
+      "objective": null,
+      "decisions": 22,
+      "gateAttempts": 0,
+      "workspace": "ws_99efc8aaf967",
+      "sha": "ec75dbd921ef327ea9a2cb9a599beae5d48d6193",
+      "base": "main",
+      "checks": [
+        "prepare",
+        "build",
+        "test"
+      ],
+      "pending": null,
+      "summary": "performOutbox (packages/appboundry-host/src/transactions.ts) recorded the outcome with one version-guarded put and, if that put threw, only warned and still returned next.state. Callers therefore saw 'done' or 'failed' while the record stayed 'performing'. recoverOutbox counted it as performed, and the record could later be re-run automatically after OUTBOX_PERFORMING_STALE_MS, which also breaks the rule that a failed effect is retried only by an operator. The fix: the outcome write is now tried up to OUTBOX_OUTCOME_WRITE_ATTEMPTS (3) times with a short backoff. After each failure the record is re-read. If its version moved and it is now done or failed (the write landed anyway, or another performer settled it), that persisted state is returned. If it moved but is still unsettled, or every attempt fails, the function warns and returns 'skipped' instead of reporting an outcome it never recorded. The doc comment now says 'done' and 'failed' are returned only when the record durably says so. host.ts is unchanged: 'skipped' is already part of the return type, recoverOutbox counts only 'done', and retryOutbox re-reads the record it returns. A new test, test/outbox-outcome.test.ts, uses a fake store and covers four cases: a done write that never commits (now 'skipped'), a failed write that never commits ('skipped'), a single transient write failure (retried, then 'done' with its result), and a concurrent version change ('skipped'). All 4 failed before the change and pass after it. The existing transactions and transactional-effects tests still pass, and the build passes.",
+      "tests": [
+        "packages/appboundry-host/test/outbox-outcome.test.ts",
+        "packages/appboundry-host/test/transactions.test.ts",
+        "packages/appboundry-host/test/transactional-effects.test.ts"
+      ],
+      "gate": {
+        "index": 3,
+        "results": [
+          {
+            "target": "packages/appboundry-host/test/outbox-outcome.test.ts",
+            "exitCode": 0
+          },
+          {
+            "target": "packages/appboundry-host/test/transactions.test.ts",
+            "exitCode": 0
+          },
+          {
+            "target": "packages/appboundry-host/test/transactional-effects.test.ts",
+            "exitCode": 0
+          }
+        ]
+      }
+    },
+    "createdAt": "2026-11-25T09:59:39.974Z",
+    "updatedAt": "2026-11-25T10:04:07.528Z",
+    "id": "mwvycczse07901acf8ac",
+    "__version": 33
+  },
+  "executions": [
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 0,
+      "at": "2026-11-25T09:59:41.024Z",
+      "from": "received",
+      "to": "received",
+      "kind": "invoke",
+      "summary": "tracker.items.get succeeded",
+      "capability": "tracker.items.get",
+      "idempotencyKey": "mwvycczse07901acf8ac:item:0",
+      "outcome": "succeeded",
+      "outboundId": "out.ca7e3c26ea094a55d2a9f3b5d4d9607c898147a2b95032150b6b771594eb95fa",
+      "id": "mwvycdsxc3c3dcbd5fb3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 0,
+      "at": "2026-11-25T09:59:58.641Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mwvycczse07901acf8ac:open",
+      "outcome": "succeeded",
+      "outboundId": "out.8d04a74300af1f637f399e12924025ad19f294bcef09c530aea075dcac5d2b17",
+      "id": "mwvycredbb3cc14d5a8c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 0,
+      "at": "2026-11-25T09:59:58.648Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at ec75dbd921ef; preparing it (install and build).",
+      "id": "mwvycrei1baf7e16b7f0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 1,
+      "at": "2026-11-25T09:59:59.351Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvycczse07901acf8ac:result:run_9377497d:1",
+      "outcome": "succeeded",
+      "outboundId": "out.3bd78bc2ef59d7a8cf90d8d0f9d7827e65e17f50c9ede8232e1daaa77a8412af",
+      "id": "mwvycry25da0246e1094",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 1,
+      "at": "2026-11-25T09:59:59.368Z",
+      "from": "preparing",
+      "to": "implementing",
+      "kind": "observe",
+      "summary": "Working copy prepared in 16 s.",
+      "id": "mwvycryi3849ed838620",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 2,
+      "at": "2026-11-25T10:00:04.652Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:0",
+      "outcome": "succeeded",
+      "outboundId": "out.f400416734c2c8b7ad5154f77226709e0dfd715ee9e44b9aa9da531953301932",
+      "id": "mwvycw1a6ed7e4a4dff9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 2,
+      "at": "2026-11-25T10:00:04.677Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:1",
+      "outcome": "succeeded",
+      "outboundId": "out.a701e9cd7dc1136953294abd5b7afd5fcb294ed439e9d795b6f71c6151b7f59e",
+      "id": "mwvycw1z45941b70b436",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 3,
+      "at": "2026-11-25T10:00:08.315Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:1",
+      "outcome": "succeeded",
+      "outboundId": "out.b4c1c1b6ce3d388462911fe9cf81a71e99c1ba9b26e1bf182fcbcb6d64a127b7",
+      "id": "mwvycyv0a7c555c0cfb7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 3,
+      "at": "2026-11-25T10:00:08.340Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:2",
+      "outcome": "succeeded",
+      "outboundId": "out.f75661360e8d50d9fae7e2c1d1bd2f144af4f1df9531cabfe440c2f4261c9b49",
+      "id": "mwvycyvq65b34ce47684",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 4,
+      "at": "2026-11-25T10:00:12.306Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:2",
+      "outcome": "succeeded",
+      "outboundId": "out.d63e9ec84e0fdabe33e64a8ff6a7eb3b7830e2d7edbf032044825288d004a87c",
+      "id": "mwvyd1xvcd6b9390f114",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 4,
+      "at": "2026-11-25T10:00:12.322Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:3",
+      "outcome": "succeeded",
+      "outboundId": "out.4c68a1b51f3040ae55ffc7ae1c4a85004df7b037523c1e8b1b1fd22205dffa2a",
+      "id": "mwvyd1ycbc41ce2bf007",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 5,
+      "at": "2026-11-25T10:00:15.384Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:3",
+      "outcome": "succeeded",
+      "outboundId": "out.c16a8837476e604f8aef89b557ee0522faa84847c4f65a03645f72afb92a57d4",
+      "id": "mwvyd4be6d72a89912c9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 5,
+      "at": "2026-11-25T10:00:15.404Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:4",
+      "outcome": "succeeded",
+      "outboundId": "out.d7f8ce6d7f50fd47353f850118000faa921228bb92d2632bdfc2378c586b8032",
+      "id": "mwvyd4bya7731d64f60a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 6,
+      "at": "2026-11-25T10:00:19.612Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:4",
+      "outcome": "succeeded",
+      "outboundId": "out.27510b01e3a35f8f4186d085e08bb936aefcfc21f2efbcb2cdba4f82b955d418",
+      "id": "mwvyd7kycf5de859c575",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 6,
+      "at": "2026-11-25T10:00:19.650Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:5",
+      "outcome": "succeeded",
+      "outboundId": "out.cdcfb7da2af7451fa154342884502118af98ad1ccc18351145bb23fc3aaf2df2",
+      "id": "mwvyd7lw7a5f2de8dcb2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 7,
+      "at": "2026-11-25T10:00:25.338Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:5",
+      "outcome": "succeeded",
+      "outboundId": "out.dfcd615821b354102b4aa9fbc015be63e5ff293378c3d9f8d37f422d7011882b",
+      "id": "mwvydbzv1f6386fa9e81",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 7,
+      "at": "2026-11-25T10:00:25.352Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:6",
+      "outcome": "succeeded",
+      "outboundId": "out.f072f4feb35064e9f2002f626a93a2e5d11c6cb038676c0cd3f6afea5fc804f5",
+      "id": "mwvydc09c84f6ee2529b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 8,
+      "at": "2026-11-25T10:00:30.024Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:6",
+      "outcome": "succeeded",
+      "outboundId": "out.1c80fd55f454d92720e3525f7131c6368bce6433a07a71988d3d7c548e5bec59",
+      "id": "mwvydfm209886c3835e0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 8,
+      "at": "2026-11-25T10:00:30.055Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:7",
+      "outcome": "succeeded",
+      "outboundId": "out.72104eab9ec35c94e722c177bc2e2b295f03f426198bac81ef5dd3b2da012c86",
+      "id": "mwvydfmx1bfeac3557e5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 9,
+      "at": "2026-11-25T10:00:33.037Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:7",
+      "outcome": "succeeded",
+      "outboundId": "out.85b12cfa138f3de01061835e00ba2f49b3c4b81bf94f9d8de98008f6bd04edac",
+      "id": "mwvydhxr0c52e093d353",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 9,
+      "at": "2026-11-25T10:00:33.067Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:8",
+      "outcome": "succeeded",
+      "outboundId": "out.461d6d372112637f14159ebe22bb13612a11efefeb765ccda37b43ae37010f61",
+      "id": "mwvydhylb62b5654aa24",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 10,
+      "at": "2026-11-25T10:00:36.589Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:8",
+      "outcome": "succeeded",
+      "outboundId": "out.a5c254d7284d65a71d1b1b00d8b0cd832dd2cf3eb0afa5f7e64c8558c22fff25",
+      "id": "mwvydkofbaaca6e40908",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 10,
+      "at": "2026-11-25T10:00:36.616Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:9",
+      "outcome": "succeeded",
+      "outboundId": "out.4785b797f20f9e35f0bd9bf821081c6b26099f3041b0d0944a1dda4203ef84d9",
+      "id": "mwvydkp540ff234e69fa",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 11,
+      "at": "2026-11-25T10:00:42.851Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:9",
+      "outcome": "succeeded",
+      "outboundId": "out.604409c160c63dab6714917112c12ef7f9e4b140cf9de59c0e931aa65875ca92",
+      "id": "mwvydpidd84050cf49e3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 11,
+      "at": "2026-11-25T10:00:42.873Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:10",
+      "outcome": "succeeded",
+      "outboundId": "out.c736d33132f6976449792df4b52b34b91a80f1dd0bbcf02ad53b16184d0d5a33",
+      "id": "mwvydpiz203251dcab23",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 12,
+      "at": "2026-11-25T10:00:54.654Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:10",
+      "outcome": "succeeded",
+      "outboundId": "out.3258027e032bf0a65638088eb6001301ec53f2e9d5b805f11b8fc2ef9d65550c",
+      "id": "mwvydym88b132b06740f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 12,
+      "at": "2026-11-25T10:00:54.671Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:11",
+      "outcome": "succeeded",
+      "outboundId": "out.8a079f9f2c9fca6aa65dfc7e731bc91fa0e0d0158ec1dd4e8df7deb297b94d8d",
+      "id": "mwvydymp2097e4ecdbc6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 13,
+      "at": "2026-11-25T10:01:19.956Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:11",
+      "outcome": "succeeded",
+      "outboundId": "out.380e8998ae807dcdfffc7957f58b751cfad33c71533cafe5e1e220ad46bdb3e7",
+      "id": "mwvyei520aa5d7e71f50",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 13,
+      "at": "2026-11-25T10:01:19.981Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.write succeeded",
+      "capability": "code.workspace.write",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:12",
+      "outcome": "succeeded",
+      "outboundId": "out.a61cafb2a0ad08fbf054979b0586073d5e6d135a31b297c9f5821a5ccbb7c2f0",
+      "id": "mwvyei5q686c60580f7c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 14,
+      "at": "2026-11-25T10:01:24.022Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:12",
+      "outcome": "succeeded",
+      "outboundId": "out.2558236b21a4bf74e8ab55e960daf08bef95605b726558c18f67bcd4bfa86d3e",
+      "id": "mwvyela0dd0bbf280591",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 14,
+      "at": "2026-11-25T10:01:25.264Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:13",
+      "outcome": "succeeded",
+      "outboundId": "out.e3e184f47b5270baa1b24b13c185874a025c5b87a5dcdd580e0b34f30924c672",
+      "id": "mwvyem8j626b40e55be9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 15,
+      "at": "2026-11-25T10:01:29.212Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:13",
+      "outcome": "succeeded",
+      "outboundId": "out.361b2ec57bb4172476805083b55421b910b93cb0ba850e3fbcf6ef58384251c5",
+      "id": "mwvyepa7b4a1b5a1a2c6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 15,
+      "at": "2026-11-25T10:01:29.234Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:14",
+      "outcome": "succeeded",
+      "outboundId": "out.06d7214ebd93143b7fd4faec3b3f3a1bfeb389618798a3aef7d757aa0b190298",
+      "id": "mwvyepaxbb136f0de98c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 16,
+      "at": "2026-11-25T10:01:42.696Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:14",
+      "outcome": "succeeded",
+      "outboundId": "out.6b670548beea2e3bb58f11dfe747d8b7128e3567ae7f754c790e2464e757533c",
+      "id": "mwvyezor7fc8da577e9d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 16,
+      "at": "2026-11-25T10:01:42.716Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:15",
+      "outcome": "succeeded",
+      "outboundId": "out.b32e41c074d64e3d2cd1f5d0d9b657a18f7a8ca9a750211e1043a9f31645f3bc",
+      "id": "mwvyezpa8f03ca2bbdf0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 17,
+      "at": "2026-11-25T10:02:58.744Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:15",
+      "outcome": "succeeded",
+      "outboundId": "out.857989cbad390821773857015c7ee508750a99c6bf736116ce2443c1e65fc6d2",
+      "id": "mwvygmd7bc8368b0ca64",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 17,
+      "at": "2026-11-25T10:02:58.821Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.write succeeded",
+      "capability": "code.workspace.write",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:16",
+      "outcome": "succeeded",
+      "outboundId": "out.7d94fe7c73d2d9758affa54097ff9f0b2d2f134eeac83115df829eafd53853ab",
+      "id": "mwvygmfb9f55d9344541",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 18,
+      "at": "2026-11-25T10:03:04.152Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:16",
+      "outcome": "succeeded",
+      "outboundId": "out.b61c3ea476c788902f36fdee40983ea7d1fcef907e69618badd0fe76f1b55d74",
+      "id": "mwvygqje386eeaa6504d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 18,
+      "at": "2026-11-25T10:03:04.310Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.diff succeeded",
+      "capability": "code.workspace.diff",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:17",
+      "outcome": "succeeded",
+      "outboundId": "out.3aef20267ed20da23ec65a40738acacce49c39d00bec1235ab3d9b9bfa12ec05",
+      "id": "mwvygqnt9f5c08e02b9f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 19,
+      "at": "2026-11-25T10:03:07.980Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:17",
+      "outcome": "succeeded",
+      "outboundId": "out.b67aea81246ce2af99f276e72356d0f69b00df4ac92ab64e9178d26dda596852",
+      "id": "mwvygthpc8742dafa8c4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 19,
+      "at": "2026-11-25T10:03:09.537Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:18",
+      "outcome": "succeeded",
+      "outboundId": "out.38190b53bf52707cad7b2b98c53a790329c6dc17701092e969ab37356b623fa4",
+      "id": "mwvyguoz244565f1eefd",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 20,
+      "at": "2026-11-25T10:03:14.556Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:18",
+      "outcome": "succeeded",
+      "outboundId": "out.e3f787368e466c68b8b40f8dc401c4f9bd1545c8779795d8e2aafa403ee9b194",
+      "id": "mwvygykd378d66f74395",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 20,
+      "at": "2026-11-25T10:03:14.568Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:19",
+      "outcome": "succeeded",
+      "outboundId": "out.069889c9a724f05db181abc23556382fd1fc2a2bbbfba2e2bb7c781596b1acf9",
+      "id": "mwvygykqfb47d330a0e8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 21,
+      "at": "2026-11-25T10:03:19.823Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:19",
+      "outcome": "succeeded",
+      "outboundId": "out.0315fdadb4dc410e3b422b16cbdc288b6c99a8ec0c0fc9152cc853a6532461ce",
+      "id": "mwvyh2mpc79fd0413ef2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 21,
+      "at": "2026-11-25T10:03:24.143Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:20",
+      "outcome": "succeeded",
+      "outboundId": "out.6b0d3a84ad886f41a8f152e789f65112e21638ec00523c7f6ed3d3cabea95f93",
+      "id": "mwvyh5yoce8704d41091",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 22,
+      "at": "2026-11-25T10:03:29.181Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:20",
+      "outcome": "succeeded",
+      "outboundId": "out.36264f579fbf83d970994ee59453522ca391fc9cc7888aa5f759edaeec4dfd36",
+      "id": "mwvyh9uo864c3ccfb570",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 22,
+      "at": "2026-11-25T10:03:32.680Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:21",
+      "outcome": "succeeded",
+      "outboundId": "out.24f578156e986130b41eb21a895194ff805beef1f6fb874b49749e9b17e822ac",
+      "id": "mwvyhcju631a1581177e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 23,
+      "at": "2026-11-25T10:03:38.242Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:21",
+      "outcome": "succeeded",
+      "outboundId": "out.2817a7221c94afd49889148487904e0b7255cb0b3944e64ce60db31e57aa0c07",
+      "id": "mwvyhgud76ab41517a68",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 23,
+      "at": "2026-11-25T10:03:43.003Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:act:22",
+      "outcome": "succeeded",
+      "outboundId": "out.51e894b1448206799c567d2e623b6a5b32139e7728541bf79a67938dcbb85343",
+      "id": "mwvyhkil1655f3c5a66e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 24,
+      "at": "2026-11-25T10:03:53.594Z",
+      "from": "implementing",
+      "to": "implementing",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvycczse07901acf8ac:decide:22",
+      "outcome": "succeeded",
+      "outboundId": "out.979127e0a97d9993355938e85d794abb397aba37488bcaeca12673dfc068f9d2",
+      "id": "mwvyhsot20a83ce06501",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 24,
+      "at": "2026-11-25T10:03:53.607Z",
+      "from": "implementing",
+      "to": "checking",
+      "kind": "decide",
+      "summary": "The implementation is ready for Eve's own checks: 3 test file(s) named.",
+      "id": "mwvyhsp52d29c43c5243",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 25,
+      "at": "2026-11-25T10:03:54.557Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.diff succeeded",
+      "capability": "code.workspace.diff",
+      "idempotencyKey": "mwvycczse07901acf8ac:gate-diff:25",
+      "outcome": "succeeded",
+      "outboundId": "out.818457379ed83007cd0565287d32611e9835cca16647bbf95b22f46ff9875419",
+      "id": "mwvyhtfld1ac1eba0840",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 25,
+      "at": "2026-11-25T10:03:55.962Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:gate-run:0:0",
+      "outcome": "succeeded",
+      "outboundId": "out.f65f51b3ac250eaed3095f4bfa6674c7708791429adf98ba9bd8d9025478cf8c",
+      "id": "mwvyhuik258e6c004b42",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 26,
+      "at": "2026-11-25T10:03:56.531Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvycczse07901acf8ac:result:run_dad89ce4:26",
+      "outcome": "succeeded",
+      "outboundId": "out.0c4f573d8d18a21066fea0b5003a5e5cb61cef2a3955124a7e203c8f1d7f2400",
+      "id": "mwvyhuydc54000295a53",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 27,
+      "at": "2026-11-25T10:04:02.352Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:gate-run:0:1",
+      "outcome": "succeeded",
+      "outboundId": "out.8d4177d1ce4a37b33cf26463f7ca7c1b843df1ed0f8b6ae75194c3f807999a61",
+      "id": "mwvyhzg27e5c9eeabc4c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 28,
+      "at": "2026-11-25T10:04:02.534Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvycczse07901acf8ac:result:run_59cc6318:28",
+      "outcome": "succeeded",
+      "outboundId": "out.8d55f6115e6043135ae45ab9de0eb18ab488a5da1ababba0ba15389dd22a2a72",
+      "id": "mwvyhzl4f3f78903a439",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 29,
+      "at": "2026-11-25T10:04:06.188Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvycczse07901acf8ac:gate-run:0:2",
+      "outcome": "succeeded",
+      "outboundId": "out.2dd889af715f5f5c897c56c683fc58b2343d3388d2f720b9802ccd2eb938644a",
+      "id": "mwvyi2em66d0d52ecedc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 30,
+      "at": "2026-11-25T10:04:06.535Z",
+      "from": "checking",
+      "to": "checking",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvycczse07901acf8ac:result:run_1ad8f5c6:30",
+      "outcome": "succeeded",
+      "outboundId": "out.5d1e30308b7417fb95d3890bf60a9da31747385ee78eadefc4d26c7b37d39a46",
+      "id": "mwvyi2o863c8546f44aa",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "seq": 31,
+      "at": "2026-11-25T10:04:07.527Z",
+      "from": "checking",
+      "to": "publishing",
+      "kind": "verify",
+      "summary": "Eve re-ran 3 test file(s); all pass. Proposing the change.",
+      "id": "mwvyi3fsf928a5b1a7c6",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "source_record",
+      "at": "2026-11-25T09:59:41.025Z",
+      "digest": "771227c02b4f1275",
+      "data": {
+        "number": 99,
+        "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+        "state": "open",
+        "url": "https://github.com/rkendel1/appboundry/issues/99",
+        "author": "rkendel1",
+        "labels": [],
+        "body": "After the effect runs, performOutbox persists the outcome with a version-guarded put. If that write throws (a version conflict, or any store error), the error is only passed to warn() and the function still returns next.state ('done' or 'failed') as if the outcome had been recorded. The record then stays 'performing' with attempts incremented. Callers rely on the return value: recoverOutbox counts it as performed (host.ts 521-523), and retryOutbox returns the record as its state is now. Meanwhile isRecoverable only picks up a 'performing' record once it is OUTBOX_PERFORMING_STALE_MS (300 s) old. So: (a) an effect that succeeded but whose 'done' could not be written is reported done, then performed a second time about 300 s later. For notifications this depends entirely on the downstream idempotency key. (b) An effect that failed, whose 'failed' could not be written, is reported 'failed' but is silently re-run automatically. That contradicts the documented rule that a failed effect is retried only by an operator. The host sees a success or failure status that does not match durable state.\n\n**Severity:** medium\n\n### Evidence\n\n1. [`packages/appboundry-host/src/transactions.ts` lines 205–210](https://github.com/rkendel1/appboundry/blob/ec75dbd921ef327ea9a2cb9a599beae5d48d6193/packages/appboundry-host/src/transactions.ts#L205-L210):\n\n```\n  try {\n    await put(db, id, claim.__version, next);\n  } catch (error) {\n    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n  }\n  return next.state as \"done\" | \"failed\";\n```\n\n2. [`packages/appboundry-host/src/transactions.ts` lines 139–141](https://github.com/rkendel1/appboundry/blob/ec75dbd921ef327ea9a2cb9a599beae5d48d6193/packages/appboundry-host/src/transactions.ts#L139-L141):\n\n```\nexport function isRecoverable(record: Pick<OutboxRecord, \"state\" | \"updatedAt\">, now: number): boolean {\n  return (record.state === \"pending\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \"performing\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\n}\n```\n\n3. [`packages/appboundry-host/src/host.ts` lines 521–523](https://github.com/rkendel1/appboundry/blob/ec75dbd921ef327ea9a2cb9a599beae5d48d6193/packages/appboundry-host/src/host.ts#L521-L523):\n\n```\n    for (const record of stale) {\n      if ((await this.#performAs(record)) === \"done\") performed += 1;\n    }\n```\n\n### Suggested fix\n\nWhen the outcome put fails, do not return next.state. Re-read the record and return its actual persisted state. If it is still 'performing', return a distinct result such as 'unrecorded' or rethrow, so callers do not count it as done. Also retry the outcome write a bounded number of times on transient errors (re-reading the version) before giving up, so a performed effect is not left eligible for automatic re-execution.\n\n### How this was verified\n\n- packages/appboundry-host/src/transactions.ts:205-210 contains the quoted code\n- packages/appboundry-host/src/transactions.ts:139-141 contains the quoted code\n- packages/appboundry-host/src/host.ts:521-523 contains the quoted code\n\nFound and verified by Eve2 (task `mwvy5fde3b87b4b4a9b3`, rkendel1/appboundry@ec75dbd921ef): each piece of evidence was re-read or re-run before filing.\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_",
+        "comments": []
+      },
+      "id": "mwvycdt51b0afdecaad4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T09:59:58.645Z",
+      "digest": "ddbf6f0d3e0f7d54",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main ec75dbd921ef; checks: prepare, build, test."
+      },
+      "id": "mwvycref5b7e7d6ffe39",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "check_result",
+      "at": "2026-11-25T09:59:59.354Z",
+      "digest": "3469a211ac80ebca",
+      "data": {
+        "run": "run_9377497d",
+        "purpose": "prepare",
+        "check": "prepare",
+        "target": null,
+        "exitCode": 0,
+        "durationMs": 15844,
+        "output": "/workspaces/ws_99efc8aaf967/packages/appboundry-route/node_modules/.bin/appboundry-host. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/packages/appboundry-route/node_modules/@appport/appboundry-host/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/appboundry/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/appboundry/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/application-capabilities/invoicing/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/application-capabilities/invoicing/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/application-capabilities/commerce/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/application-capabilities/commerce/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/documents/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/documents/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/materialization-reference/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/materialization-reference/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/todos/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/todos/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/contract-first-taskboard/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/examples/contract-first-taskboard/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/packages/appboundry/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/packages/appboundry/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/packages/appboundry/node_modules/.bin/appboundry-host. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967/packages/appboundry/node_modules/@appport/appboundry-host/dist/bin.js'\nDone in 2.6s using pnpm v10.33.0\n(node:11210) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11222) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n> appport-monorepo@1.0.0 build /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967\n> tsc -b tsconfig.build.json\n\n"
+      },
+      "id": "mwvycryfc1cd66228889",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:04.654Z",
+      "digest": "8f5bbd9c3b2f4027",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 106,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 2620,
+        "latencyMs": 4259,
+        "messageId": "msg_011ChPT8F7gn5V9C5CQL5Pev"
+      },
+      "id": "mwvycw1dca9f41b106ee",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:04.657Z",
+      "digest": "66b7688daab96fd8",
+      "data": {
+        "n": 1,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 1, \"endLine\": 260}",
+        "resultJson": null,
+        "rationale": "Read the code around performOutbox to understand the outcome write and return value."
+      },
+      "id": "mwvycw1f7f1355c538bf",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:04.680Z",
+      "digest": "dd117db5f400594a",
+      "data": {
+        "n": 1,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 1,
+          "endLine": 260
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 1-259 of 259:\n1\t/**\n2\t * Host interface transactions@1: `db.sequence` and `outbox.stage`, the guest operations behind a\n3\t * producer's transactional sequences and after-commit effects (FeltKit: ctx.db.sequence,\n4\t * ctx.afterCommit). The contract is FeltKit's docs/TRANSACTIONS.md, implemented here on the\n5\t * host's own FeltDB transaction (collections.ts) with host-owned collections:\n6\t *\n7\t *   sequence      per stream (its name): strictly increasing and gapless in commit order, written\n8\t *                 in the mutation's transaction guarded on the version read, so a concurrent\n9\t *                 commit of the same stream refuses the whole transaction (CONFLICT) and a\n10\t *                 failed mutation consumes nothing; independent streams never contend\n11\t *   outbox        one record per effect, committed with the mutation or not at all; performed\n12\t *                 after the commit as the caller (claimed pending → performing, version-checked),\n13\t *                 then done (with its result) or failed (with the error); stale pending and\n14\t *                 performing records are recovered by the worker after a restart; a failed one\n15\t *                 is retried only by an operator. A job or webhook event is created in the same\n16\t *                 FeltDB transaction that records it done (AppPort Services' transaction context,\n17\t *                 @appport/services 0.13.1), so it is created once per committed effect; a\n18\t *                 notification carries the record id as its idempotency key. Creation, not\n19\t *                 delivery: a job's run or a webhook's delivery to its endpoint is the services'\n20\t *                 own (at least o\n…\nlicts: n as number };\n237\t}\n238\t\n239\t/** After-commit effects in `db`, newest first (optionally only one state). */\n240\texport async function listOutbox(db: { collection(name: string): { find(filter: Record<string, unknown>): Promise<unknown[]> } }, filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\n241\t  if (filter.state !== undefined && ![\"pending\", \"performing\", \"done\", \"failed\"].includes(filter.state)) throw new HostError(\"INVALID_ARGUMENT\", \"state is pending, performing, done or failed.\");\n242\t  const rows = (await db.collection(OUTBOX_COLLECTION).find(filter.state ? { state: filter.state } : {})) as Array<OutboxRecord & { __version?: number }>;\n243\t  return rows.map(r => strip(r)).sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.min(Math.max(Number(filter.limit) || 100, 1), 1000));\n244\t}\n245\t\n246\t/** Move a failed record back to pending (an operator's retry); a running host then performs it. */\n247\texport async function retryOutboxRecord(db: Store, id: unknown, by: string): Promise<OutboxRecord> {\n248\t  if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"Name the after-commit effect to retry (see `appboundry admin outbox list --status failed`).\");\n249\t  const record = (await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null;\n250\t  if (!record) throw new HostError(\"NOT_FOUND\", `No after-commit effect ${id}.`);\n251\t  const next = retried(record, by);\n252\t  try {\n253\t    await put(db, id, record.__version, next);\n254\t  } catch {\n255\t    throw new HostError(\"CONFLICT\", `After-commit effect ${id} changed while it was being retried. Nothing was changed; read it again.`);\n256\t  }\n257\t  return next;\n258\t}\n259\t"
+      },
+      "id": "mwvycw2ycbba49638af8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:08.316Z",
+      "digest": "c1496f1ab7ba9987",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 118,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 3980,
+        "latencyMs": 2948,
+        "messageId": "msg_011ChPT8buqACm9pnaH62V6M"
+      },
+      "id": "mwvycyv2f9e35df58236",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:08.318Z",
+      "digest": "911ef0cb6cf3cfd2",
+      "data": {
+        "n": 2,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":20,\"endLine\":238}",
+        "resultJson": null,
+        "rationale": "The earlier read was cut off in the middle, so I need the full performOutbox body and its helpers before changing anything."
+      },
+      "id": "mwvycyv4aba2aaed9149",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:08.343Z",
+      "digest": "38f5abf87e7b73fd",
+      "data": {
+        "n": 2,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 20,
+          "endLine": 238
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 20-238 of 259:\n20\t *                 own (at least once).\n21\t *\n22\t * No second transaction system: the records are extra operations of the mutation's FeltDB\n23\t * transaction.\n24\t */\n25\timport { HostError } from \"./collections.js\";\n26\t\n27\texport const SEQUENCES_COLLECTION = \"_appboundry_sequences\";\n28\texport const OUTBOX_COLLECTION = \"_appboundry_outbox\";\n29\t/** A pending record not performed after this long is recovered (its runtime likely stopped). */\n30\texport const OUTBOX_RECOVER_AFTER_MS = 30_000;\n31\t/** A record left performing this long (its performer stopped mid-way) is recovered too. */\n32\texport const OUTBOX_PERFORMING_STALE_MS = OUTBOX_RECOVER_AFTER_MS * 10;\n33\t/** The most re-runs a function's manifest may ask for on sequence contention. */\n34\texport const MAX_SEQUENCE_RETRIES = 10;\n35\t\n36\tconst SEQUENCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;\n37\tconst RECORD_ID = /^[A-Za-z0-9._-]{1,128}$/;\n38\t\n39\t/**\n40\t * The record id a stream is stored under: the name itself when it is a valid FeltDB id, else \"_\"\n41\t * + the name with \".\" written \".d\" and \":\" written \".c\" (injective, never equal to a name).\n42\t */\n43\texport function sequenceRecordId(name: unknown): string {\n44\t  if (typeof name !== \"string\" || !SEQUENCE_NAME.test(name)) {\n45\t    throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} must be 1-128 letters, digits, \"_\", \".\", \":\" or \"-\", starting with a letter or digit.`);\n46\t  }\n47\t  if (RECORD_ID.test(name)) return name;\n48\t  const id = `_${name.replace(/\\./g, \".d\").replace(/:/g, \".c\")}`;\n49\t  if (!RECORD_ID.test(id)) throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} is too long to store (${id.len\n…\nring; method: string; input: Record<string, unknown> } {\n215\t  const effect = record.effect;\n216\t  if (effect.service === \"notifications\") return { service: \"notifications\", method: \"send\", input: { ...effect.input, idempotencyKey: effect.input.idempotencyKey ?? record.id } };\n217\t  if (effect.service === \"jobs\") return { service: \"jobs\", method: \"enqueue\", input: { type: effect.type, payload: effect.payload, ...(effect.options ? { options: effect.options } : {}) } };\n218\t  return { service: \"webhooks\", method: \"emit\", input: { type: effect.type, payload: effect.payload } };\n219\t}\n220\t\n221\t/** What an effect produced, as recorded on its outbox record. */\n222\texport function effectResult(record: OutboxRecord, value: unknown): Record<string, unknown> {\n223\t  const v = (value ?? {}) as Record<string, unknown>;\n224\t  if (record.effect.service === \"notifications\") return typeof v.id === \"string\" ? { notificationId: v.id } : {};\n225\t  if (record.effect.service === \"jobs\") return typeof v.id === \"string\" ? { jobId: v.id } : {};\n226\t  return { deliveries: typeof v.deliveries === \"number\" ? v.deliveries : Array.isArray(value) ? value.length : 0 };\n227\t}\n228\t\n229\t/** The retry policy a manifest function entry may carry. */\n230\texport function retryPolicy(value: unknown, kind: string): { sequenceConflicts: number } | undefined {\n231\t  if (value === undefined) return undefined;\n232\t  const n = isObject(value) ? value.sequenceConflicts : undefined;\n233\t  if (kind !== \"mutation\" || !Number.isInteger(n) || (n as number) < 1 || (n as number) > MAX_SEQUENCE_RETRIES) {\n234\t    throw new Error(`retry must be { sequenceConflicts: 1-${MAX_SEQUENCE_RETRIES} } on a mutation`);\n235\t  }\n236\t  return { sequenceConflicts: n as number };\n237\t}\n238\t"
+      },
+      "id": "mwvycyw2b426fa1acd38",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:12.307Z",
+      "digest": "052609bc88cccf2b",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 165,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 5556,
+        "latencyMs": 2934,
+        "messageId": "msg_011ChPT8u3TxH5mr9m1Kab1z"
+      },
+      "id": "mwvyd1xx9801598b19d2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:12.309Z",
+      "digest": "fc61fead949cf7c2",
+      "data": {
+        "n": 3,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":130,\"endLine\":214}",
+        "resultJson": null,
+        "rationale": "The earlier reads were truncated before performOutbox; I need its full body and the helpers it uses (put, retried, isRecoverable)."
+      },
+      "id": "mwvyd1xzd0841c61fda8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:12.324Z",
+      "digest": "0ad5457fefb1c55e",
+      "data": {
+        "n": 3,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 130,
+          "endLine": 214
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 130-214 of 259:\n130\t      throw new HostError(\"INVALID_ARGUMENT\", \"An after-commit effect is notifications.send { recipient, type, title }, webhooks.emit { type, payload } or jobs.enqueue { type, payload, options? }.\");\n131\t    }\n132\t    if (!call.services.includes(valid.service)) {\n133\t      throw new HostError(\"CONFIGURATION\", `The ${valid.service[0]!.toUpperCase()}${valid.service.slice(1)} service is not enabled.`);\n134\t    }\n135\t    return { id, requestId: call.requestId, function: call.fn, principalId: call.principalId!, ...(call.tenantId ? { tenantId: call.tenantId } : {}), effect: JSON.parse(JSON.stringify(valid)) as OutboxEffect, state: \"pending\", createdAt: now, updatedAt: now, attempts: 0 };\n136\t  });\n137\t}\n138\t\n139\texport function isRecoverable(record: Pick<OutboxRecord, \"state\" | \"updatedAt\">, now: number): boolean {\n140\t  return (record.state === \"pending\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \"performing\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\n141\t}\n142\t\n143\tfunction strip(record: OutboxRecord): OutboxRecord {\n144\t  const { __version: _v, ...rest } = record;\n145\t  return rest;\n146\t}\n147\t\n148\texport function retried(record: OutboxRecord, by: string, now = Date.now()): OutboxRecord {\n149\t  if (record.state !== \"failed\") throw new HostError(\"FAILED_PRECONDITION\", `After-commit effect ${record.id} is ${record.state}; only a failed effect can be retried.`);\n150\t  return { ...strip(record), state: \"pending\", updatedAt: now, retriedBy: by };\n151\t}\n152\t\n153\ttype Store = { collection(name: string): { get(id: string): Promise<unknown>; find(filter: Record<string, unknown>): Promise<unknown[]> }; transaction(requ\n…\nonst current = await get();\n180\t  if (!current || current.state === \"done\" || current.state === \"failed\") return \"skipped\";\n181\t  try {\n182\t    await put(db, id, current.__version, { ...current, state: \"performing\", attempts: (current.attempts ?? 0) + 1, updatedAt: Date.now() });\n183\t  } catch {\n184\t    return \"skipped\";\n185\t  }\n186\t  const claim = await get();\n187\t  if (!claim || claim.state !== \"performing\") return \"skipped\";\n188\t  let next: OutboxRecord;\n189\t  let completed = false;\n190\t  const complete = (result: Record<string, unknown>) => {\n191\t    completed = true;\n192\t    return completion(claim, result);\n193\t  };\n194\t  try {\n195\t    const result = await perform(claim, complete);\n196\t    // Committed with the effect: done is already recorded.\n197\t    if (completed) return \"done\";\n198\t    const { error: _e, ...rest } = claim;\n199\t    next = { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) };\n200\t  } catch (error) {\n201\t    const e = error as { code?: string; message?: string };\n202\t    next = { ...claim, state: \"failed\", updatedAt: Date.now(), error: { code: e?.code ?? \"INTERNAL\", message: e?.message ?? String(error) } };\n203\t    warn(`after-commit ${claim.effect.service}.${claim.effect.method} from ${claim.function} failed: ${next.error!.message}`);\n204\t  }\n205\t  try {\n206\t    await put(db, id, claim.__version, next);\n207\t  } catch (error) {\n208\t    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n209\t  }\n210\t  return next.state as \"done\" | \"failed\";\n211\t}\n212\t\n213\t/** The service call an effect is. */\n214\texport function serviceCall(record: OutboxRecord): { service: string; method: string; input: Record<string, unknown> } {"
+      },
+      "id": "mwvyd1yl7c6acab95848",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:15.386Z",
+      "digest": "2f1f41c150b631a2",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 164,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 7037,
+        "latencyMs": 2967,
+        "messageId": "msg_011ChPT97vcZVbrrkRwNXigS"
+      },
+      "id": "mwvyd4bgbf61c833a0b7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:15.388Z",
+      "digest": "f1309b91a0c92a18",
+      "data": {
+        "n": 4,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":153,\"endLine\":180}",
+        "resultJson": null,
+        "rationale": "Lines 153-180 were cut off in both earlier reads. I need the Store type, put, and the start of performOutbox (its signature and return type) before changing how a failed outcome write is reported."
+      },
+      "id": "mwvyd4bi4a18491efe5f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:15.406Z",
+      "digest": "55a6f6c0287af267",
+      "data": {
+        "n": 4,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 153,
+          "endLine": 180
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 153-180 of 259:\n153\ttype Store = { collection(name: string): { get(id: string): Promise<unknown>; find(filter: Record<string, unknown>): Promise<unknown[]> }; transaction(request: never): Promise<unknown> };\n154\t\n155\t/** Write `value` only if the record is still at `version` (throws otherwise; nothing written). */\n156\tasync function put(db: Store, id: string, version: number, value: OutboxRecord): Promise<void> {\n157\t  await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\n158\t}\n159\t\n160\t/**\n161\t * The write that records `claim` done with `result`, guarded on the claim's version: an effect\n162\t * that commits it in its own transaction (a job, webhook deliveries) is created exactly when the\n163\t * record says done, and a stale claim creates nothing.\n164\t */\n165\texport function completion(claim: OutboxRecord & { __version: number }, result: Record<string, unknown>): Record<string, unknown> {\n166\t  const { error: _e, ...rest } = strip(claim);\n167\t  return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\n168\t}\n169\t\n170\t/**\n171\t * Perform one record: claim it (version-checked, so two performers never both perform it),\n172\t * perform, record done with its result or failed with the error. `perform` may instead commit\n173\t * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\n174\t * then nothing more is written. Never throws: the mutation has committed. `skipped`: gone,\n175\t * settled, or claimed by another performer.\n176\t */\n177\texport async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => {}): Promise<\"done\" | \"failed\" | \"skipped\"> {\n178\t  const get = async () => ((await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null) ?? null;\n179\t  const current = await get();\n180\t  if (!current || current.state === \"done\" || current.state === \"failed\") return \"skipped\";"
+      },
+      "id": "mwvyd4c3f787b420296d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:19.618Z",
+      "digest": "48825f6d65fdea0c",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 151,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 7967,
+        "latencyMs": 3183,
+        "messageId": "msg_011ChPT9RERD3zd4rvbfg53K"
+      },
+      "id": "mwvyd7l0cba41b625892",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:19.620Z",
+      "digest": "962aad66910cff2f",
+      "data": {
+        "n": 5,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\": \"performOutbox|#performAs|\\\"skipped\\\"\", \"path\": \"packages/appboundry-host\"}",
+        "resultJson": null,
+        "rationale": "Find callers of performOutbox and existing tests before changing its return contract."
+      },
+      "id": "mwvyd7l24fd1857a28bf",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:19.652Z",
+      "digest": "ae4f07a9ee0882ae",
+      "data": {
+        "n": 5,
+        "action": "search",
+        "input": {
+          "pattern": "performOutbox|#performAs|\"skipped\"",
+          "path": "packages/appboundry-host"
+        },
+        "summary": "packages/appboundry-host/src/host.ts:43: import { effectResult, isRecoverable, listOutbox, OUTBOX_COLLECTION, performOutbox, retryOutboxRecord, SEQUENCES_COLLECTION, SequenceAllocations, serviceCall, stagedRecords, type OutboxRecord } from \"./transactions.js\";\npackages/appboundry-host/src/host.ts:522:       if ((await this.#performAs(record)) === \"done\") performed += 1;\npackages/appboundry-host/src/host.ts:528:   async #performAs(record: OutboxRecord & { __version: number }): Promise<\"done\" | \"failed\" | \"skipped\"> {\npackages/appboundry-host/src/host.ts:535:       return performOutbox(this.#db as never, record.id, async () => {\npackages/appboundry-host/src/host.ts:541:       const outcome = await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, principal, requestId), message => this.#logger.warn(message));\npackages/appboundry-host/src/host.ts:589:       await this.#performAs(record as OutboxRecord & { __version: number });\npackages/appboundry-host/src/host.ts:768:             await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, options.principal, requestId), message => this.#logger.warn(`${name} (${requestId}): ${message}`));\npackages/appboundry-host/src/transactions.ts:177: export async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => \npackages/appboundry-host/src/transactions.ts:180:   if (!current || current.state === \"done\" || current.state === \"failed\") return \"skipped\";\npackages/appboundry-host/src/transactions.ts:184:     return \"skipped\";\npackages/appboundry-host/src/transactions.ts:187:   if (!claim || claim.state !== \"performing\") return \"skipped\";"
+      },
+      "id": "mwvyd7m205c2969be489",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:25.339Z",
+      "digest": "3dff878cee563971",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 158,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 8748,
+        "latencyMs": 4913,
+        "messageId": "msg_011ChPT9iGMj7FxvhwaBmQkQ"
+      },
+      "id": "mwvydbzx4eebafbe40cf",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:25.341Z",
+      "digest": "2af5a7194c11e786",
+      "data": {
+        "n": 6,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/host.ts\",\"startLine\":505,\"endLine\":600}",
+        "resultJson": null,
+        "rationale": "See how callers of performOutbox (#performAs, recoverOutbox, retryOutbox) use the return value before changing it."
+      },
+      "id": "mwvydbzz7c33a88efd4c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:25.353Z",
+      "digest": "76b0e0a17a1332c6",
+      "data": {
+        "n": 6,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/host.ts",
+          "startLine": 505,
+          "endLine": 600
+        },
+        "summary": "packages/appboundry-host/src/host.ts lines 505-600 of 963:\n505\t    } catch (error) {\n506\t      this.#logger.error(`job worker: ${(error as Error).message}`);\n507\t    } finally {\n508\t      this.#ticking = false;\n509\t    }\n510\t  }\n511\t\n512\t  /**\n513\t   * After-commit effects whose runtime stopped before performing them (pending past 30 s, or\n514\t   * performing past 300 s), performed as their caller's current principal; a caller that can no\n515\t   * longer be resolved fails the record. A failed record is never retried here (retryOutbox).\n516\t   */\n517\t  async recoverOutbox(now = Date.now()): Promise<number> {\n518\t    const outbox = this.#db.collection<OutboxRecord & { __version: number }>(OUTBOX_COLLECTION);\n519\t    const stale = [...(await outbox.find({ state: \"pending\" } as never)), ...(await outbox.find({ state: \"performing\" } as never))].filter(r => isRecoverable(r as OutboxRecord, now)) as Array<OutboxRecord & { __version: number }>;\n520\t    let performed = 0;\n521\t    for (const record of stale) {\n522\t      if ((await this.#performAs(record)) === \"done\") performed += 1;\n523\t    }\n524\t    return performed;\n525\t  }\n526\t\n527\t  /** Perform one outbox record as its caller (resolved now), or fail it if the caller is gone. */\n528\t  async #performAs(record: OutboxRecord & { __version: number }): Promise<\"done\" | \"failed\" | \"skipped\"> {\n529\t    // In the tenant the caller worked in, through the live membership only; no membership: not performed.\n530\t    const account = await this.identity.resolveDurable(record.principalId);\n531\t    const inTenant = account && record.tenantId ? await this.withTenant(account, record.tenantId) : account;\n532\t    const principal = inTenant && record.tenantId && inTenant.tenant?.id !== record.tenan\n…\ntions(authority: InvocationAuthority, clock?: () => Date, options: { fence?: CommitFence } = {}): InvocationService {\n572\t    const host = this;\n573\t    return new InvocationService({\n574\t      db: this.#db, manifest: this.artifact.manifest, fence: options.fence ?? this.authorityFence(clock),\n575\t      provider: { applicationId: this.artifact.manifest.application.id, incarnation: this.#stateRecord.incarnation ?? 1, version: this.artifact.manifest.application.version },\n576\t      call: (name, args, options) => host.call(name, args, options as CallOptions) as never\n577\t    }, authority, clock);\n578\t  }\n579\t\n580\t  async listOutbox(filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\n581\t    return listOutbox(this.#db, filter);\n582\t  }\n583\t\n584\t  /** An operator's retry of a failed effect: back to pending (attempts, last error kept), then performed now. */\n585\t  async retryOutbox(id: string, by: string): Promise<OutboxRecord> {\n586\t    return this.#gate.shared(async () => {\n587\t      await retryOutboxRecord(this.#db, id, by);\n588\t      const record = (await this.#db.collection<OutboxRecord & { __version: number }>(OUTBOX_COLLECTION).get(id))!;\n589\t      await this.#performAs(record as OutboxRecord & { __version: number });\n590\t      const { __version: _v, ...after } = (await this.#db.collection<OutboxRecord & { __version: number }>(OUTBOX_COLLECTION).get(id))! as OutboxRecord & { __version: number };\n591\t      return after as OutboxRecord;\n592\t    });\n593\t  }\n594\t\n595\t  /** Run due jobs now (tests, and the worker's timer). */\n596\t  runDueJobs(): Promise<void> {\n597\t    return this.#tick();\n598\t  }\n599\t\n600\t  /** Administration, under the shared gate (a backup sees all of an operation or none of it). */"
+      },
+      "id": "mwvydc0h295c5d2652a8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:30.026Z",
+      "digest": "bbb6ca0d4a2ee578",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 150,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 10166,
+        "latencyMs": 4601,
+        "messageId": "msg_011ChPTA5fxb4ZxTQnypCvsu"
+      },
+      "id": "mwvydfm53dc53a4577b8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:30.029Z",
+      "digest": "1b82a5cfd6aeb452",
+      "data": {
+        "n": 7,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"performOutbox\",\"path\":\"packages/appboundry-host/test\"}",
+        "resultJson": null,
+        "rationale": "Find existing unit tests for performOutbox to extend with a failing-outcome-write case."
+      },
+      "id": "mwvydfm8c8789ea1c879",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:30.057Z",
+      "digest": "701ee7cba0080e78",
+      "data": {
+        "n": 7,
+        "action": "search",
+        "input": {
+          "pattern": "performOutbox",
+          "path": "packages/appboundry-host/test"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvydfmz321d7ca3156d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:33.039Z",
+      "digest": "82c3bd27433a371c",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 155,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 10204,
+        "latencyMs": 2607,
+        "messageId": "msg_011ChPTAT7YvxMqfpoxuM8jG"
+      },
+      "id": "mwvydhxtbc8611f183da",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:33.041Z",
+      "digest": "3176bd8c959c03c9",
+      "data": {
+        "n": 8,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"transactions\\\\.js|completion\\\\(|retried\\\\(|isRecoverable\",\"path\":\"packages/appboundry-host/test\"}",
+        "resultJson": null,
+        "rationale": "Find existing tests for transactions.ts so the new test fits an existing file and its conventions."
+      },
+      "id": "mwvydhxv40423cbc56bd",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:33.069Z",
+      "digest": "8814634e084ce06b",
+      "data": {
+        "n": 8,
+        "action": "search",
+        "input": {
+          "pattern": "transactions\\.js|completion\\(|retried\\(|isRecoverable",
+          "path": "packages/appboundry-host/test"
+        },
+        "summary": "packages/appboundry-host/test/transactional-effects.test.ts:13: import { OUTBOX_COLLECTION, OUTBOX_PERFORMING_STALE_MS, type OutboxRecord } from \"../src/transactions.js\";\npackages/appboundry-host/test/transactions.test.ts:15: import { OUTBOX_COLLECTION, OUTBOX_RECOVER_AFTER_MS, SEQUENCES_COLLECTION, sequenceRecordId, type OutboxRecord } from \"../src/transactions.js\";"
+      },
+      "id": "mwvydhyn8f55e92bb8fb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:36.591Z",
+      "digest": "3226c68e14c99e57",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 139,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 10446,
+        "latencyMs": 3151,
+        "messageId": "msg_011ChPTAfvjbmmkz4VcN8uwX"
+      },
+      "id": "mwvydkole0e23fd9854d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:36.597Z",
+      "digest": "4291e12b6ffaf2fe",
+      "data": {
+        "n": 9,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/host.ts\",\"startLine\":528,\"endLine\":570}",
+        "resultJson": null,
+        "rationale": "See how #performAs uses performOutbox's result before changing the return type."
+      },
+      "id": "mwvydkoo69657d76e54e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:36.618Z",
+      "digest": "aeca8c7bf165f942",
+      "data": {
+        "n": 9,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/host.ts",
+          "startLine": 528,
+          "endLine": 570
+        },
+        "summary": "packages/appboundry-host/src/host.ts lines 528-570 of 963:\n528\t  async #performAs(record: OutboxRecord & { __version: number }): Promise<\"done\" | \"failed\" | \"skipped\"> {\n529\t    // In the tenant the caller worked in, through the live membership only; no membership: not performed.\n530\t    const account = await this.identity.resolveDurable(record.principalId);\n531\t    const inTenant = account && record.tenantId ? await this.withTenant(account, record.tenantId) : account;\n532\t    const principal = inTenant && record.tenantId && inTenant.tenant?.id !== record.tenantId ? null : inTenant;\n533\t    const requestId = `outbox_${record.id}`;\n534\t    if (!principal) {\n535\t      return performOutbox(this.#db as never, record.id, async () => {\n536\t        throw new HostError(\"UNAUTHORIZED\", `${record.principalId} could not be resolved to a current principal, so the effect was not performed.`);\n537\t      });\n538\t    }\n539\t    const release = this.#services.enter(requestId, principal);\n540\t    try {\n541\t      const outcome = await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, principal, requestId), message => this.#logger.warn(message));\n542\t      const call = serviceCall(record);\n543\t      const collection = SERVICE_COLLECTIONS[call.service];\n544\t      if (collection && SERVICE_WRITES.has(call.method)) this.#emit(new Set([collection]));\n545\t      return outcome;\n546\t    } finally {\n547\t      release();\n548\t    }\n549\t  }\n550\t\n551\t  /**\n552\t   * Perform one after-commit effect as `principal`. A job or webhook event is created in the same\n553\t   * FeltDB transaction as `complete(result)`, the record's done write (exactly once per committed\n554\t   * effect); a notification is sent directly with the record id as its idempotency key.\n555\t   */\n556\t  async #effect(claim: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>, principal: Principal | null, requestId: string): Promise<Record<string, unknown>> {\n557\t    const call = serviceCall(claim);\n558\t    if (claim.effect.service === \"jobs\" || claim.effect.service === \"webhooks\") return this.#services.performInTransaction(call, { principal, requestId }, complete);\n559\t    return effectResult(claim, await this.#services.perform(call, { principal, requestId, writable: true, reads: new Set() }));\n560\t  }\n561\t\n562\t  /** After-commit effects, newest first (optionally only one state). */\n563\t  /**\n564\t   * The provider-side invocation ledger and service (application participation, contract 3), bound to this state's application\n565\t   * incarnation. `authority` is the platform: it attributes and authorizes requests.\n566\t   */\n567\t  /** The provider's authority fence (contract 3): the platform installs, revokes and closes through it; invocation commits are guarded by it. */\n568\t  authorityFence(clock?: () => Date): AuthorityFence { return new AuthorityFence(this.#db, clock); }\n569\t\n570\t  /** `options.fence`: the provider fence to guard commits with (default: this host's own); a harness can observe or pace it. */"
+      },
+      "id": "mwvydkpkf26592ba8aaa",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:42.854Z",
+      "digest": "6ee6f5ea246ccee7",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 396,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 11599,
+        "latencyMs": 5405,
+        "messageId": "msg_011ChPTAy8LzMja18DEJTbuK"
+      },
+      "id": "mwvydpig36813889577c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:42.856Z",
+      "digest": "1ef7f40f1e9e1ad0",
+      "data": {
+        "n": 10,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/test/transactions.test.ts\",\"startLine\":1,\"endLine\":60}",
+        "resultJson": null,
+        "rationale": "See test conventions (runner, imports) before writing a unit test for performOutbox with a fake store."
+      },
+      "id": "mwvydpiid9399f8b44ba",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:42.875Z",
+      "digest": "36b9dfb4b635a46d",
+      "data": {
+        "n": 10,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/test/transactions.test.ts",
+          "startLine": 1,
+          "endLine": 60
+        },
+        "summary": "packages/appboundry-host/test/transactions.test.ts lines 1-60 of 212:\n1\t/**\n2\t * Host interface transactions@1 (transactions.ts): sequences and after-commit effects on one\n3\t * persisted state directory, with real concurrency, the contract FeltKit's runtime meets\n4\t * (FeltKit docs/TRANSACTIONS.md; cross-runtime parity is FeltKit's\n5\t * tests/e2e/state-contract-parity.test.mjs).\n6\t */\n7\timport { mkdtemp, rm } from \"node:fs/promises\";\n8\timport { tmpdir } from \"node:os\";\n9\timport { execFileSync } from \"node:child_process\";\n10\timport { join } from \"node:path\";\n11\timport { fileURLToPath } from \"node:url\";\n12\timport { afterAll, describe, expect, it } from \"vitest\";\n13\timport { ArtifactHost, loadArtifact, type Principal } from \"@appport/appboundry-host\";\n14\timport { adminRequest, localTarget } from \"../src/admin-channel.js\";\n15\timport { OUTBOX_COLLECTION, OUTBOX_RECOVER_AFTER_MS, SEQUENCES_COLLECTION, sequenceRecordId, type OutboxRecord } from \"../src/transactions.js\";\n16\timport { syntheticArtifact, type SyntheticFunction } from \"./helpers.js\";\n17\t\n18\tconst scratch: string[] = [];\n19\tafterAll(async () => { await Promise.all(scratch.map(dir => rm(dir, { recursive: true, force: true }))); });\n20\tconst dev: Principal = { id: \"dev\", type: \"user\", roles: [\"member\"] } as Principal;\n21\t\n22\tconst object = (properties: Record<string, unknown>, required: string[]) => ({ type: \"object\", properties, required, additionalProperties: false });\n23\tconst COLLECTIONS = [{ name: \"events\", schema: object({ stream: { type: \"string\" }, seq: { type: \"number\" }, what: { type: \"string\" } }, [\"stream\", \"seq\", \"what\"]) }];\n24\tconst append = `async (a, host) => { const seq = await host(\"db.sequence\", { name: a.stream }); return host(\"db.insert\", { collec\n…\n, seq, what: \"paid\" } });\n38\t      await host(\"outbox.stage\", { effects: [{ id: \"outbox_\" + a.invoice + \"_1\", effect: { service: \"notifications\", method: \"send\", input: { recipient: \"dev\", type: \"paid\", title: a.invoice } } }] });\n39\t      if (a.fail) throw Object.assign(new Error(\"not payable\"), { code: \"FAILED_PRECONDITION\" });\n40\t      return id;\n41\t    }`\n42\t  },\n43\t  { name: \"log:inbox\", kind: \"query\", access: \"data.read\", body: `async (a, host) => (await host(\"service\", { service: \"notifications\", method: \"list\", input: {} })).map((n) => n.title).sort()` }\n44\t];\n45\tconst ROLES = (canNotify = true) => ({ member: [\"data.*\", ...(canNotify ? [\"notifications.*\"] : [\"notifications.read\"])] });\n46\t\n47\tasync function build(dir: string, version: string, options: { transactions?: number; canNotify?: boolean } = {}) {\n48\t  return syntheticArtifact(dir, FUNCTIONS, \"ledger\", { collections: COLLECTIONS, roles: ROLES(options.canNotify ?? true), services: { notifications: {} }, version, transactions: options.transactions ?? 1, path: join(dir, `ledger-${version}.app`) });\n49\t}\n50\t\n51\tasync function open(path: string, stateDir: string) {\n52\t  const host = await ArtifactHost.open({ artifact: await loadArtifact(path), stateDir, environment: \"development\", jobIntervalMs: 0 });\n53\t  const call = (name: string, args: unknown) => host.call(name, args, { principal: dev, via: \"test\" });\n54\t  const value = async (name: string, args: unknown) => {\n55\t    const result = await call(name, args);\n56\t    expect(result, JSON.stringify(result)).toMatchObject({ ok: true });\n57\t    return (result as { value: unknown }).value;\n58\t  };\n59\t  return { host, call, value, trail: (stream: string) => value(\"log:trail\", { stream }) as Promise<number[]> };\n60\t}"
+      },
+      "id": "mwvydpjcb63ebd48c736",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:00:54.656Z",
+      "digest": "a48eb72248c0a5e3",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 941,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 13118,
+        "latencyMs": 11214,
+        "messageId": "msg_011ChPTBQjUGHUYPvfBwbTp2"
+      },
+      "id": "mwvydyma274fb4a549ee",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:00:54.658Z",
+      "digest": "942396b8225ac33b",
+      "data": {
+        "n": 11,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":49,\"endLine\":130}",
+        "resultJson": null,
+        "rationale": "I need the full text of transactions.ts (lines 49-130 were cut off) before I can rewrite it with the fix, and I need the OutboxRecord shape for a unit test."
+      },
+      "id": "mwvydymd6b876070cdd5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:00:54.673Z",
+      "digest": "2579d15d822374c0",
+      "data": {
+        "n": 11,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 49,
+          "endLine": 130
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 49-130 of 259:\n49\t  if (!RECORD_ID.test(id)) throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} is too long to store (${id.length} characters encoded, at most 128).`);\n50\t  return id;\n51\t}\n52\t\n53\t/** The sequences one mutation drew from, and the guarded writes that advance them. */\n54\texport class SequenceAllocations {\n55\t  readonly #streams = new Map<string, { id: string; version: number | null; committed: number; next: number }>();\n56\t\n57\t  async next(name: unknown, read: (id: string) => Promise<{ value?: unknown; __version: number } | null>): Promise<number> {\n58\t    const key = String(name);\n59\t    let stream = this.#streams.get(key);\n60\t    if (!stream) {\n61\t      const id = sequenceRecordId(name);\n62\t      const record = await read(id);\n63\t      const committed = typeof record?.value === \"number\" ? record.value : 0;\n64\t      stream = { id, version: record ? record.__version : null, committed, next: committed };\n65\t      this.#streams.set(key, stream);\n66\t    }\n67\t    stream.next += 1;\n68\t    return stream.next;\n69\t  }\n70\t\n71\t  operations(transactionId: string): Array<Record<string, unknown>> {\n72\t    const out: Array<Record<string, unknown>> = [];\n73\t    for (const [name, s] of this.#streams) {\n74\t      if (s.next === s.committed) continue;\n75\t      const value = { id: s.id, name, value: s.next, transactionId };\n76\t      out.push(s.version === null ? { collection: SEQUENCES_COLLECTION, id: s.id, requireAbsent: true, value } : { collection: SEQUENCES_COLLECTION, id: s.id, ifVersion: s.version, value });\n77\t    }\n78\t    return out;\n79\t  }\n80\t}\n81\t\n82\texport type OutboxEffect =\n83\t  | { service: \"notifications\"; method: \"send\"; input: Recor\n…\nn) => {\n118\t    const id = isObject(staged) ? staged.id : undefined;\n119\t    const effect = isObject(staged) ? staged.effect : undefined;\n120\t    if (typeof id !== \"string\" || !RECORD_ID.test(id)) throw new HostError(\"INVALID_ARGUMENT\", \"An outbox record needs an id of 1-128 letters, digits, \\\".\\\", \\\"_\\\" or \\\"-\\\".\");\n121\t    if (!isObject(effect)) throw new HostError(\"INVALID_ARGUMENT\", \"An after-commit effect is notifications.send, webhooks.emit or jobs.enqueue.\");\n122\t    let valid: OutboxEffect;\n123\t    if (effect.service === \"notifications\" && effect.method === \"send\" && isObject(effect.input) && text(effect.input.recipient) && text(effect.input.type) && text(effect.input.title)) {\n124\t      valid = { service: \"notifications\", method: \"send\", input: effect.input as OutboxEffect & never };\n125\t    } else if (effect.service === \"webhooks\" && effect.method === \"emit\" && text(effect.type) && isObject(effect.payload ?? {})) {\n126\t      valid = { service: \"webhooks\", method: \"emit\", type: effect.type as string, payload: (effect.payload ?? {}) as Record<string, unknown> };\n127\t    } else if (effect.service === \"jobs\" && effect.method === \"enqueue\" && text(effect.type) && isObject(effect.payload ?? {}) && (effect.options === undefined || isObject(effect.options))) {\n128\t      valid = { service: \"jobs\", method: \"enqueue\", type: effect.type as string, payload: (effect.payload ?? {}) as Record<string, unknown>, ...(effect.options ? { options: effect.options as { runAt?: string; maxAttempts?: number } } : {}) };\n129\t    } else {\n130\t      throw new HostError(\"INVALID_ARGUMENT\", \"An after-commit effect is notifications.send { recipient, type, title }, webhooks.emit { type, payload } or jobs.enqueue { type, payload, options? }.\");"
+      },
+      "id": "mwvydyn122dee637c682",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:01:19.958Z",
+      "digest": "2f9e50bdcc20913c",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 2851,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 14580,
+        "latencyMs": 24500,
+        "messageId": "msg_011ChPTCJ87mXviRinkAZpi1"
+      },
+      "id": "mwvyei53d154bc7df924",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:01:19.959Z",
+      "digest": "c82854b499c8d2bf",
+      "data": {
+        "n": 12,
+        "kind": "act",
+        "action": "write",
+        "inputJson": "{\"path\":\"packages/appboundry-host/test/outbox-outcome.test.ts\",\"content\":\"/**\\n * performOutbox (transactions.ts) reports an outcome only when it was recorded: a done or failed\\n * write that cannot be committed is retried while the claim still holds, and otherwise the\\n * performer reports `skipped`, never `done`/`failed` for a record still left performing.\\n */\\nimport { describe, expect, it } from \\\"vitest\\\";\\nimport { OUTBOX_COLLECTION, performOutbox, type OutboxRecord } from \\\"../src/transactions.js\\\";\\n\\ntype Stored = OutboxRecord & { __version: number };\\n\\nfunction fakeStore(record: OutboxRecord, failWrite: (attempt: number, records: Map<string, Stored>) => boolean) {\\n  const records = new Map<string, Stored>([[record.id, { ...record, __version: 1 }]]);\\n  let writes = 0;\\n  const db = {\\n    collection(name: string) {\\n      expect(name).toBe(OUTBOX_COLLECTION);\\n      return {\\n        async get(id: string) {\\n          const r = records.get(id);\\n          if (!r) throw new Error(\\\"not found\\\");\\n          return JSON.parse(JSON.stringify(r)) as Stored;\\n        },\\n        async find() { return [...records.values()]; }\\n      };\\n    },\\n    async transaction(request: { operations: Array<{ id: string; ifVersion: number; value: OutboxRecord }> }) {\\n      writes += 1;\\n      if (failWrite(writes, records)) throw new Error(\\\"store unavailable\\\");\\n      for (const op of request.operations) {\\n        const current = records.get(op.id);\\n        if (!current || current.__version !== op.ifVersion) throw new Error(\\\"version conflict\\\");\\n        records.set(op.id, { ...op.value, __version: current.__version + 1 } as Stored);\\n      }\\n      return {};\\n    }\\n  };\\n  return { db, records };\\n}\\n\\nconst pending = (): OutboxRecord => ({ id: \\\"outbox_1\\\", requestId: \\\"req_1\\\", function: \\\"pay\\\", principalId: \\\"dev\\\", effect: { service: \\\"notifications\\\", method: \\\"send\\\", input: { recipient: \\\"dev\\\", type: \\\"paid\\\", title: \\\"x\\\" } } as OutboxRecord[\\\"effect\\\"], state: \\\"pending\\\", createdAt: 1, updatedAt: 1, attempts: 0 });\\n\\ndescribe(\\\"performOutbox outcome write\\\", () => {\\n  it(\\\"does not report done when the done write never commits\\\", async () => {\\n    const { db, records } = fakeStore(pending(), attempt => attempt > 1);\\n    const warnings: string[] = [];\\n    const outcome = await performOutbox(db as never, \\\"outbox_1\\\", async () => ({}), m => warnings.push(m));\\n    expect(outcome).toBe(\\\"skipped\\\");\\n    expect(records.get(\\\"outbox_1\\\")!.state).toBe(\\\"performing\\\");\\n    expect(warnings.length).toBeGreaterThan(0);\\n  });\\n\\n  it(\\\"does not report failed when the failed write never commits\\\", async () => {\\n    const { db, records } = fakeStore(pending(), attempt => attempt > 1);\\n    const outcome = await performOutbox(db as never, \\\"outbox_1\\\", async () => { throw new Error(\\\"boom\\\"); });\\n    expect(outcome).toBe(\\\"skipped\\\");\\n    expect(records.get(\\\"outbox_1\\\")!.state).toBe(\\\"performing\\\");\\n  });\\n\\n  it(\\\"retries a transient outcome write failure while the claim holds\\\", async () => {\\n    const { db, records } = fakeStore(pending(), attempt => attempt === 2);\\n    const outcome = await performOutbox(db as never, \\\"outbox_1\\\", async () => ({ notificationId: \\\"n1\\\" }));\\n    expect(outcome).toBe(\\\"done\\\");\\n    expect(records.get(\\\"outbox_1\\\")).toMatchObject({ state: \\\"done\\\", result: { notificationId: \\\"n1\\\" }, attempts: 1 });\\n  });\\n\\n  it(\\\"reports skipped when another performer changed the record\\\", async () => {\\n    const { db, records } = fakeStore(pending(), (attempt, all) => {\\n      if (attempt === 2) { const r = all.get(\\\"outbox_1\\\")!; all.set(\\\"outbox_1\\\", { ...r, attempts: r.attempts + 1, __version: r.__version + 1 }); }\\n      return false;\\n    });\\n    const outcome = await performOutbox(db as never, \\\"outbox_1\\\", async () => ({}));\\n    expect(outcome).toBe(\\\"skipped\\\");\\n    expect(records.get(\\\"outbox_1\\\")!.state).toBe(\\\"performing\\\");\\n  });\\n});\\n\"}",
+        "resultJson": null,
+        "rationale": "Add a focused unit test with a fake store that reproduces the bug (outcome reported despite unrecorded write) and covers bounded retry and conflict."
+      },
+      "id": "mwvyei5cd8036300da46",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:01:19.982Z",
+      "digest": "2ef584f00927e1c5",
+      "data": {
+        "n": 12,
+        "action": "write",
+        "input": {
+          "path": "packages/appboundry-host/test/outbox-outcome.test.ts"
+        },
+        "summary": "wrote packages/appboundry-host/test/outbox-outcome.test.ts (3730 bytes)"
+      },
+      "id": "mwvyei5r9196fca457c9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:01:24.024Z",
+      "digest": "dcd86a04bfd36239",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 160,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 14651,
+        "latencyMs": 3490,
+        "messageId": "msg_011ChPTE9Tnb9RTF8dZjzEP1"
+      },
+      "id": "mwvyela17dac53058bbe",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:01:24.025Z",
+      "digest": "6a6a72345c1f5a15",
+      "data": {
+        "n": 13,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\": \"test\", \"target\": \"packages/appboundry-host/test/outbox-outcome.test.ts\"}",
+        "resultJson": null,
+        "rationale": "Run the new test before changing the source, to confirm it reproduces the wrong return value when the outcome write fails."
+      },
+      "id": "mwvyela53863f502aa10",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:01:25.267Z",
+      "digest": "704fd6db0dad08ba",
+      "data": {
+        "n": 13,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/outbox-outcome.test.ts"
+        },
+        "summary": "test packages/appboundry-host/test/outbox-outcome.test.ts: exit 1 in 1 s\nnode --trace-warnings ...` to show where the warning was created)\n \u001b[31m❯\u001b[39m packages/appboundry-host/test/outbox-outcome.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m4 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 21\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m performOutbox outcome write\u001b[2m > \u001b[22mdoes not report done when the done write never commits\u001b[39m\u001b[32m 11\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     → expected 'done' to be 'skipped' // Object.is equality\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m performOutbox outcome write\u001b[2m > \u001b[22mdoes not report failed when the failed write never commits\u001b[39m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     → expected 'failed' to be 'skipped' // Object.is equality\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m performOutbox outcome write\u001b[2m > \u001b[22mretries a transient outcome write failure while the claim holds\u001b[39m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     → expected { id: 'outbox_1', …(9) } to match object { state: 'done', …(2) }\n(11 matching properties omitted from actual)\u001b[39m\n\u001b[31m   \u001b[31m×\u001b[31m performOutbox outcome write\u001b[2m > \u001b[22mreports skipped when another performer changed the record\u001b[39m\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     → expected 'done' to be 'skipped' // Object.is equality\u001b[39m\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 4 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m packages/appboundry-host/test/outbox-outcome.test.ts\u001b[2m > \u001b[22mperformOutbox outcome write\u001b[2m > \u001b[22mdoes not report done when the done write never commits\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'done' to be 'skipped' // Object.is equality\u001b[39m\n\nExpected: \u001b[32m\"skipped\"\u001b[39m\nReceived: \u001b[31m\"done\"\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m packages/appboundry-host/test/outbox-outcome.test.ts:\u001b[2m47:21\u001b[22m\u001b[39m\n    \u001b[90m 45| \u001b[39m    \u001b\n…\n[34mtoBe\u001b[39m(\u001b[32m\"done\"\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 63| \u001b[39m    expect(records.get(\"outbox_1\")).toMatchObject({ state: \"done\", res…\n    \u001b[90m   | \u001b[39m                                    \u001b[31m^\u001b[39m\n    \u001b[90m 64| \u001b[39m  })\u001b[33m;\u001b[39m\n    \u001b[90m 65| \u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m packages/appboundry-host/test/outbox-outcome.test.ts\u001b[2m > \u001b[22mperformOutbox outcome write\u001b[2m > \u001b[22mreports skipped when another performer changed the record\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 'done' to be 'skipped' // Object.is equality\u001b[39m\n\nExpected: \u001b[32m\"skipped\"\u001b[39m\nReceived: \u001b[31m\"done\"\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m packages/appboundry-host/test/outbox-outcome.test.ts:\u001b[2m72:21\u001b[22m\u001b[39m\n    \u001b[90m 70| \u001b[39m    })\u001b[33m;\u001b[39m\n    \u001b[90m 71| \u001b[39m    const outcome = await performOutbox(db as never, \"outbox_1\", async…\n    \u001b[90m 72| \u001b[39m    \u001b[34mexpect\u001b[39m(outcome)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m\"skipped\"\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   | \u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m 73| \u001b[39m    \u001b[34mexpect\u001b[39m(records\u001b[33m.\u001b[39m\u001b[35mget\u001b[39m(\u001b[32m\"outbox_1\"\u001b[39m)\u001b[33m!\u001b[39m\u001b[33m.\u001b[39mstate)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[32m\"performing\"\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m 74| \u001b[39m  })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[31m4 failed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:01:24\n\u001b[2m   Duration \u001b[22m 483ms\u001b[2m (transform 118ms, setup 0ms, collect 194ms, tests 21ms, environment 0ms, prepare 62ms)\u001b[22m\n\n(node:11457) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvyem8wae6105fd6284",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:01:29.215Z",
+      "digest": "0f355f0da4703b36",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 180,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16505,
+        "latencyMs": 3742,
+        "messageId": "msg_011ChPTEWS6UqByxkd2MSFfU"
+      },
+      "id": "mwvyepa9360f40436ed0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:01:29.218Z",
+      "digest": "a960c992aeb3f50d",
+      "data": {
+        "n": 14,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/test/outbox-outcome.test.ts\",\"startLine\":1,\"endLine\":120}",
+        "resultJson": null,
+        "rationale": "I need the exact expectations of the test I wrote (all four cases fail now, as expected) before changing performOutbox. The history shows only its size, not its content."
+      },
+      "id": "mwvyepac0160c5ecebd7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:01:29.241Z",
+      "digest": "3a1d80f239768151",
+      "data": {
+        "n": 14,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/test/outbox-outcome.test.ts",
+          "startLine": 1,
+          "endLine": 120
+        },
+        "summary": "packages/appboundry-host/test/outbox-outcome.test.ts lines 1-76 of 76:\n1\t/**\n2\t * performOutbox (transactions.ts) reports an outcome only when it was recorded: a done or failed\n3\t * write that cannot be committed is retried while the claim still holds, and otherwise the\n4\t * performer reports `skipped`, never `done`/`failed` for a record still left performing.\n5\t */\n6\timport { describe, expect, it } from \"vitest\";\n7\timport { OUTBOX_COLLECTION, performOutbox, type OutboxRecord } from \"../src/transactions.js\";\n8\t\n9\ttype Stored = OutboxRecord & { __version: number };\n10\t\n11\tfunction fakeStore(record: OutboxRecord, failWrite: (attempt: number, records: Map<string, Stored>) => boolean) {\n12\t  const records = new Map<string, Stored>([[record.id, { ...record, __version: 1 }]]);\n13\t  let writes = 0;\n14\t  const db = {\n15\t    collection(name: string) {\n16\t      expect(name).toBe(OUTBOX_COLLECTION);\n17\t      return {\n18\t        async get(id: string) {\n19\t          const r = records.get(id);\n20\t          if (!r) throw new Error(\"not found\");\n21\t          return JSON.parse(JSON.stringify(r)) as Stored;\n22\t        },\n23\t        async find() { return [...records.values()]; }\n24\t      };\n25\t    },\n26\t    async transaction(request: { operations: Array<{ id: string; ifVersion: number; value: OutboxRecord }> }) {\n27\t      writes += 1;\n28\t      if (failWrite(writes, records)) throw new Error(\"store unavailable\");\n29\t      for (const op of request.operations) {\n30\t        const current = records.get(op.id);\n31\t        if (!current || current.__version !== op.ifVersion) throw new Error(\"version conflict\");\n32\t        records.set(op.id, { ...op.value, __version: current.__version + 1 } as Stored);\n33\t      }\n34\t      return {};\n35\t    }\n36\t  }\n…\nkeStore(pending(), attempt => attempt > 1);\n45\t    const warnings: string[] = [];\n46\t    const outcome = await performOutbox(db as never, \"outbox_1\", async () => ({}), m => warnings.push(m));\n47\t    expect(outcome).toBe(\"skipped\");\n48\t    expect(records.get(\"outbox_1\")!.state).toBe(\"performing\");\n49\t    expect(warnings.length).toBeGreaterThan(0);\n50\t  });\n51\t\n52\t  it(\"does not report failed when the failed write never commits\", async () => {\n53\t    const { db, records } = fakeStore(pending(), attempt => attempt > 1);\n54\t    const outcome = await performOutbox(db as never, \"outbox_1\", async () => { throw new Error(\"boom\"); });\n55\t    expect(outcome).toBe(\"skipped\");\n56\t    expect(records.get(\"outbox_1\")!.state).toBe(\"performing\");\n57\t  });\n58\t\n59\t  it(\"retries a transient outcome write failure while the claim holds\", async () => {\n60\t    const { db, records } = fakeStore(pending(), attempt => attempt === 2);\n61\t    const outcome = await performOutbox(db as never, \"outbox_1\", async () => ({ notificationId: \"n1\" }));\n62\t    expect(outcome).toBe(\"done\");\n63\t    expect(records.get(\"outbox_1\")).toMatchObject({ state: \"done\", result: { notificationId: \"n1\" }, attempts: 1 });\n64\t  });\n65\t\n66\t  it(\"reports skipped when another performer changed the record\", async () => {\n67\t    const { db, records } = fakeStore(pending(), (attempt, all) => {\n68\t      if (attempt === 2) { const r = all.get(\"outbox_1\")!; all.set(\"outbox_1\", { ...r, attempts: r.attempts + 1, __version: r.__version + 1 }); }\n69\t      return false;\n70\t    });\n71\t    const outcome = await performOutbox(db as never, \"outbox_1\", async () => ({}));\n72\t    expect(outcome).toBe(\"skipped\");\n73\t    expect(records.get(\"outbox_1\")!.state).toBe(\"performing\");\n74\t  });\n75\t});\n76\t"
+      },
+      "id": "mwvyepb54e77c9c28b8b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:01:42.699Z",
+      "digest": "60e03a9d480a5e70",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 1103,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 17978,
+        "latencyMs": 13226,
+        "messageId": "msg_011ChPTEoVWud759tZt3gqWv"
+      },
+      "id": "mwvyezou65a07d2f445d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:01:42.702Z",
+      "digest": "cdcd70e29d12a6c1",
+      "data": {
+        "n": 15,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":82,\"endLine\":118}",
+        "resultJson": null,
+        "rationale": "I need the exact text of lines 82-118 before rewriting the whole file to fix performOutbox; earlier reads truncated that range."
+      },
+      "id": "mwvyezow7cb120ea1a17",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:01:42.718Z",
+      "digest": "1df3f56fc6a80fac",
+      "data": {
+        "n": 15,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 82,
+          "endLine": 118
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 82-118 of 259:\n82\texport type OutboxEffect =\n83\t  | { service: \"notifications\"; method: \"send\"; input: Record<string, unknown> & { recipient: string; type: string; title: string; idempotencyKey?: string } }\n84\t  | { service: \"webhooks\"; method: \"emit\"; type: string; payload: Record<string, unknown> }\n85\t  | { service: \"jobs\"; method: \"enqueue\"; type: string; payload: Record<string, unknown>; options?: { runAt?: string; maxAttempts?: number } };\n86\t\n87\texport interface OutboxRecord {\n88\t  id: string;\n89\t  requestId: string;\n90\t  function: string;\n91\t  principalId: string;\n92\t  /** The tenant the caller worked in (tenancy@1): a recovered effect is performed there, through the live membership only. */\n93\t  tenantId?: string;\n94\t  effect: OutboxEffect;\n95\t  state: \"pending\" | \"performing\" | \"done\" | \"failed\";\n96\t  createdAt: number;\n97\t  updatedAt: number;\n98\t  attempts: number;\n99\t  error?: { code: string; message: string };\n100\t  result?: Record<string, unknown>;\n101\t  retriedBy?: string;\n102\t  __version?: number;\n103\t}\n104\t\n105\tconst isObject = (v: unknown): v is Record<string, unknown> => typeof v === \"object\" && v !== null && !Array.isArray(v);\n106\tconst text = (v: unknown) => typeof v === \"string\" && v.trim().length > 0;\n107\t\n108\t/**\n109\t * The outbox records a guest staged (`outbox.stage { effects: [{ id, effect }] }`), validated: the\n110\t * effect's shape, and its service enabled in the manifest. Caller, request and function come from\n111\t * the call, never from the guest.\n112\t */\n113\texport function stagedRecords(input: unknown, call: { fn: string; principalId: string | null; tenantId?: string | null; requestId: string; services: readonly string[] }, now = Date.now()): OutboxRecord[] {\n114\t  const effects = isObject(input) && Array.isArray(input.effects) ? input.effects : null;\n115\t  if (!effects) throw new HostError(\"INVALID_ARGUMENT\", \"outbox.stage needs { effects: [{ id, effect }] }.\");\n116\t  if (!call.principalId) throw new HostError(\"UNAUTHORIZED\", \"Authentication is required to use services\");\n117\t  return effects.map((staged: unknown) => {\n118\t    const id = isObject(staged) ? staged.id : undefined;"
+      },
+      "id": "mwvyezpif37689bbb121",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:02:58.747Z",
+      "digest": "d0f573be158a9933",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 10565,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 18906,
+        "latencyMs": 75251,
+        "messageId": "msg_011ChPTFqTMiYAvP7P3eJF8N"
+      },
+      "id": "mwvygmd99d773d0c2a2c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:02:58.749Z",
+      "digest": "421bdbfc112ef961",
+      "data": {
+        "n": 16,
+        "kind": "act",
+        "action": "write",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/transactions.ts\",\"content\":\"/**\\n * Host interface transactions@1: `db.sequence` and `outbox.stage`, the guest operations behind a\\n * producer's transactional sequences and after-commit effects (FeltKit: ctx.db.sequence,\\n * ctx.afterCommit). The contract is FeltKit's docs/TRANSACTIONS.md, implemented here on the\\n * host's own FeltDB transaction (collections.ts) with host-owned collections:\\n *\\n *   sequence      per stream (its name): strictly increasing and gapless in commit order, written\\n *                 in the mutation's transaction guarded on the version read, so a concurrent\\n *                 commit of the same stream refuses the whole transaction (CONFLICT) and a\\n *                 failed mutation consumes nothing; independent streams never contend\\n *   outbox        one record per effect, committed with the mutation or not at all; performed\\n *                 after the commit as the caller (claimed pending → performing, version-checked),\\n *                 then done (with its result) or failed (with the error); stale pending and\\n *                 performing records are recovered by the worker after a restart; a failed one\\n *                 is retried only by an operator. A job or webhook event is created in the same\\n *                 FeltDB transaction that records it done (AppPort Services' transaction context,\\n *                 @appport/services 0.13.1), so it is created once per committed effect; a\\n *                 notification carries the record id as its idempotency key. Creation, not\\n *                 delivery: a job's run or a webhook's delivery to its endpoint is the services'\\n *                 own (at least once).\\n *\\n * No second transaction system: the records are extra operations of the mutation's FeltDB\\n * transaction.\\n */\\nimport { HostError } from \\\"./collections.js\\\";\\n\\nexport const SEQUENCES_COLLECTION = \\\"_appboundry_sequences\\\";\\nexport const OUTBOX_COLLECTION = \\\"_appboundry_outbox\\\";\\n/** A pending record not performed after this long is recovered (its runtime likely stopped). */\\nexport const OUTBOX_RECOVER_AFTER_MS = 30_000;\\n/** A record left performing this long (its performer stopped mid-way) is recovered too. */\\nexport const OUTBOX_PERFORMING_STALE_MS = OUTBOX_RECOVER_AFTER_MS * 10;\\n/** The most re-runs a function's manifest may ask for on sequence contention. */\\nexport const MAX_SEQUENCE_RETRIES = 10;\\n/** How many times a performer tries to record an outcome (done or failed) while its claim holds. */\\nexport const OUTBOX_OUTCOME_WRITE_ATTEMPTS = 3;\\n\\nconst SEQUENCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;\\nconst RECORD_ID = /^[A-Za-z0-9._-]{1,128}$/;\\n\\n/**\\n * The record id a stream is stored under: the name itself when it is a valid FeltDB id, else \\\"_\\\"\\n * + the name with \\\".\\\" written \\\".d\\\" and \\\":\\\" written \\\".c\\\" (injective, never equal to a name).\\n */\\nexport function sequenceRecordId(name: unknown): string {\\n  if (typeof name !== \\\"string\\\" || !SEQUENCE_NAME.test(name)) {\\n    throw new HostError(\\\"INVALID_ARGUMENT\\\", `Sequence name ${JSON.stringify(name)} must be 1-128 letters, digits, \\\"_\\\", \\\".\\\", \\\":\\\" or \\\"-\\\", starting with a letter or digit.`);\\n  }\\n  if (RECORD_ID.test(name)) return name;\\n  const id = `_${name.replace(/\\\\./g, \\\".d\\\").replace(/:/g, \\\".c\\\")}`;\\n  if (!RECORD_ID.test(id)) throw new HostError(\\\"INVALID_ARGUMENT\\\", `Sequence name ${JSON.stringify(name)} is too long to store (${id.length} characters encoded, at most 128).`);\\n  return id;\\n}\\n\\n/** The sequences one mutation drew from, and the guarded writes that advance them. */\\nexport class SequenceAllocations {\\n  readonly #streams = new Map<string, { id: string; version: number | null; committed: number; next: number }>();\\n\\n  async next(name: unknown, read: (id: string) => Promise<{ value?: unknown; __version: number } | null>): Promise<number> {\\n    const key = String(name);\\n    let stream = this.#streams.get(key);\\n    if (!stream) {\\n      const id = sequenceRecordId(name);\\n      const record = await read(id);\\n      const committed = typeof record?.value === \\\"number\\\" ? record.value : 0;\\n      stream = { id, version: record ? record.__version : null, committed, next: committed };\\n      this.#streams.set(key, stream);\\n    }\\n    stream.next += 1;\\n    return stream.next;\\n  }\\n\\n  operations(transactionId: string): Array<Record<string, unknown>> {\\n    const out: Array<Record<string, unknown>> = [];\\n    for (const [name, s] of this.#streams) {\\n      if (s.next === s.committed) continue;\\n      const value = { id: s.id, name, value: s.next, transactionId };\\n      out.push(s.version === null ? { collection: SEQUENCES_COLLECTION, id: s.id, requireAbsent: true, value } : { collection: SEQUENCES_COLLECTION, id: s.id, ifVersion: s.version, value });\\n    }\\n    return out;\\n  }\\n}\\n\\nexport type OutboxEffect =\\n  | { service: \\\"notifications\\\"; method: \\\"send\\\"; input: Record<string, unknown> & { recipient: string; type: string; title: string; idempotencyKey?: string } }\\n  | { service: \\\"webhooks\\\"; method: \\\"emit\\\"; type: string; payload: Record<string, unknown> }\\n  | { service: \\\"jobs\\\"; method: \\\"enqueue\\\"; type: string; payload: Record<string, unknown>; options?: { runAt?: string; maxAttempts?: number } };\\n\\nexport interface OutboxRecord {\\n  id: string;\\n  requestId: string;\\n  function: string;\\n  principalId: string;\\n  /** The tenant the caller worked in (tenancy@1): a recovered effect is performed there, through the live membership only. */\\n  tenantId?: string;\\n  effect: OutboxEffect;\\n  state: \\\"pending\\\" | \\\"performing\\\" | \\\"done\\\" | \\\"failed\\\";\\n  createdAt: number;\\n  updatedAt: number;\\n  attempts: number;\\n  error?: { code: string; message: string };\\n  result?: Record<string, unknown>;\\n  retriedBy?: string;\\n  __version?: number;\\n}\\n\\nconst isObject = (v: unknown): v is Record<string, unknown> => typeof v === \\\"object\\\" && v !== null && !Array.isArray(v);\\nconst text = (v: unknown) => typeof v === \\\"string\\\" && v.trim().length > 0;\\n\\n/**\\n * The outbox records a guest staged (`outbox.stage { effects: [{ id, effect }] }`), validated: the\\n * effect's shape, and its service enabled in the manifest. Caller, request and function come from\\n * the call, never from the guest.\\n */\\nexport function stagedRecords(input: unknown, call: { fn: string; principalId: string | null; tenantId?: string | null; requestId: string; services: readonly string[] }, now = Date.now()): OutboxRecord[] {\\n  const effects = isObject(input) && Array.isArray(input.effects) ? input.effects : null;\\n  if (!effects) throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"outbox.stage needs { effects: [{ id, effect }] }.\\\");\\n  if (!call.principalId) throw new HostError(\\\"UNAUTHORIZED\\\", \\\"Authentication is required to use services\\\");\\n  return effects.map((staged: unknown) => {\\n    const id = isObject(staged) ? staged.id : undefined;\\n    const effect = isObject(staged) ? staged.effect : undefined;\\n    if (typeof id !== \\\"string\\\" || !RECORD_ID.test(id)) throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"An outbox record needs an id of 1-128 letters, digits, \\\\\\\".\\\\\\\", \\\\\\\"_\\\\\\\" or \\\\\\\"-\\\\\\\".\\\");\\n    if (!isObject(effect)) throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"An after-commit effect is notifications.send, webhooks.emit or jobs.enqueue.\\\");\\n    let valid: OutboxEffect;\\n    if (effect.service === \\\"notifications\\\" && effect.method === \\\"send\\\" && isObject(effect.input) && text(effect.input.recipient) && text(effect.input.type) && text(effect.input.title)) {\\n      valid = { service: \\\"notifications\\\", method: \\\"send\\\", input: effect.input as OutboxEffect & never };\\n    } else if (effect.service === \\\"webhooks\\\" && effect.method === \\\"emit\\\" && text(effect.type) && isObject(effect.payload ?? {})) {\\n      valid = { service: \\\"webhooks\\\", method: \\\"emit\\\", type: effect.type as string, payload: (effect.payload ?? {}) as Record<string, unknown> };\\n    } else if (effect.service === \\\"jobs\\\" && effect.method === \\\"enqueue\\\" && text(effect.type) && isObject(effect.payload ?? {}) && (effect.options === undefined || isObject(effect.options))) {\\n      valid = { service: \\\"jobs\\\", method: \\\"enqueue\\\", type: effect.type as string, payload: (effect.payload ?? {}) as Record<string, unknown>, ...(effect.options ? { options: effect.options as { runAt?: string; maxAttempts?: number } } : {}) };\\n    } else {\\n      throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"An after-commit effect is notifications.send { recipient, type, title }, webhooks.emit { type, payload } or jobs.enqueue { type, payload, options? }.\\\");\\n    }\\n    if (!call.services.includes(valid.service)) {\\n      throw new HostError(\\\"CONFIGURATION\\\", `The ${valid.service[0]!.toUpperCase()}${valid.service.slice(1)} service is not enabled.`);\\n    }\\n    return { id, requestId: call.requestId, function: call.fn, principalId: call.principalId!, ...(call.tenantId ? { tenantId: call.tenantId } : {}), effect: JSON.parse(JSON.stringify(valid)) as OutboxEffect, state: \\\"pending\\\", createdAt: now, updatedAt: now, attempts: 0 };\\n  });\\n}\\n\\nexport function isRecoverable(record: Pick<OutboxRecord, \\\"state\\\" | \\\"updatedAt\\\">, now: number): boolean {\\n  return (record.state === \\\"pending\\\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \\\"performing\\\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\\n}\\n\\nfunction strip(record: OutboxRecord): OutboxRecord {\\n  const { __version: _v, ...rest } = record;\\n  return rest;\\n}\\n\\nexport function retried(record: OutboxRecord, by: string, now = Date.now()): OutboxRecord {\\n  if (record.state !== \\\"failed\\\") throw new HostError(\\\"FAILED_PRECONDITION\\\", `After-commit effect ${record.id} is ${record.state}; only a failed effect can be retried.`);\\n  return { ...strip(record), state: \\\"pending\\\", updatedAt: now, retriedBy: by };\\n}\\n\\ntype Store = { collection(name: string): { get(id: string): Promise<unknown>; find(filter: Record<string, unknown>): Promise<unknown[]> }; transaction(request: never): Promise<unknown> };\\n\\n/** Write `value` only if the record is still at `version` (throws otherwise; nothing written). */\\nasync function put(db: Store, id: string, version: number, value: OutboxRecord): Promise<void> {\\n  await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\\n}\\n\\n/**\\n * The write that records `claim` done with `result`, guarded on the claim's version: an effect\\n * that commits it in its own transaction (a job, webhook deliveries) is created exactly when the\\n * record says done, and a stale claim creates nothing.\\n */\\nexport function completion(claim: OutboxRecord & { __version: number }, result: Record<string, unknown>): Record<string, unknown> {\\n  const { error: _e, ...rest } = strip(claim);\\n  return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \\\"done\\\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\\n}\\n\\n/**\\n * Perform one record: claim it (version-checked, so two performers never both perform it),\\n * perform, record done with its result or failed with the error. `perform` may instead commit\\n * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\\n * then nothing more is written. Never throws: the mutation has committed. `skipped`: gone,\\n * settled, or claimed by another performer, or its outcome could not be recorded (the outcome\\n * write is retried while the claim holds; a record left performing is recovered later). `done`\\n * and `failed` are reported only when that state is what the record durably says.\\n */\\nexport async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => {}): Promise<\\\"done\\\" | \\\"failed\\\" | \\\"skipped\\\"> {\\n  const get = async () => ((await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null) ?? null;\\n  const current = await get();\\n  if (!current || current.state === \\\"done\\\" || current.state === \\\"failed\\\") return \\\"skipped\\\";\\n  try {\\n    await put(db, id, current.__version, { ...current, state: \\\"performing\\\", attempts: (current.attempts ?? 0) + 1, updatedAt: Date.now() });\\n  } catch {\\n    return \\\"skipped\\\";\\n  }\\n  const claim = await get();\\n  if (!claim || claim.state !== \\\"performing\\\") return \\\"skipped\\\";\\n  let next: OutboxRecord;\\n  let completed = false;\\n  const complete = (result: Record<string, unknown>) => {\\n    completed = true;\\n    return completion(claim, result);\\n  };\\n  try {\\n    const result = await perform(claim, complete);\\n    // Committed with the effect: done is already recorded.\\n    if (completed) return \\\"done\\\";\\n    const { error: _e, ...rest } = claim;\\n    next = { ...rest, state: \\\"done\\\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) };\\n  } catch (error) {\\n    const e = error as { code?: string; message?: string };\\n    next = { ...claim, state: \\\"failed\\\", updatedAt: Date.now(), error: { code: e?.code ?? \\\"INTERNAL\\\", message: e?.message ?? String(error) } };\\n    warn(`after-commit ${claim.effect.service}.${claim.effect.method} from ${claim.function} failed: ${next.error!.message}`);\\n  }\\n  for (let attempt = 1; ; attempt += 1) {\\n    try {\\n      await put(db, id, claim.__version, next);\\n      return next.state as \\\"done\\\" | \\\"failed\\\";\\n    } catch (error) {\\n      const now = await get();\\n      if (now && now.__version !== claim.__version) {\\n        // Recorded after all (the write committed but reported an error), or changed by another performer.\\n        if (now.state === \\\"done\\\" || now.state === \\\"failed\\\") return now.state;\\n        warn(`after-commit ${id}: could not record ${next.state}: the record changed (now ${now.state}).`);\\n        return \\\"skipped\\\";\\n      }\\n      if (attempt >= OUTBOX_OUTCOME_WRITE_ATTEMPTS) {\\n        warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\\n        return \\\"skipped\\\";\\n      }\\n      await new Promise(resolve => setTimeout(resolve, 10 * attempt));\\n    }\\n  }\\n}\\n\\n/** The service call an effect is. */\\nexport function serviceCall(record: OutboxRecord): { service: string; method: string; input: Record<string, unknown> } {\\n  const effect = record.effect;\\n  if (effect.service === \\\"notifications\\\") return { service: \\\"notifications\\\", method: \\\"send\\\", input: { ...effect.input, idempotencyKey: effect.input.idempotencyKey ?? record.id } };\\n  if (effect.service === \\\"jobs\\\") return { service: \\\"jobs\\\", method: \\\"enqueue\\\", input: { type: effect.type, payload: effect.payload, ...(effect.options ? { options: effect.options } : {}) } };\\n  return { service: \\\"webhooks\\\", method: \\\"emit\\\", input: { type: effect.type, payload: effect.payload } };\\n}\\n\\n/** What an effect produced, as recorded on its outbox record. */\\nexport function effectResult(record: OutboxRecord, value: unknown): Record<string, unknown> {\\n  const v = (value ?? {}) as Record<string, unknown>;\\n  if (record.effect.service === \\\"notifications\\\") return typeof v.id === \\\"string\\\" ? { notificationId: v.id } : {};\\n  if (record.effect.service === \\\"jobs\\\") return typeof v.id === \\\"string\\\" ? { jobId: v.id } : {};\\n  return { deliveries: typeof v.deliveries === \\\"number\\\" ? v.deliveries : Array.isArray(value) ? value.length : 0 };\\n}\\n\\n/** The retry policy a manifest function entry may carry. */\\nexport function retryPolicy(value: unknown, kind: string): { sequenceConflicts: number } | undefined {\\n  if (value === undefined) return undefined;\\n  const n = isObject(value) ? value.sequenceConflicts : undefined;\\n  if (kind !== \\\"mutation\\\" || !Number.isInteger(n) || (n as number) < 1 || (n as number) > MAX_SEQUENCE_RETRIES) {\\n    throw new Error(`retry must be { sequenceConflicts: 1-${MAX_SEQUENCE_RETRIES} } on a mutation`);\\n  }\\n  return { sequenceConflicts: n as number };\\n}\\n\\n/** After-commit effects in `db`, newest first (optionally only one state). */\\nexport async function listOutbox(db: { collection(name: string): { find(filter: Record<string, unknown>): Promise<unknown[]> } }, filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\\n  if (filter.state !== undefined && ![\\\"pending\\\", \\\"performing\\\", \\\"done\\\", \\\"failed\\\"].includes(filter.state)) throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"state is pending, performing, done or failed.\\\");\\n  const rows = (await db.collection(OUTBOX_COLLECTION).find(filter.state ? { state: filter.state } : {})) as Array<OutboxRecord & { __version?: number }>;\\n  return rows.map(r => strip(r)).sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.min(Math.max(Number(filter.limit) || 100, 1), 1000));\\n}\\n\\n/** Move a failed record back to pending (an operator's retry); a running host then performs it. */\\nexport async function retryOutboxRecord(db: Store, id: unknown, by: string): Promise<OutboxRecord> {\\n  if (typeof id !== \\\"string\\\" || !id) throw new HostError(\\\"INVALID_ARGUMENT\\\", \\\"Name the after-commit effect to retry (see `appboundry admin outbox list --status failed`).\\\");\\n  const record = (await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null;\\n  if (!record) throw new HostError(\\\"NOT_FOUND\\\", `No after-commit effect ${id}.`);\\n  const next = retried(record, by);\\n  try {\\n    await put(db, id, record.__version, next);\\n  } catch {\\n    throw new HostError(\\\"CONFLICT\\\", `After-commit effect ${id} changed while it was being retried. Nothing was changed; read it again.`);\\n  }\\n  return next;\\n}\\n\"}",
+        "resultJson": null,
+        "rationale": "Fix performOutbox: retry the outcome write a bounded number of times while the claim holds, return the durable state if the record changed to done/failed, and otherwise report skipped instead of done/failed."
+      },
+      "id": "mwvygmel9fcc1f158228",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:02:58.823Z",
+      "digest": "f390430dac2b280a",
+      "data": {
+        "n": 16,
+        "action": "write",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts"
+        },
+        "summary": "wrote packages/appboundry-host/src/transactions.ts (17310 bytes)"
+      },
+      "id": "mwvygmfda7532254452a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:04.154Z",
+      "digest": "8fe16dfa0e10f42f",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 117,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 18965,
+        "latencyMs": 4628,
+        "messageId": "msg_011ChPTMSqVhwRTPNxncp2BP"
+      },
+      "id": "mwvygqjg61ed6e437402",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:04.156Z",
+      "digest": "7c035ec9692ab08c",
+      "data": {
+        "n": 17,
+        "kind": "act",
+        "action": "diff",
+        "inputJson": "{}",
+        "resultJson": null,
+        "rationale": "Before running the new test, confirm that the rewrite of transactions.ts in step #16 changed only performOutbox's outcome-write handling."
+      },
+      "id": "mwvygqjia2723d4111a1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:03:04.313Z",
+      "digest": "04d795632527fc34",
+      "data": {
+        "n": 17,
+        "action": "diff",
+        "input": {},
+        "summary": "packages/appboundry-host/src/transactions.ts +23 -6\npackages/appboundry-host/test/outbox-outcome.test.ts +75 -0\ndiff --git a/packages/appboundry-host/src/transactions.ts b/packages/appboundry-host/src/transactions.ts\nindex 29e71e1..b88b828 100644\n--- a/packages/appboundry-host/src/transactions.ts\n+++ b/packages/appboundry-host/src/transactions.ts\n@@ -32,6 +32,8 @@ export const OUTBOX_RECOVER_AFTER_MS = 30_000;\n export const OUTBOX_PERFORMING_STALE_MS = OUTBOX_RECOVER_AFTER_MS * 10;\n /** The most re-runs a function's manifest may ask for on sequence contention. */\n export const MAX_SEQUENCE_RETRIES = 10;\n+/** How many times a performer tries to record an outcome (done or failed) while its claim holds. */\n+export const OUTBOX_OUTCOME_WRITE_ATTEMPTS = 3;\n \n const SEQUENCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;\n const RECORD_ID = /^[A-Za-z0-9._-]{1,128}$/;\n@@ -172,7 +174,9 @@ export function completion(claim: OutboxRecord & { __version: number }, result:\n  * perform, record done with its result or failed with the error. `perform` may instead commit\n  * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\n  * then nothing more is written. Never throws: the mutation has committed. `skipped`: gone,\n- * settled, or claimed by another performer.\n+ * settled, or claimed by another performer, or its outcome could not be recorded (the outcome\n+ * write is retried while the claim holds; a record left performing is recovered later). `done`\n+ * and `failed` are reported only when that state is what the record durably says.\n  */\n export async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknow\n…\nite never commits\", async () => {\n+    const { db, records } = fakeStore(pending(), attempt => attempt > 1);\n+    const warnings: string[] = [];\n+    const outcome = await performOutbox(db as never, \"outbox_1\", async () => ({}), m => warnings.push(m));\n+    expect(outcome).toBe(\"skipped\");\n+    expect(records.get(\"outbox_1\")!.state).toBe(\"performing\");\n+    expect(warnings.length).toBeGreaterThan(0);\n+  });\n+\n+  it(\"does not report failed when the failed write never commits\", async () => {\n+    const { db, records } = fakeStore(pending(), attempt => attempt > 1);\n+    const outcome = await performOutbox(db as never, \"outbox_1\", async () => { throw new Error(\"boom\"); });\n+    expect(outcome).toBe(\"skipped\");\n+    expect(records.get(\"outbox_1\")!.state).toBe(\"performing\");\n+  });\n+\n+  it(\"retries a transient outcome write failure while the claim holds\", async () => {\n+    const { db, records } = fakeStore(pending(), attempt => attempt === 2);\n+    const outcome = await performOutbox(db as never, \"outbox_1\", async () => ({ notificationId: \"n1\" }));\n+    expect(outcome).toBe(\"done\");\n+    expect(records.get(\"outbox_1\")).toMatchObject({ state: \"done\", result: { notificationId: \"n1\" }, attempts: 1 });\n+  });\n+\n+  it(\"reports skipped when another performer changed the record\", async () => {\n+    const { db, records } = fakeStore(pending(), (attempt, all) => {\n+      if (attempt === 2) { const r = all.get(\"outbox_1\")!; all.set(\"outbox_1\", { ...r, attempts: r.attempts + 1, __version: r.__version + 1 }); }\n+      return false;\n+    });\n+    const outcome = await performOutbox(db as never, \"outbox_1\", async () => ({}));\n+    expect(outcome).toBe(\"skipped\");\n+    expect(records.get(\"outbox_1\")!.state).toBe(\"performing\");\n+  });\n+});\n"
+      },
+      "id": "mwvygqo40237f07a717b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:07.982Z",
+      "digest": "3b221ba4cfbe528f",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 156,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 20445,
+        "latencyMs": 3439,
+        "messageId": "msg_011ChPTMoxFEDNpbcbRrzYKc"
+      },
+      "id": "mwvygthrd76f7e8640dd",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:07.983Z",
+      "digest": "b56f7d595d777b70",
+      "data": {
+        "n": 18,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\":\"test\",\"target\":\"packages/appboundry-host/test/outbox-outcome.test.ts\"}",
+        "resultJson": null,
+        "rationale": "The fix in transactions.ts is written. The new test failed in all four cases before the change. Running it now checks whether the fix makes it pass."
+      },
+      "id": "mwvygtht64a0d4dd6ec0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:03:09.540Z",
+      "digest": "8ba58f8e4b06fcad",
+      "data": {
+        "n": 18,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/outbox-outcome.test.ts"
+        },
+        "summary": "test packages/appboundry-host/test/outbox-outcome.test.ts: exit 0 in 2 s\n(node:11498) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11510) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967\u001b[39m\n\n(node:11546) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11547) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11553) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/outbox-outcome.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 80\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m4 passed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:03:08\n\u001b[2m   Duration \u001b[22m 667ms\u001b[2m (transform 130ms, setup 0ms, collect 252ms, tests 80ms, environment 0ms, prepare 85ms)\u001b[22m\n\n(node:11603) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvygup70627f9dee874",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:14.558Z",
+      "digest": "50ffd53a887010ff",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 213,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 21271,
+        "latencyMs": 4014,
+        "messageId": "msg_011ChPTNFdLB6o7qL8iVpxez"
+      },
+      "id": "mwvygykf39d7cf5dcdad",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:14.559Z",
+      "digest": "48c15a3b1b475b52",
+      "data": {
+        "n": 19,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 170, \"endLine\": 232}",
+        "resultJson": null,
+        "rationale": "The diff output was truncated in the middle of the source change, so I'll read the rewritten performOutbox to confirm the change is minimal and correct before running the existing outbox suites."
+      },
+      "id": "mwvygykh7faa5d5c6b97",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:03:14.570Z",
+      "digest": "b80cfd574834c30e",
+      "data": {
+        "n": 19,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 170,
+          "endLine": 232
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 170-232 of 276:\n170\t}\n171\t\n172\t/**\n173\t * Perform one record: claim it (version-checked, so two performers never both perform it),\n174\t * perform, record done with its result or failed with the error. `perform` may instead commit\n175\t * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\n176\t * then nothing more is written. Never throws: the mutation has committed. `skipped`: gone,\n177\t * settled, or claimed by another performer, or its outcome could not be recorded (the outcome\n178\t * write is retried while the claim holds; a record left performing is recovered later). `done`\n179\t * and `failed` are reported only when that state is what the record durably says.\n180\t */\n181\texport async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => {}): Promise<\"done\" | \"failed\" | \"skipped\"> {\n182\t  const get = async () => ((await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null) ?? null;\n183\t  const current = await get();\n184\t  if (!current || current.state === \"done\" || current.state === \"failed\") return \"skipped\";\n185\t  try {\n186\t    await put(db, id, current.__version, { ...current, state: \"performing\", attempts: (current.attempts ?? 0) + 1, updatedAt: Date.now() });\n187\t  } catch {\n188\t    return \"skipped\";\n189\t  }\n190\t  const claim = await get();\n191\t  if (!claim || claim.state !== \"performing\") return \"skipped\";\n192\t  let next: OutboxRecord;\n193\t  let completed = false;\n194\t  const complete = (result\n…\n the effect: done is already recorded.\n201\t    if (completed) return \"done\";\n202\t    const { error: _e, ...rest } = claim;\n203\t    next = { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) };\n204\t  } catch (error) {\n205\t    const e = error as { code?: string; message?: string };\n206\t    next = { ...claim, state: \"failed\", updatedAt: Date.now(), error: { code: e?.code ?? \"INTERNAL\", message: e?.message ?? String(error) } };\n207\t    warn(`after-commit ${claim.effect.service}.${claim.effect.method} from ${claim.function} failed: ${next.error!.message}`);\n208\t  }\n209\t  for (let attempt = 1; ; attempt += 1) {\n210\t    try {\n211\t      await put(db, id, claim.__version, next);\n212\t      return next.state as \"done\" | \"failed\";\n213\t    } catch (error) {\n214\t      const now = await get();\n215\t      if (now && now.__version !== claim.__version) {\n216\t        // Recorded after all (the write committed but reported an error), or changed by another performer.\n217\t        if (now.state === \"done\" || now.state === \"failed\") return now.state;\n218\t        warn(`after-commit ${id}: could not record ${next.state}: the record changed (now ${now.state}).`);\n219\t        return \"skipped\";\n220\t      }\n221\t      if (attempt >= OUTBOX_OUTCOME_WRITE_ATTEMPTS) {\n222\t        warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n223\t        return \"skipped\";\n224\t      }\n225\t      await new Promise(resolve => setTimeout(resolve, 10 * attempt));\n226\t    }\n227\t  }\n228\t}\n229\t\n230\t/** The service call an effect is. */\n231\texport function serviceCall(record: OutboxRecord): { service: string; method: string; input: Record<string, unknown> } {\n232\t  const effect = record.effect;"
+      },
+      "id": "mwvygyl2a48d3cbfc51c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:19.825Z",
+      "digest": "14793b473ccd9654",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 185,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 22648,
+        "latencyMs": 4298,
+        "messageId": "msg_011ChPTNcukv3LEkZdvAfndp"
+      },
+      "id": "mwvyh2mrba3417eaf4e0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:19.827Z",
+      "digest": "10c5d9b2ff1d4a8f",
+      "data": {
+        "n": 20,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\": \"test\", \"target\": \"packages/appboundry-host/test/transactions.test.ts\"}",
+        "resultJson": null,
+        "rationale": "The new test passes. Next I'm running the existing transactions suite, which covers performOutbox through the host, to check the change caused no regressions."
+      },
+      "id": "mwvyh2mt713e31f2af2e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:03:24.144Z",
+      "digest": "ce2018720922b805",
+      "data": {
+        "n": 20,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/transactions.test.ts"
+        },
+        "summary": "test packages/appboundry-host/test/transactions.test.ts: exit 0 in 4 s\nrace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDIC\n…\ny time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11768) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11668) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/transactions.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 2411\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactions@1\u001b[2m > \u001b[22mindependent streams advance concurrently, each strictly increasing and gapless \u001b[33m 644\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactions@1\u001b[2m > \u001b[22mone stream: losers get CONFLICT and consume nothing; an opted-in mutation is re-run until it commits; one that used a service is not \u001b[33m 456\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactions@1\u001b[2m > \u001b[22ma failed effect stays inspectable and is retried by an operator, on a stopped state and on a running one \u001b[33m 693\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m7 passed\u001b[39m\u001b[22m\u001b[90m (7)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:03:20\n\u001b[2m   Duration \u001b[22m 3.61s\u001b[2m (transform 453ms, setup 0ms, collect 942ms, tests 2.41s, environment 0ms, prepare 68ms)\u001b[22m\n\n(node:11777) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvyh5yx1d9cb26e22ad",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:29.184Z",
+      "digest": "0a43fbe31671a19e",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 296,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 24194,
+        "latencyMs": 4622,
+        "messageId": "msg_011ChPTPHZhL9X11UdYgrgnx"
+      },
+      "id": "mwvyh9uqdc2a973d208f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:29.186Z",
+      "digest": "c07e580eea8c4459",
+      "data": {
+        "n": 21,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\":\"test\",\"target\":\"packages/appboundry-host/test/transactional-effects.test.ts\"}",
+        "resultJson": null,
+        "rationale": "transactional-effects.test.ts also exercises the outbox performing path (it imports OUTBOX_PERFORMING_STALE_MS). Running it checks that the bounded retry and the re-read in performOutbox don't regress after-commit effects on jobs and webhooks."
+      },
+      "id": "mwvyh9us803bfc231182",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:03:32.682Z",
+      "digest": "eedafc130713144e",
+      "data": {
+        "n": 21,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/transactional-effects.test.ts"
+        },
+        "summary": "test packages/appboundry-host/test/transactional-effects.test.ts: exit 0 in 3 s\n(node:11799) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11811) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967\u001b[39m\n\n(node:11845) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11852) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11846) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11845) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11845) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11845) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11845) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/transactional-effects.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 851\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactional outbox effects\u001b[2m > \u001b[22ma committed mutation's job and webhook deliveries are created with their done marks, once \u001b[33m 338\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:03:30\n\u001b[2m   Duration \u001b[22m 2.52s\u001b[2m (transform 594ms, setup 0ms, collect 1.33s, tests 851ms, environment 0ms, prepare 102ms)\u001b[22m\n\n(node:11937) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvyhck49c9744687bac",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:38.245Z",
+      "digest": "24d1feefb78d8ca8",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 287,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 25386,
+        "latencyMs": 4696,
+        "messageId": "msg_011ChPTPx2DkfZ1dFJ6CzNru"
+      },
+      "id": "mwvyhguf08aa906c85a9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:38.247Z",
+      "digest": "33cec7d7ba45c938",
+      "data": {
+        "n": 22,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\":\"build\"}",
+        "resultJson": null,
+        "rationale": "The new test and the two existing transactions test files pass. Vitest does not type-check, so I'm running the build to confirm the changed `performOutbox` (the `now.state` narrowing and the retry loop) compiles before finishing."
+      },
+      "id": "mwvyhguhcfc2663fcf3e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "observation",
+      "at": "2026-11-25T10:03:43.005Z",
+      "digest": "bf5042f3a24969ac",
+      "data": {
+        "n": 22,
+        "action": "run",
+        "input": {
+          "check": "build"
+        },
+        "summary": "build: exit 0 in 5 s\n(node:11956) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:11967) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n> appport-monorepo@1.0.0 build /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967\n> tsc -b tsconfig.build.json\n\n"
+      },
+      "id": "mwvyhkio2c0d1f09c6eb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "model_usage",
+      "at": "2026-11-25T10:03:53.597Z",
+      "digest": "d38dcd3270ec6817",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 890,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 25636,
+        "latencyMs": 10040,
+        "messageId": "msg_011ChPTQgqCscg5nKtuvCBgq"
+      },
+      "id": "mwvyhsovfd95c099d62a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "decision",
+      "at": "2026-11-25T10:03:53.599Z",
+      "digest": "849988d69216a3ff",
+      "data": {
+        "n": 23,
+        "kind": "finish",
+        "action": null,
+        "inputJson": null,
+        "resultJson": "{\"summary\":\"performOutbox (packages/appboundry-host/src/transactions.ts) recorded the outcome with one version-guarded put and, if that put threw, only warned and still returned next.state. Callers therefore saw 'done' or 'failed' while the record stayed 'performing'. recoverOutbox counted it as performed, and the record could later be re-run automatically after OUTBOX_PERFORMING_STALE_MS, which also breaks the rule that a failed effect is retried only by an operator. The fix: the outcome write is now tried up to OUTBOX_OUTCOME_WRITE_ATTEMPTS (3) times with a short backoff. After each failure the record is re-read. If its version moved and it is now done or failed (the write landed anyway, or another performer settled it), that persisted state is returned. If it moved but is still unsettled, or every attempt fails, the function warns and returns 'skipped' instead of reporting an outcome it never recorded. The doc comment now says 'done' and 'failed' are returned only when the record durably says so. host.ts is unchanged: 'skipped' is already part of the return type, recoverOutbox counts only 'done', and retryOutbox re-reads the record it returns. A new test, test/outbox-outcome.test.ts, uses a fake store and covers four cases: a done write that never commits (now 'skipped'), a failed write that never commits ('skipped'), a single transient write failure (retried, then 'done' with its result), and a concurrent version change ('skipped'). All 4 failed before the change and pass after it. The existing transactions and transactional-effects tests still pass, and the build passes.\",\"tests\":[\"packages/appboundry-host/test/outbox-outcome.test.ts\",\"packages/appboundry-host/test/transactions.test.ts\",\"packages/appboundry-host/test/transactional-effects.test.ts\"]}",
+        "rationale": "The fix is in place. The new test failed 4 of 4 before the change (#13) and passes after it (#18). The related suites (#20, #21) and the build (#22) pass."
+      },
+      "id": "mwvyhsp10fb0cf583e07",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "verification",
+      "at": "2026-11-25T10:03:54.561Z",
+      "digest": "19443300a06b2413",
+      "data": {
+        "stage": "diff",
+        "files": [
+          {
+            "path": "packages/appboundry-host/src/transactions.ts",
+            "additions": 23,
+            "deletions": 6
+          },
+          {
+            "path": "packages/appboundry-host/test/outbox-outcome.test.ts",
+            "additions": 75,
+            "deletions": 0
+          }
+        ],
+        "patchSha256": "843f7490e2108946a60acd60673e9943b39b4f6687b830a1863ae1763ddda2b4"
+      },
+      "id": "mwvyhtfpd57a02e8b5ab",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "check_result",
+      "at": "2026-11-25T10:03:56.533Z",
+      "digest": "4e44ac85e941ef46",
+      "data": {
+        "run": "run_dad89ce4",
+        "purpose": "gate",
+        "check": "test",
+        "target": "packages/appboundry-host/test/outbox-outcome.test.ts",
+        "exitCode": 0,
+        "durationMs": 1367,
+        "output": "(node:11996) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12008) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967\u001b[39m\n\n(node:12042) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12043) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12054) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/outbox-outcome.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 79\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m4 passed\u001b[39m\u001b[22m\u001b[90m (4)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:03:55\n\u001b[2m   Duration \u001b[22m 509ms\u001b[2m (transform 110ms, setup 0ms, collect 193ms, tests 79ms, environment 0ms, prepare 55ms)\u001b[22m\n\n(node:12100) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvyhuyid62da4e1b049",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "check_result",
+      "at": "2026-11-25T10:04:02.536Z",
+      "digest": "aefc1a7c419b47dd",
+      "data": {
+        "run": "run_59cc6318",
+        "purpose": "gate",
+        "check": "test",
+        "target": "packages/appboundry-host/test/transactions.test.ts",
+        "exitCode": 0,
+        "durationMs": 4823,
+        "output": "ng was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12289) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/transactions.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 2802\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactions@1\u001b[2m > \u001b[22mindependent streams advance concurrently, each strictly increasing and gapless \u001b[33m 677\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactions@1\u001b[2m > \u001b[22mone stream: losers get CONFLICT and consume nothing; an opted-in mutation is re-run until it commits; one that used a service is not \u001b[33m 583\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m transactions@1\u001b[2m > \u001b[22ma failed effect stays inspectable and is retried by an operator, on a stopped state and on a running one \u001b[33m 780\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m7 passed\u001b[39m\u001b[22m\u001b[90m (7)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:03:58\n\u001b[2m   Duration \u001b[22m 4.03s\u001b[2m (transform 481ms, setup 0ms, collect 933ms, tests 2.80s, environment 0ms, prepare 58ms)\u001b[22m\n\n(node:12298) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvyhzld5e4d1b0c43a9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "check_result",
+      "at": "2026-11-25T10:04:06.536Z",
+      "digest": "f5e0bb598e0a5010",
+      "data": {
+        "run": "run_1ad8f5c6",
+        "purpose": "gate",
+        "check": "test",
+        "target": "packages/appboundry-host/test/transactional-effects.test.ts",
+        "exitCode": 0,
+        "durationMs": 2649,
+        "output": "(node:12325) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12337) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_99efc8aaf967\u001b[39m\n\n(node:12371) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12372) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12378) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12371) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12371) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12371) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:12371) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/transactional-effects.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 702\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:04:04\n\u001b[2m   Duration \u001b[22m 1.93s\u001b[2m (transform 506ms, setup 0ms, collect 967ms, tests 702ms, environment 0ms, prepare 71ms)\u001b[22m\n\n(node:12438) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvyi2ofaa897745c173",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvycczse07901acf8ac",
+      "kind": "verification",
+      "at": "2026-11-25T10:04:07.525Z",
+      "digest": "a07b84e7089de6ac",
+      "data": {
+        "stage": "tests",
+        "results": [
+          {
+            "target": "packages/appboundry-host/test/outbox-outcome.test.ts",
+            "exitCode": 0
+          },
+          {
+            "target": "packages/appboundry-host/test/transactions.test.ts",
+            "exitCode": 0
+          },
+          {
+            "target": "packages/appboundry-host/test/transactional-effects.test.ts",
+            "exitCode": 0
+          }
+        ]
+      },
+      "id": "mwvyi3fr53d88dd84cd7",
+      "__version": 1
+    }
+  ]
+}

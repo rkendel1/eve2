@@ -45,4 +45,63 @@ const interpret = defineCapability({
   },
 });
 
-serve({ id: "reasoning-claude", name: "Claude reasoning", capabilities: [interpret], port: Number(process.env.PORT ?? 5410), consumerToken: process.env.CONSUMER_TOKEN });
+const DECIDE_SCHEMA = {
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: ["act", "finish"] },
+    action: { anyOf: [{ type: "string" }, { type: "null" }] },
+    inputJson: { anyOf: [{ type: "string" }, { type: "null" }] },
+    resultJson: { anyOf: [{ type: "string" }, { type: "null" }] },
+    rationale: { type: "string" },
+  },
+  required: ["kind", "action", "inputJson", "resultJson", "rationale"],
+  additionalProperties: false,
+};
+
+const decide = defineCapability({
+  name: "reasoning.decide", version: 1,
+  description: "Choose the single next action toward an objective from the actions offered, given what has been observed; or finish with a result in the requested shape. Executes nothing.",
+  input: s.object({ objective: s.string(), guidance: s.string(), actions: s.unknown(), observations: s.string(), resultShape: s.string() }),
+  output: s.object({ decision: s.unknown(), usage: s.unknown() }),
+  authorization: [], idempotency: "supported",
+  handler: async ({ objective, guidance, actions, observations, resultShape }) => {
+    const started = Date.now();
+    const system = [
+      "You direct an operator that works on a software repository through a fixed set of actions. You never execute anything yourself: each turn you choose exactly one action from the list, with its input, or you finish.",
+      "Work from evidence: read and search before concluding, cite exact files and lines, and run a check when a claim depends on behavior. Do not repeat an action whose result you already have.",
+      "Reply with kind \"act\", the action name and inputJson (a JSON object string matching that action's input), or kind \"finish\" and resultJson (a JSON string in the result shape).",
+      guidance,
+    ].join("\n");
+    const response = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      output_config: { effort: process.env.DECIDE_EFFORT ?? "high", format: { type: "json_schema", schema: DECIDE_SCHEMA } },
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system,
+      // The history only grows: one block per observation keeps every earlier block a cacheable prefix of the next call.
+      messages: [{ role: "user", content: [
+        { type: "text", text: `Actions:\n${JSON.stringify(actions, null, 1)}\n\nResult shape when finishing:\n${resultShape}\n\nWhat you have done and observed so far, oldest first:` },
+        // The breakpoint goes on the newest observation, not on the objective after it (which changes every call).
+        ...(observations ? observations.split(/\n\n(?=#\d+ )/) : ["(nothing yet)"]).map((text, i, all) => ({ type: "text", text, ...(i === all.length - 1 ? { cache_control: { type: "ephemeral" } } : {}) })),
+        { type: "text", text: `Objective:\n${objective}` },
+      ] }],
+    });
+    const usage = {
+      provider: "anthropic", requested: MODEL, served: response.model, stopReason: response.stop_reason,
+      inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0, cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      latencyMs: Date.now() - started, messageId: response.id,
+    };
+    totals.calls++; totals.inputTokens += usage.inputTokens; totals.outputTokens += usage.outputTokens;
+    log("decide", { ...usage, totals });
+    if (response.stop_reason === "refusal") throw new AppPortError("FORBIDDEN", `The model declined (${response.stop_details?.category ?? "no category"}).`);
+    if (response.stop_reason === "max_tokens") throw new AppPortError("INTERNAL_ERROR", "The model's answer was cut off.");
+    const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    let decision;
+    try { decision = JSON.parse(text); } catch { throw new AppPortError("INTERNAL_ERROR", "The model did not return JSON."); }
+    return { decision, usage };
+  },
+});
+
+serve({ id: "reasoning-claude", name: "Claude reasoning", capabilities: [interpret, decide], port: Number(process.env.PORT ?? 5410), consumerToken: process.env.CONSUMER_TOKEN });

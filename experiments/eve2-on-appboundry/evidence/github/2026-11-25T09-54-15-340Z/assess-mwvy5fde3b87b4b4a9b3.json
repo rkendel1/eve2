@@ -1,0 +1,2958 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:assess-1795600456457",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "assess-1795600456457"
+    },
+    "operation": "assess",
+    "status": "completed",
+    "reference": "EVE-E73BF218E83C",
+    "attempts": 0,
+    "steps": 39,
+    "work": {
+      "objective": "Review rkendel1/appboundry for unresolved reliability gaps, starting with packages/appboundry-host (the artifact host: guest execution, collections and transactions, identity, backups). Find problems you can substantiate, with evidence.",
+      "decisions": 30,
+      "gateAttempts": 0,
+      "workspace": "ws_5f71698283ed",
+      "sha": "ec75dbd921ef327ea9a2cb9a599beae5d48d6193",
+      "base": "main",
+      "checks": [
+        "prepare",
+        "build",
+        "test"
+      ],
+      "pending": null,
+      "findings": [
+        {
+          "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+          "severity": "medium",
+          "summary": "After the effect runs, performOutbox persists the outcome with a version-guarded put. If that write throws (a version conflict, or any store error), the error is only passed to warn() and the function still returns next.state ('done' or 'failed') as if the outcome had been recorded. The record then stays 'performing' with attempts incremented. Callers rely on the return value: recoverOutbox counts it as performed (host.ts 521-523), and retryOutbox returns the record as its state is now. Meanwhile isRecoverable only picks up a 'performing' record once it is OUTBOX_PERFORMING_STALE_MS (300 s) old. So: (a) an effect that succeeded but whose 'done' could not be written is reported done, then performed a second time about 300 s later. For notifications this depends entirely on the downstream idempotency key. (b) An effect that failed, whose 'failed' could not be written, is reported 'failed' but is silently re-run automatically. That contradicts the documented rule that a failed effect is retried only by an operator. The host sees a success or failure status that does not match durable state.",
+          "evidence": [
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/transactions.ts",
+              "startLine": 205,
+              "endLine": 210,
+              "quote": "  try {\n    await put(db, id, claim.__version, next);\n  } catch (error) {\n    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n  }\n  return next.state as \"done\" | \"failed\";"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/transactions.ts",
+              "startLine": 139,
+              "endLine": 141,
+              "quote": "export function isRecoverable(record: Pick<OutboxRecord, \"state\" | \"updatedAt\">, now: number): boolean {\n  return (record.state === \"pending\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \"performing\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\n}"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/host.ts",
+              "startLine": 521,
+              "endLine": 523,
+              "quote": "    for (const record of stale) {\n      if ((await this.#performAs(record)) === \"done\") performed += 1;\n    }"
+            }
+          ],
+          "fix": "When the outcome put fails, do not return next.state. Re-read the record and return its actual persisted state. If it is still 'performing', return a distinct result such as 'unrecorded' or rethrow, so callers do not count it as done. Also retry the outcome write a bounded number of times on transient errors (re-reading the version) before giving up, so a performed effect is not left eligible for automatic re-execution."
+        }
+      ],
+      "prove": {
+        "finding": 1,
+        "evidence": 0,
+        "results": [
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/transactions.ts:205-210 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/transactions.ts:139-141 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/host.ts:521-523 contains the quoted code"
+          }
+        ]
+      },
+      "filed": [
+        {
+          "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+          "number": 99,
+          "url": "https://github.com/rkendel1/appboundry/issues/99"
+        }
+      ]
+    },
+    "createdAt": "2026-11-25T09:54:16.463Z",
+    "updatedAt": "2026-11-25T09:59:35.333Z",
+    "report": {
+      "filed": [
+        {
+          "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+          "number": 99,
+          "url": "https://github.com/rkendel1/appboundry/issues/99"
+        }
+      ],
+      "skipped": [],
+      "notFiled": [],
+      "rejected": [],
+      "decisions": 30
+    },
+    "id": "mwvy5fde3b87b4b4a9b3",
+    "__version": 40
+  },
+  "executions": [
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 0,
+      "at": "2026-11-25T09:54:32.288Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:open",
+      "outcome": "succeeded",
+      "outboundId": "out.2467972010e9901bd793800ef47d1ccf8560b20523db1eae05b0590da30a8e6c",
+      "id": "mwvy5rky17cf66f2142c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 0,
+      "at": "2026-11-25T09:54:32.294Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at ec75dbd921ef; preparing it (install and build).",
+      "id": "mwvy5rl308876620b9d2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 1,
+      "at": "2026-11-25T09:54:33.173Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.result succeeded",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:result:run_93781d9c:1",
+      "outcome": "succeeded",
+      "outboundId": "out.f249d83186731b9ae24bc476d98998d0d5c114ab35435619822043e961765427",
+      "id": "mwvy5s9j8cde8e3d2eb6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 1,
+      "at": "2026-11-25T09:54:33.188Z",
+      "from": "preparing",
+      "to": "investigating",
+      "kind": "observe",
+      "summary": "Working copy prepared in 14 s.",
+      "id": "mwvy5s9ybd6b5fb15191",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 2,
+      "at": "2026-11-25T09:54:36.822Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:0",
+      "outcome": "succeeded",
+      "outboundId": "out.7aaf3b0e47151b22b23f295842cd2a0808afcde7a23546936ba0214643ad941a",
+      "id": "mwvy5v2w4ba15af800eb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 2,
+      "at": "2026-11-25T09:54:36.839Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:1",
+      "outcome": "succeeded",
+      "outboundId": "out.7924d98d8e6291ae59aff8867b3fc5f7bb91fafe8f52b166533dd4b7b99060af",
+      "id": "mwvy5v3c3272764936e7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 3,
+      "at": "2026-11-25T09:54:38.945Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:1",
+      "outcome": "succeeded",
+      "outboundId": "out.948f7e090e387c9c3a14f667bd48240e55f2199d7cfc09e973257dd9fb4b76f1",
+      "id": "mwvy5wq095a3c138fa01",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 3,
+      "at": "2026-11-25T09:54:38.968Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:2",
+      "outcome": "succeeded",
+      "outboundId": "out.fdbd767edfee6f43c85b4b97f50d0bb1af6a41e4be85d162261ea0dcc91929bf",
+      "id": "mwvy5wqh97976111ce8b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 4,
+      "at": "2026-11-25T09:54:42.535Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:2",
+      "outcome": "succeeded",
+      "outboundId": "out.9bf5b6dbd462761a0df4eb0027f291876db6bbede6b49a4e93ef2d4daee36da5",
+      "id": "mwvy5zhlfc5220f807e4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 4,
+      "at": "2026-11-25T09:54:42.559Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:3",
+      "outcome": "succeeded",
+      "outboundId": "out.dc7793442d146da8b7af6008f38c3b029014653a5b7547bc374e291f1c3b6eb0",
+      "id": "mwvy5ziae489a3f47388",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 5,
+      "at": "2026-11-25T09:54:48.043Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:3",
+      "outcome": "succeeded",
+      "outboundId": "out.58446c24cc9ea27d2827f5023131907e82ab986a26656313614bd939b9bb5bb6",
+      "id": "mwvy63ql8718a8bf9586",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 5,
+      "at": "2026-11-25T09:54:48.064Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:4",
+      "outcome": "succeeded",
+      "outboundId": "out.e6bc6a517fa986e739c64b2ac50fdbf06b5e19589aa8bf840602f5d4d46bae80",
+      "id": "mwvy63r7902354c004c4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 6,
+      "at": "2026-11-25T09:54:52.918Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:4",
+      "outcome": "succeeded",
+      "outboundId": "out.293253eac011668d49739edd3b81f37e3a764962a5aadca992d6a03ae9d0eeec",
+      "id": "mwvy67i037821acfd87b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 6,
+      "at": "2026-11-25T09:54:52.934Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:5",
+      "outcome": "succeeded",
+      "outboundId": "out.92fc0e685ce11f10eced6b365f5a3eff6bc8c98bf97979af0474971a442c4f20",
+      "id": "mwvy67ig07f144cf895a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 7,
+      "at": "2026-11-25T09:54:56.646Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:5",
+      "outcome": "succeeded",
+      "outboundId": "out.db797dd20cb416e7241577cbdeeab9a2aa48f2a38bd6f2d73740e4d1e319d88e",
+      "id": "mwvy6adjf948328466e0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 7,
+      "at": "2026-11-25T09:54:56.663Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:6",
+      "outcome": "succeeded",
+      "outboundId": "out.db2b3f9cd8bb8c6087028ad33aeb5810b84381d28d892c354c4fb2e88f5415f1",
+      "id": "mwvy6ae1c330633c8df0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 8,
+      "at": "2026-11-25T09:55:03.901Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:6",
+      "outcome": "succeeded",
+      "outboundId": "out.d58884b04d21e549ec96f545979cf9c13aa0a13f31f990de41a758caf8935ce8",
+      "id": "mwvy6fz3f1fa44379d93",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 8,
+      "at": "2026-11-25T09:55:03.926Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:7",
+      "outcome": "succeeded",
+      "outboundId": "out.c58e78a753bf1146fd294b16aec6fd8b0d39a4f802cd3e0175367bf6dcc86608",
+      "id": "mwvy6fzrce5e076d4b0b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 9,
+      "at": "2026-11-25T09:55:08.324Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:7",
+      "outcome": "succeeded",
+      "outboundId": "out.c534ce89b639585ce1fe52e820d159e4dc1b35379571a9d2a92e56393945857a",
+      "id": "mwvy6jdydc6f0d16a1b8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 9,
+      "at": "2026-11-25T09:55:08.347Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:8",
+      "outcome": "succeeded",
+      "outboundId": "out.3f97dea19ac4d6056cd75929571e328f131704d543db9b265d88d783a37a2900",
+      "id": "mwvy6jem2aadffbdcaf9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 10,
+      "at": "2026-11-25T09:55:15.884Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:8",
+      "outcome": "succeeded",
+      "outboundId": "out.dadfba360ddea9b34e7caa531ae950530108b9a2c5cc4499e12a8d3eeafb17b8",
+      "id": "mwvy6p7z5e697c039dea",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 10,
+      "at": "2026-11-25T09:55:15.914Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:9",
+      "outcome": "succeeded",
+      "outboundId": "out.b4d908db9b562d0407c8232cf8aa1f57a98bca0d30798fbbdad230afced7b504",
+      "id": "mwvy6p8s4e4907691698",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 11,
+      "at": "2026-11-25T09:55:26.005Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:9",
+      "outcome": "succeeded",
+      "outboundId": "out.2400539fe55f0dd12f881ebef9fc374f6c365122f4fcb4e8a1113d750aaefd5d",
+      "id": "mwvy6x1380e1eb878110",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 11,
+      "at": "2026-11-25T09:55:26.032Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:10",
+      "outcome": "succeeded",
+      "outboundId": "out.7a60c58807748cea713537d003858e180513a0bc211a8c6f20a6c4f2dc62ca4f",
+      "id": "mwvy6x1w165d57d63d99",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 12,
+      "at": "2026-11-25T09:55:30.234Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:10",
+      "outcome": "succeeded",
+      "outboundId": "out.cb4a4ffa11c65e3bd76bd30603e8f7e669d4e8e95425226b67fe1b73907e463c",
+      "id": "mwvy70ak9d79a87c7fcb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 12,
+      "at": "2026-11-25T09:55:30.267Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:11",
+      "outcome": "succeeded",
+      "outboundId": "out.45906d0c77c8235e7d2f2eba2c811fd73013c73d8abc9d02941055bc2d23b3f5",
+      "id": "mwvy70bgb0e513f2efc9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 13,
+      "at": "2026-11-25T09:55:35.417Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:11",
+      "outcome": "succeeded",
+      "outboundId": "out.5e0dbb4a173005a82302644382af582f458762e5597d0eefdbae19aece1ffd1a",
+      "id": "mwvy74ajbeea24a1f962",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 13,
+      "at": "2026-11-25T09:55:35.431Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:12",
+      "outcome": "succeeded",
+      "outboundId": "out.4a499be09f1d5d8266488570b4bf56f53b09e3d74ccf11e684f0315fb5f814f2",
+      "id": "mwvy74awb4cf2a92c82f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 14,
+      "at": "2026-11-25T09:55:43.586Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:12",
+      "outcome": "succeeded",
+      "outboundId": "out.492f1811ab18143c4f514134ff3009a1d7050ca39a94c11a280ec7205b852bee",
+      "id": "mwvy7alg468bcaf3a1f3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 14,
+      "at": "2026-11-25T09:55:43.602Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:13",
+      "outcome": "succeeded",
+      "outboundId": "out.935de1d2e981927c79412ddf9c6e9e7844bd7421051ea04de6f47625bf420306",
+      "id": "mwvy7alwdd483fc4b7b1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 15,
+      "at": "2026-11-25T09:55:53.306Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:13",
+      "outcome": "succeeded",
+      "outboundId": "out.5a37162dd54b946822cfbe784e807871893f39b7696a3bddfda9cdf640e46f87",
+      "id": "mwvy7i3f82a56e8376b9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 15,
+      "at": "2026-11-25T09:55:53.319Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:14",
+      "outcome": "succeeded",
+      "outboundId": "out.87be97b68a7544a8a521f54852fff0fc58d2ffeb84491373794dae19ae9375a7",
+      "id": "mwvy7i3s8eaaf69d9042",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 16,
+      "at": "2026-11-25T09:56:01.482Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:14",
+      "outcome": "succeeded",
+      "outboundId": "out.51d0d653a3b3b59a2d5d41c03ab6fb302f6c54ae55c4c7df1a609d27cc728662",
+      "id": "mwvy7oejc693db86f696",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 16,
+      "at": "2026-11-25T09:56:01.500Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:15",
+      "outcome": "succeeded",
+      "outboundId": "out.499c629e358cb900d4817768e8ffb7f3f03243444a6535a9aa49965a283f5514",
+      "id": "mwvy7of2cd5219c063ab",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 17,
+      "at": "2026-11-25T09:56:08.319Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:15",
+      "outcome": "succeeded",
+      "outboundId": "out.d166bcc7f8e030d5135d3aa7da716a63658b33b519ecfcfdd2afc27c6ab01ffb",
+      "id": "mwvy7toh8e531c34202a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 17,
+      "at": "2026-11-25T09:56:08.336Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:16",
+      "outcome": "succeeded",
+      "outboundId": "out.be6922047255725e5feeff9490e6eef5516cbe7b071d2092f9aa9edcbc3b876f",
+      "id": "mwvy7toye5539b6f5367",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 18,
+      "at": "2026-11-25T09:56:18.423Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:16",
+      "outcome": "succeeded",
+      "outboundId": "out.094e5540ed250d45d2b9f54124132a4ba1f2e615c45eb2b930fcb8cec46009dc",
+      "id": "mwvy81h5679bcd7f5c08",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 18,
+      "at": "2026-11-25T09:56:18.446Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:17",
+      "outcome": "succeeded",
+      "outboundId": "out.196c726f83997a2a1ad1707f39d180dd03533f829b75fc42bec0f15d4eab25e8",
+      "id": "mwvy81hr51247e6a74f7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 19,
+      "at": "2026-11-25T09:56:25.478Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:17",
+      "outcome": "succeeded",
+      "outboundId": "out.90efefa842d6c3f92e43bd06de197421cce4ed783f68780f6a2b7143fea991a5",
+      "id": "mwvy86x4be7a4e32f8c5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 19,
+      "at": "2026-11-25T09:56:25.507Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:18",
+      "outcome": "succeeded",
+      "outboundId": "out.f9f6f314bc9aec593e0350d9f5d4a0a18d0ee5ab6c19c07b84a01a5f3f4e0704",
+      "id": "mwvy86xxc11369af4186",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 20,
+      "at": "2026-11-25T09:56:42.815Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:18",
+      "outcome": "succeeded",
+      "outboundId": "out.073113c75eb1edf1bb07274199ab515720c755e5dac234808d737c66bd73529c",
+      "id": "mwvy8kap1dc605a414c4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 20,
+      "at": "2026-11-25T09:56:42.838Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:19",
+      "outcome": "succeeded",
+      "outboundId": "out.67d1250ac522fb6596d63bcb345faf2036bf5455d96e1a785a7acce75aadecbb",
+      "id": "mwvy8kbcbb8cb03a1975",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 21,
+      "at": "2026-11-25T09:56:50.007Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:19",
+      "outcome": "succeeded",
+      "outboundId": "out.4f034b11b75fa3dcec663b8b239c658f6855fdeb651d20ea013ec19ed722fcb1",
+      "id": "mwvy8puh181e58c18db3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 21,
+      "at": "2026-11-25T09:56:50.036Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:20",
+      "outcome": "succeeded",
+      "outboundId": "out.b2abc7167851aeb45143b1397eb26f5c3294c752e3003099ec595b9239fe95fa",
+      "id": "mwvy8pva70a6ed3a4f77",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 22,
+      "at": "2026-11-25T09:56:59.162Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:20",
+      "outcome": "succeeded",
+      "outboundId": "out.5db7a4b74f7902cce12a06ae19f455581a557bd3a023541398806acf581b7629",
+      "id": "mwvy8wws98c6a7d16fc3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 22,
+      "at": "2026-11-25T09:56:59.192Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.search succeeded",
+      "capability": "code.workspace.search",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:21",
+      "outcome": "succeeded",
+      "outboundId": "out.861d4eb33f15b914f5f9bdc37affa99cbbada175736d1b8ba9f834b0f78b95e4",
+      "id": "mwvy8wxm62ec5948533e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 23,
+      "at": "2026-11-25T09:57:08.513Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:21",
+      "outcome": "succeeded",
+      "outboundId": "out.281df8b1aaaacfa93db377a1a73433da414ab7b6f7aaa3646346049ba878bd06",
+      "id": "mwvy944ie49345dd36b3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 23,
+      "at": "2026-11-25T09:57:08.530Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list succeeded",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:22",
+      "outcome": "succeeded",
+      "outboundId": "out.059119188a049edfe005e2d39948f2cbbf35fc7363fede1339532677b226d9cf",
+      "id": "mwvy9451954272489372",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 24,
+      "at": "2026-11-25T09:57:19.793Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:22",
+      "outcome": "succeeded",
+      "outboundId": "out.2e0e13b7161ca9693f3c19ddf1653d882cfe636e21a617744537b2a367bb6ded",
+      "id": "mwvy9ctv42cbe2a94444",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 24,
+      "at": "2026-11-25T09:57:19.810Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:23",
+      "outcome": "succeeded",
+      "outboundId": "out.bcca37c39105177d52a3e5d5e34bbbf660dd93048fbb4b9b13fd52c86a602451",
+      "id": "mwvy9cuc27b770d87eff",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 25,
+      "at": "2026-11-25T09:57:29.933Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:23",
+      "outcome": "succeeded",
+      "outboundId": "out.1f9979ca4ed1dee8a08812145fe933dc49e3eeab482dc3a20813ca70c395751e",
+      "id": "mwvy9knj19bad5373e2e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 25,
+      "at": "2026-11-25T09:57:32.750Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.run succeeded",
+      "capability": "code.workspace.run",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:24",
+      "outcome": "succeeded",
+      "outboundId": "out.4ae26e2cf5c029750c5397f091a501e36cc0c94ff0fdcd7c2df6b83fd359e89f",
+      "id": "mwvy9mts6a6fa8fbae25",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 26,
+      "at": "2026-11-25T09:57:43.086Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:24",
+      "outcome": "succeeded",
+      "outboundId": "out.37700f6cb3f17df6d626e93f12d6810903e84c8925ee71d92ab9256c7f9a3022",
+      "id": "mwvy9usv3a5760f554bf",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 26,
+      "at": "2026-11-25T09:57:43.103Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:25",
+      "outcome": "succeeded",
+      "outboundId": "out.d3078e6dee2914b44746ef37fcad802229ed10e2aa35359f634dbc87e4184de9",
+      "id": "mwvy9utga0165cb7af32",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 27,
+      "at": "2026-11-25T09:57:54.545Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:25",
+      "outcome": "succeeded",
+      "outboundId": "out.30a916758f48cc9d3f2edd5c31ca7be8ff98e4fb0536e2a4d98dc987a76e17a3",
+      "id": "mwvya3n797e19fada864",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 27,
+      "at": "2026-11-25T09:57:54.562Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:26",
+      "outcome": "succeeded",
+      "outboundId": "out.36bda83ae295217e1c9dc2b097a05b61bc69e72f06d75722bcf818d63bcaba04",
+      "id": "mwvya3no6ba16144249d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 28,
+      "at": "2026-11-25T09:58:12.163Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:26",
+      "outcome": "succeeded",
+      "outboundId": "out.cccb0fc7c4a1b241df5140b858ff8c8b21de8cd24966ada09d5649a10d319d80",
+      "id": "mwvyah8l8448be362417",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 28,
+      "at": "2026-11-25T09:58:12.186Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:27",
+      "outcome": "succeeded",
+      "outboundId": "out.e987a83ac8edfa1b171d6abec0ae6cc3a17dad562c5e05e1610b8f2b0e75cb9e",
+      "id": "mwvyah983ec5e7d1f975",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 29,
+      "at": "2026-11-25T09:58:24.863Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:27",
+      "outcome": "succeeded",
+      "outboundId": "out.f88878a9d9b132ac8b423d726c8f16809028d04e51a7b793d81372c770b530bc",
+      "id": "mwvyar1db713987c48ad",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 29,
+      "at": "2026-11-25T09:58:24.879Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.list failed: NOT_FOUND node_modules/@appport is not a directory.",
+      "capability": "code.workspace.list",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:28",
+      "outcome": "failed",
+      "outboundId": "out.b3c925fdfd1e372a3393c772afbb22f8c0499f1d948559b64070502cb42fdcaf",
+      "detail": {
+        "code": "NOT_FOUND",
+        "message": "node_modules/@appport is not a directory."
+      },
+      "id": "mwvyar1sf088c9c7f6e9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 30,
+      "at": "2026-11-25T09:58:40.318Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:28",
+      "outcome": "succeeded",
+      "outboundId": "out.187853f556694fe574aae6811f88930bf699e290b4c1a122c045cc30f48f68e1",
+      "id": "mwvyb2yoe9ed8f06a996",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 30,
+      "at": "2026-11-25T09:58:40.340Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:29",
+      "outcome": "succeeded",
+      "outboundId": "out.e22acd7df42f9082f41c1c463c2831c40f031742d06d6972e30b5e05bd18826e",
+      "id": "mwvyb2zaaddb869edba7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 31,
+      "at": "2026-11-25T09:58:57.033Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:29",
+      "outcome": "succeeded",
+      "outboundId": "out.f7405737e81cf51e00dfc1869ca837dfb630a94ee05f35776b7a974b1e9edd05",
+      "id": "mwvybfuz2a6fc10a97e8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 31,
+      "at": "2026-11-25T09:58:57.048Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:act:30",
+      "outcome": "succeeded",
+      "outboundId": "out.39d0d6ccc5d283133ae100406b9ee9be131cf2dd73bc6bb6dd1a3c9b3b8bee03",
+      "id": "mwvybfve85c8830092ad",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 32,
+      "at": "2026-11-25T09:59:27.793Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide succeeded",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:decide:30",
+      "outcome": "succeeded",
+      "outboundId": "out.6a8415cb82a24de59ad35bf7a708fd2009ba52bb179b8984a8a8bbad54337449",
+      "id": "mwvyc3lf81ccf3ee6150",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 32,
+      "at": "2026-11-25T09:59:27.810Z",
+      "from": "investigating",
+      "to": "proving",
+      "kind": "decide",
+      "summary": "The investigation proposed 1 finding(s); proving each before anything is filed.",
+      "id": "mwvyc3lw970fb42674d5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 33,
+      "at": "2026-11-25T09:59:28.328Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:prove:0:0",
+      "outcome": "succeeded",
+      "outboundId": "out.e76f517b91d9465d3a366232481d4ee9d5ace891eca59c7c7458498ec109d417",
+      "id": "mwvyc409354a5c56e1d8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 33,
+      "at": "2026-11-25T09:59:28.333Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing': verified (packages/appboundry-host/src/transactions.ts:205-210 contains the quoted code).",
+      "id": "mwvyc40f1dee4410f9b2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 34,
+      "at": "2026-11-25T09:59:29.331Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:prove:0:1",
+      "outcome": "succeeded",
+      "outboundId": "out.98586ca1d995f31b071f906b91089381245dbb10bed4cb9b4e6cf5c88e19c4f7",
+      "id": "mwvyc4s453ba8260479d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 34,
+      "at": "2026-11-25T09:59:29.336Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing': verified (packages/appboundry-host/src/transactions.ts:139-141 contains the quoted code).",
+      "id": "mwvyc4s9c879f1ce08d5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 35,
+      "at": "2026-11-25T09:59:30.334Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "invoke",
+      "summary": "code.workspace.read succeeded",
+      "capability": "code.workspace.read",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:prove:0:2",
+      "outcome": "succeeded",
+      "outboundId": "out.1c41560e96fb100dcfbaeb3816520871e6ee3213924404c8114d43b0fbe401cf",
+      "id": "mwvyc5jz2618ad3473ca",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 35,
+      "at": "2026-11-25T09:59:30.362Z",
+      "from": "proving",
+      "to": "proving",
+      "kind": "verify",
+      "summary": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing': verified (packages/appboundry-host/src/host.ts:521-523 contains the quoted code).",
+      "id": "mwvyc5ks0cd0fe956dbc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 36,
+      "at": "2026-11-25T09:59:31.326Z",
+      "from": "proving",
+      "to": "filing",
+      "kind": "verify",
+      "summary": "Proved 1 of 1 finding(s).",
+      "id": "mwvyc6bjecb3161cf398",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 37,
+      "at": "2026-11-25T09:59:33.656Z",
+      "from": "filing",
+      "to": "filing",
+      "kind": "invoke",
+      "summary": "tracker.items.find succeeded",
+      "capability": "tracker.items.find",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:dup:2c4ba26b4769da58",
+      "outcome": "succeeded",
+      "outboundId": "out.5be049a045842f1a14c4ec007c09d5dd7f6fa29551d37f57d8a5d1fabea51b5b",
+      "id": "mwvyc84a37eba132464c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 37,
+      "at": "2026-11-25T09:59:34.694Z",
+      "from": "filing",
+      "to": "filing",
+      "kind": "invoke",
+      "summary": "tracker.items.create succeeded",
+      "capability": "tracker.items.create",
+      "idempotencyKey": "mwvy5fde3b87b4b4a9b3:file:2c4ba26b4769da58",
+      "outcome": "succeeded",
+      "outboundId": "out.1c5bf34f2e4b996d0a3e55adcbd39310968d5bcf6487c9890fac0c5e5bf6653b",
+      "id": "mwvyc8x4cfc198af3bdc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "seq": 38,
+      "at": "2026-11-25T09:59:35.331Z",
+      "from": "filing",
+      "to": "completed",
+      "kind": "report",
+      "summary": "Filed 1 issue(s); 0 already tracked, 0 over the limit, 0 rejected for lack of proof.",
+      "id": "mwvyc9etdbb81bca6686",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:32.290Z",
+      "digest": "ddbf6f0d3e0f7d54",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main ec75dbd921ef; checks: prepare, build, test."
+      },
+      "id": "mwvy5rl0060d2311473c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "check_result",
+      "at": "2026-11-25T09:54:33.175Z",
+      "digest": "fb7b43c7aec76a82",
+      "data": {
+        "run": "run_93781d9c",
+        "purpose": "prepare",
+        "check": "prepare",
+        "target": null,
+        "exitCode": 0,
+        "durationMs": 13566,
+        "output": "/workspaces/ws_5f71698283ed/packages/appboundry-route/node_modules/.bin/appboundry-host. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/packages/appboundry-route/node_modules/@appport/appboundry-host/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/appboundry/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/appboundry/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/documents/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/documents/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/materialization-reference/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/materialization-reference/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/application-capabilities/invoicing/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/application-capabilities/invoicing/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/application-capabilities/commerce/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/application-capabilities/commerce/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/todos/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/todos/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/contract-first-taskboard/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/examples/contract-first-taskboard/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/packages/appboundry/node_modules/.bin/appport. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/packages/appboundry/node_modules/appport/dist/bin.js'\n WARN  Failed to create bin at /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/packages/appboundry/node_modules/.bin/appboundry-host. ENOENT: no such file or directory, open '/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed/packages/appboundry/node_modules/@appport/appboundry-host/dist/bin.js'\nDone in 2.3s using pnpm v10.33.0\n(node:10436) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10448) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n> appport-monorepo@1.0.0 build /home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed\n> tsc -b tsconfig.build.json\n\n"
+      },
+      "id": "mwvy5s9v9fe31bb9ae0e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:54:36.824Z",
+      "digest": "c0c33bbdb7f7c8a2",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 68,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1417,
+        "latencyMs": 2606,
+        "messageId": "msg_011ChPSiChfKBt2uAPmLfCrW"
+      },
+      "id": "mwvy5v2zc174e9c869a7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:54:36.827Z",
+      "digest": "e1cad5b4f9cbfb1f",
+      "data": {
+        "n": 1,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host\"}",
+        "resultJson": null,
+        "rationale": "Start by exploring the host package structure."
+      },
+      "id": "mwvy5v30ec3c7de70f7c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:36.840Z",
+      "digest": "cc200957b9f17998",
+      "data": {
+        "n": 1,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host"
+        },
+        "summary": "packages/appboundry-host: README.md  package.json  src/  test/  tsconfig.json  tsconfig.tsbuildinfo"
+      },
+      "id": "mwvy5v3e609eb7b5aae5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:54:38.952Z",
+      "digest": "2079aa87da95184e",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 70,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1484,
+        "latencyMs": 1761,
+        "messageId": "msg_011ChPSiQs9JxMGFtQ8gyQHH"
+      },
+      "id": "mwvy5wq2f34f4dad38a3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:54:38.954Z",
+      "digest": "d137aefb78062b90",
+      "data": {
+        "n": 2,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "Map the host source tree before reading files."
+      },
+      "id": "mwvy5wq4470cc8e69497",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:38.969Z",
+      "digest": "5f232709b3a43618",
+      "data": {
+        "n": 2,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src: admin-channel.ts  admin.ts  appport.ts  archive.ts  artifact.ts  authority-fence.ts  backup.ts  bin.ts  capabilities.ts  cli.ts  collections.ts  contract.ts  guest.ts  host.ts  http.ts  identity.ts  index.ts  integrity.ts  invocations.ts  isolation-verify.ts  managed.ts  manifest.ts  mcp.ts  memory-policy.ts  paged-read.ts  routing.ts  services.ts  state.ts  tenancy.ts  transactions.ts  verify.ts"
+      },
+      "id": "mwvy5wqk32e06115c59b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:54:42.537Z",
+      "digest": "0573b6b328c10632",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 147,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 1724,
+        "latencyMs": 3344,
+        "messageId": "msg_011ChPSiZLPFusgt8kTWLRxQ"
+      },
+      "id": "mwvy5zhn08db7a5950a6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:54:42.539Z",
+      "digest": "d27ec052c163e1fb",
+      "data": {
+        "n": 3,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 1, \"endLine\": 200}",
+        "resultJson": null,
+        "rationale": "Transactions are a prime spot for data-loss and atomicity defects; start there."
+      },
+      "id": "mwvy5zhq36e4a67f36cc",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:42.562Z",
+      "digest": "a0ea739a509b82a9",
+      "data": {
+        "n": 3,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 1,
+          "endLine": 200
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 1-200 of 259:\n1\t/**\n2\t * Host interface transactions@1: `db.sequence` and `outbox.stage`, the guest operations behind a\n3\t * producer's transactional sequences and after-commit effects (FeltKit: ctx.db.sequence,\n4\t * ctx.afterCommit). The contract is FeltKit's docs/TRANSACTIONS.md, implemented here on the\n5\t * host's own FeltDB transaction (collections.ts) with host-owned collections:\n6\t *\n7\t *   sequence      per stream (its name): strictly increasing and gapless in commit order, written\n8\t *                 in the mutation's transaction guarded on the version read, so a concurrent\n9\t *                 commit of the same stream refuses the whole transaction (CONFLICT) and a\n10\t *                 failed mutation consumes nothing; independent streams never contend\n11\t *   outbox        one record per effect, committed with the mutation or not at all; performed\n12\t *                 after the commit as the caller (claimed pending → performing, version-checked),\n13\t *                 then done (with its result) or failed (with the error); stale pending and\n14\t *                 performing records are recovered by the worker after a restart; a failed one\n15\t *                 is retried only by an operator. A job or webhook event is created in the same\n16\t *                 FeltDB transaction that records it done (AppPort Services' transaction context,\n17\t *                 @appport/services 0.13.1), so it is created once per committed effect; a\n18\t *                 notification carries the record id as its idempotency key. Creation, not\n19\t *                 delivery: a job's run or a webhook's delivery to its endpoint is the services'\n20\t *                 own (at least o\n…\nr failed with the error. `perform` may instead commit\n173\t * the done write itself, in the transaction that creates the effect (`complete(result)` gives it);\n174\t * then nothing more is written. Never throws: the mutation has committed. `skipped`: gone,\n175\t * settled, or claimed by another performer.\n176\t */\n177\texport async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => {}): Promise<\"done\" | \"failed\" | \"skipped\"> {\n178\t  const get = async () => ((await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null) ?? null;\n179\t  const current = await get();\n180\t  if (!current || current.state === \"done\" || current.state === \"failed\") return \"skipped\";\n181\t  try {\n182\t    await put(db, id, current.__version, { ...current, state: \"performing\", attempts: (current.attempts ?? 0) + 1, updatedAt: Date.now() });\n183\t  } catch {\n184\t    return \"skipped\";\n185\t  }\n186\t  const claim = await get();\n187\t  if (!claim || claim.state !== \"performing\") return \"skipped\";\n188\t  let next: OutboxRecord;\n189\t  let completed = false;\n190\t  const complete = (result: Record<string, unknown>) => {\n191\t    completed = true;\n192\t    return completion(claim, result);\n193\t  };\n194\t  try {\n195\t    const result = await perform(claim, complete);\n196\t    // Committed with the effect: done is already recorded.\n197\t    if (completed) return \"done\";\n198\t    const { error: _e, ...rest } = claim;\n199\t    next = { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) };\n200\t  } catch (error) {"
+      },
+      "id": "mwvy5zij843e22149150",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:54:48.045Z",
+      "digest": "d75be2428f9c8ff5",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 268,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 3032,
+        "latencyMs": 4848,
+        "messageId": "msg_011ChPSirVWg2ekwKFuF6aq2"
+      },
+      "id": "mwvy63qn3cf7eb27df5f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:54:48.047Z",
+      "digest": "1ff2359ad51aecaf",
+      "data": {
+        "n": 4,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 20, \"endLine\": 259}",
+        "resultJson": null,
+        "rationale": "Read the rest of transactions.ts: the module header I skipped and the end of performOutbox, so I can check how the outbox claim, completion and recovery handle failures."
+      },
+      "id": "mwvy63qr5d4c22950fa2",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:48.067Z",
+      "digest": "4a7efb790acbf23c",
+      "data": {
+        "n": 4,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 20,
+          "endLine": 259
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 20-259 of 259:\n20\t *                 own (at least once).\n21\t *\n22\t * No second transaction system: the records are extra operations of the mutation's FeltDB\n23\t * transaction.\n24\t */\n25\timport { HostError } from \"./collections.js\";\n26\t\n27\texport const SEQUENCES_COLLECTION = \"_appboundry_sequences\";\n28\texport const OUTBOX_COLLECTION = \"_appboundry_outbox\";\n29\t/** A pending record not performed after this long is recovered (its runtime likely stopped). */\n30\texport const OUTBOX_RECOVER_AFTER_MS = 30_000;\n31\t/** A record left performing this long (its performer stopped mid-way) is recovered too. */\n32\texport const OUTBOX_PERFORMING_STALE_MS = OUTBOX_RECOVER_AFTER_MS * 10;\n33\t/** The most re-runs a function's manifest may ask for on sequence contention. */\n34\texport const MAX_SEQUENCE_RETRIES = 10;\n35\t\n36\tconst SEQUENCE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;\n37\tconst RECORD_ID = /^[A-Za-z0-9._-]{1,128}$/;\n38\t\n39\t/**\n40\t * The record id a stream is stored under: the name itself when it is a valid FeltDB id, else \"_\"\n41\t * + the name with \".\" written \".d\" and \":\" written \".c\" (injective, never equal to a name).\n42\t */\n43\texport function sequenceRecordId(name: unknown): string {\n44\t  if (typeof name !== \"string\" || !SEQUENCE_NAME.test(name)) {\n45\t    throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} must be 1-128 letters, digits, \"_\", \".\", \":\" or \"-\", starting with a letter or digit.`);\n46\t  }\n47\t  if (RECORD_ID.test(name)) return name;\n48\t  const id = `_${name.replace(/\\./g, \".d\").replace(/:/g, \".c\")}`;\n49\t  if (!RECORD_ID.test(id)) throw new HostError(\"INVALID_ARGUMENT\", `Sequence name ${JSON.stringify(name)} is too long to store (${id.len\n…\nlicts: n as number };\n237\t}\n238\t\n239\t/** After-commit effects in `db`, newest first (optionally only one state). */\n240\texport async function listOutbox(db: { collection(name: string): { find(filter: Record<string, unknown>): Promise<unknown[]> } }, filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\n241\t  if (filter.state !== undefined && ![\"pending\", \"performing\", \"done\", \"failed\"].includes(filter.state)) throw new HostError(\"INVALID_ARGUMENT\", \"state is pending, performing, done or failed.\");\n242\t  const rows = (await db.collection(OUTBOX_COLLECTION).find(filter.state ? { state: filter.state } : {})) as Array<OutboxRecord & { __version?: number }>;\n243\t  return rows.map(r => strip(r)).sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.min(Math.max(Number(filter.limit) || 100, 1), 1000));\n244\t}\n245\t\n246\t/** Move a failed record back to pending (an operator's retry); a running host then performs it. */\n247\texport async function retryOutboxRecord(db: Store, id: unknown, by: string): Promise<OutboxRecord> {\n248\t  if (typeof id !== \"string\" || !id) throw new HostError(\"INVALID_ARGUMENT\", \"Name the after-commit effect to retry (see `appboundry admin outbox list --status failed`).\");\n249\t  const record = (await db.collection(OUTBOX_COLLECTION).get(id).catch(() => null)) as (OutboxRecord & { __version: number }) | null;\n250\t  if (!record) throw new HostError(\"NOT_FOUND\", `No after-commit effect ${id}.`);\n251\t  const next = retried(record, by);\n252\t  try {\n253\t    await put(db, id, record.__version, next);\n254\t  } catch {\n255\t    throw new HostError(\"CONFLICT\", `After-commit effect ${id} changed while it was being retried. Nothing was changed; read it again.`);\n256\t  }\n257\t  return next;\n258\t}\n259\t"
+      },
+      "id": "mwvy63rk5e884db7b07d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:54:52.920Z",
+      "digest": "3a3b7937877ba0ca",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 181,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 4616,
+        "latencyMs": 4698,
+        "messageId": "msg_011ChPSjDu8G8R7qDGZnWR3V"
+      },
+      "id": "mwvy67i25cea1f3abaf9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:54:52.922Z",
+      "digest": "297ed32ac7fe99fb",
+      "data": {
+        "n": 5,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 50, \"endLine\": 172}",
+        "resultJson": null,
+        "rationale": "Both earlier reads came back truncated, so lines 50-172 (the sequence and outbox put/claim logic) are still unseen. I need them before judging the outbox perform path."
+      },
+      "id": "mwvy67i4b92f142f8476",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:52.936Z",
+      "digest": "00e1d4d38af024c0",
+      "data": {
+        "n": 5,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 50,
+          "endLine": 172
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 50-172 of 259:\n50\t  return id;\n51\t}\n52\t\n53\t/** The sequences one mutation drew from, and the guarded writes that advance them. */\n54\texport class SequenceAllocations {\n55\t  readonly #streams = new Map<string, { id: string; version: number | null; committed: number; next: number }>();\n56\t\n57\t  async next(name: unknown, read: (id: string) => Promise<{ value?: unknown; __version: number } | null>): Promise<number> {\n58\t    const key = String(name);\n59\t    let stream = this.#streams.get(key);\n60\t    if (!stream) {\n61\t      const id = sequenceRecordId(name);\n62\t      const record = await read(id);\n63\t      const committed = typeof record?.value === \"number\" ? record.value : 0;\n64\t      stream = { id, version: record ? record.__version : null, committed, next: committed };\n65\t      this.#streams.set(key, stream);\n66\t    }\n67\t    stream.next += 1;\n68\t    return stream.next;\n69\t  }\n70\t\n71\t  operations(transactionId: string): Array<Record<string, unknown>> {\n72\t    const out: Array<Record<string, unknown>> = [];\n73\t    for (const [name, s] of this.#streams) {\n74\t      if (s.next === s.committed) continue;\n75\t      const value = { id: s.id, name, value: s.next, transactionId };\n76\t      out.push(s.version === null ? { collection: SEQUENCES_COLLECTION, id: s.id, requireAbsent: true, value } : { collection: SEQUENCES_COLLECTION, id: s.id, ifVersion: s.version, value });\n77\t    }\n78\t    return out;\n79\t  }\n80\t}\n81\t\n82\texport type OutboxEffect =\n83\t  | { service: \"notifications\"; method: \"send\"; input: Record<string, unknown> & { recipient: string; type: string; title: string; idempotencyKey?: string } }\n84\t  | { service: \"webhooks\"; method: \"emit\"; type: string; payload: Record<string\n…\nord, by: string, now = Date.now()): OutboxRecord {\n149\t  if (record.state !== \"failed\") throw new HostError(\"FAILED_PRECONDITION\", `After-commit effect ${record.id} is ${record.state}; only a failed effect can be retried.`);\n150\t  return { ...strip(record), state: \"pending\", updatedAt: now, retriedBy: by };\n151\t}\n152\t\n153\ttype Store = { collection(name: string): { get(id: string): Promise<unknown>; find(filter: Record<string, unknown>): Promise<unknown[]> }; transaction(request: never): Promise<unknown> };\n154\t\n155\t/** Write `value` only if the record is still at `version` (throws otherwise; nothing written). */\n156\tasync function put(db: Store, id: string, version: number, value: OutboxRecord): Promise<void> {\n157\t  await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\n158\t}\n159\t\n160\t/**\n161\t * The write that records `claim` done with `result`, guarded on the claim's version: an effect\n162\t * that commits it in its own transaction (a job, webhook deliveries) is created exactly when the\n163\t * record says done, and a stale claim creates nothing.\n164\t */\n165\texport function completion(claim: OutboxRecord & { __version: number }, result: Record<string, unknown>): Record<string, unknown> {\n166\t  const { error: _e, ...rest } = strip(claim);\n167\t  return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\n168\t}\n169\t\n170\t/**\n171\t * Perform one record: claim it (version-checked, so two performers never both perform it),\n172\t * perform, record done with its result or failed with the error. `perform` may instead commit"
+      },
+      "id": "mwvy67ip7de69ddb1506",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:54:56.648Z",
+      "digest": "6f1da85d06a0c350",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 204,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 6032,
+        "latencyMs": 3445,
+        "messageId": "msg_011ChPSjbFkz69FmdQmBcsD1"
+      },
+      "id": "mwvy6adle9e7df3dd9f5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:54:56.649Z",
+      "digest": "0d7a8bdee8b15633",
+      "data": {
+        "n": 6,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 200, \"endLine\": 237}",
+        "resultJson": null,
+        "rationale": "See how performOutbox records done/failed after perform, and the recovery logic I have not read yet."
+      },
+      "id": "mwvy6adn8c3b266dcf0c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:54:56.665Z",
+      "digest": "a4fc980f04b201c0",
+      "data": {
+        "n": 6,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 200,
+          "endLine": 237
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 200-237 of 259:\n200\t  } catch (error) {\n201\t    const e = error as { code?: string; message?: string };\n202\t    next = { ...claim, state: \"failed\", updatedAt: Date.now(), error: { code: e?.code ?? \"INTERNAL\", message: e?.message ?? String(error) } };\n203\t    warn(`after-commit ${claim.effect.service}.${claim.effect.method} from ${claim.function} failed: ${next.error!.message}`);\n204\t  }\n205\t  try {\n206\t    await put(db, id, claim.__version, next);\n207\t  } catch (error) {\n208\t    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n209\t  }\n210\t  return next.state as \"done\" | \"failed\";\n211\t}\n212\t\n213\t/** The service call an effect is. */\n214\texport function serviceCall(record: OutboxRecord): { service: string; method: string; input: Record<string, unknown> } {\n215\t  const effect = record.effect;\n216\t  if (effect.service === \"notifications\") return { service: \"notifications\", method: \"send\", input: { ...effect.input, idempotencyKey: effect.input.idempotencyKey ?? record.id } };\n217\t  if (effect.service === \"jobs\") return { service: \"jobs\", method: \"enqueue\", input: { type: effect.type, payload: effect.payload, ...(effect.options ? { options: effect.options } : {}) } };\n218\t  return { service: \"webhooks\", method: \"emit\", input: { type: effect.type, payload: effect.payload } };\n219\t}\n220\t\n221\t/** What an effect produced, as recorded on its outbox record. */\n222\texport function effectResult(record: OutboxRecord, value: unknown): Record<string, unknown> {\n223\t  const v = (value ?? {}) as Record<string, unknown>;\n224\t  if (record.effect.service === \"notifications\") return typeof v.id === \"string\" ? { notificationId: v.id } : {};\n225\t  if (record.effect.service === \"jobs\") return typeof v.id === \"string\" ? { jobId: v.id } : {};\n226\t  return { deliveries: typeof v.deliveries === \"number\" ? v.deliveries : Array.isArray(value) ? value.length : 0 };\n227\t}\n228\t\n229\t/** The retry policy a manifest function entry may carry. */\n230\texport function retryPolicy(value: unknown, kind: string): { sequenceConflicts: number } | undefined {\n231\t  if (value === undefined) return undefined;\n232\t  const n = isObject(value) ? value.sequenceConflicts : undefined;\n233\t  if (kind !== \"mutation\" || !Number.isInteger(n) || (n as number) < 1 || (n as number) > MAX_SEQUENCE_RETRIES) {\n234\t    throw new Error(`retry must be { sequenceConflicts: 1-${MAX_SEQUENCE_RETRIES} } on a mutation`);\n235\t  }\n236\t  return { sequenceConflicts: n as number };\n237\t}"
+      },
+      "id": "mwvy6aeb79edce50c613",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:03.903Z",
+      "digest": "8b21be65a473f8aa",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 537,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 7109,
+        "latencyMs": 6689,
+        "messageId": "msg_011ChPSjtQ8NZkG6o8KMtfqy"
+      },
+      "id": "mwvy6fz59a79d3e23435",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:03.905Z",
+      "digest": "7eb6ae41b15c81fa",
+      "data": {
+        "n": 7,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\": \"performOutbox|OUTBOX_PERFORMING_STALE_MS|OUTBOX_RECOVER_AFTER_MS\", \"path\": \"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "See how outbox records are performed and recovered, to judge what happens when performOutbox's final write fails."
+      },
+      "id": "mwvy6fz674033924630c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:03.927Z",
+      "digest": "cc6001b335d489e6",
+      "data": {
+        "n": 7,
+        "action": "search",
+        "input": {
+          "pattern": "performOutbox|OUTBOX_PERFORMING_STALE_MS|OUTBOX_RECOVER_AFTER_MS",
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src/host.ts:43: import { effectResult, isRecoverable, listOutbox, OUTBOX_COLLECTION, performOutbox, retryOutboxRecord, SEQUENCES_COLLECTION, SequenceAllocations, serviceCall, stagedRecords, type OutboxRecord } from \"./transactions.js\";\npackages/appboundry-host/src/host.ts:535:       return performOutbox(this.#db as never, record.id, async () => {\npackages/appboundry-host/src/host.ts:541:       const outcome = await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, principal, requestId), message => this.#logger.warn(message));\npackages/appboundry-host/src/host.ts:768:             await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, options.principal, requestId), message => this.#logger.warn(`${name} (${requestId}): ${message}`));\npackages/appboundry-host/src/transactions.ts:30: export const OUTBOX_RECOVER_AFTER_MS = 30_000;\npackages/appboundry-host/src/transactions.ts:32: export const OUTBOX_PERFORMING_STALE_MS = OUTBOX_RECOVER_AFTER_MS * 10;\npackages/appboundry-host/src/transactions.ts:140:   return (record.state === \"pending\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \"performing\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\npackages/appboundry-host/src/transactions.ts:177: export async function performOutbox(db: Store, id: string, perform: (record: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>) => Promise<Record<string, unknown>>, warn: (message: string) => void = () => "
+      },
+      "id": "mwvy6fzw5712bb952ecb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:08.326Z",
+      "digest": "143e164cb26f7a57",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 366,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 7870,
+        "latencyMs": 4118,
+        "messageId": "msg_011ChPSkQNgUvdQ2uCCo2Q32"
+      },
+      "id": "mwvy6je08e1dde73dff0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:08.328Z",
+      "digest": "1337b578b0b17d1f",
+      "data": {
+        "n": 8,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/host.ts\", \"startLine\": 505, \"endLine\": 600}",
+        "resultJson": null,
+        "rationale": "Look at how the host recovers and performs outbox records, to check the claim/recovery interaction with performOutbox."
+      },
+      "id": "mwvy6je2d7311924c10c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:08.350Z",
+      "digest": "e77bff437f5f2840",
+      "data": {
+        "n": 8,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/host.ts",
+          "startLine": 505,
+          "endLine": 600
+        },
+        "summary": "packages/appboundry-host/src/host.ts lines 505-600 of 963:\n505\t    } catch (error) {\n506\t      this.#logger.error(`job worker: ${(error as Error).message}`);\n507\t    } finally {\n508\t      this.#ticking = false;\n509\t    }\n510\t  }\n511\t\n512\t  /**\n513\t   * After-commit effects whose runtime stopped before performing them (pending past 30 s, or\n514\t   * performing past 300 s), performed as their caller's current principal; a caller that can no\n515\t   * longer be resolved fails the record. A failed record is never retried here (retryOutbox).\n516\t   */\n517\t  async recoverOutbox(now = Date.now()): Promise<number> {\n518\t    const outbox = this.#db.collection<OutboxRecord & { __version: number }>(OUTBOX_COLLECTION);\n519\t    const stale = [...(await outbox.find({ state: \"pending\" } as never)), ...(await outbox.find({ state: \"performing\" } as never))].filter(r => isRecoverable(r as OutboxRecord, now)) as Array<OutboxRecord & { __version: number }>;\n520\t    let performed = 0;\n521\t    for (const record of stale) {\n522\t      if ((await this.#performAs(record)) === \"done\") performed += 1;\n523\t    }\n524\t    return performed;\n525\t  }\n526\t\n527\t  /** Perform one outbox record as its caller (resolved now), or fail it if the caller is gone. */\n528\t  async #performAs(record: OutboxRecord & { __version: number }): Promise<\"done\" | \"failed\" | \"skipped\"> {\n529\t    // In the tenant the caller worked in, through the live membership only; no membership: not performed.\n530\t    const account = await this.identity.resolveDurable(record.principalId);\n531\t    const inTenant = account && record.tenantId ? await this.withTenant(account, record.tenantId) : account;\n532\t    const principal = inTenant && record.tenantId && inTenant.tenant?.id !== record.tenan\n…\ntions(authority: InvocationAuthority, clock?: () => Date, options: { fence?: CommitFence } = {}): InvocationService {\n572\t    const host = this;\n573\t    return new InvocationService({\n574\t      db: this.#db, manifest: this.artifact.manifest, fence: options.fence ?? this.authorityFence(clock),\n575\t      provider: { applicationId: this.artifact.manifest.application.id, incarnation: this.#stateRecord.incarnation ?? 1, version: this.artifact.manifest.application.version },\n576\t      call: (name, args, options) => host.call(name, args, options as CallOptions) as never\n577\t    }, authority, clock);\n578\t  }\n579\t\n580\t  async listOutbox(filter: { state?: string; limit?: number } = {}): Promise<OutboxRecord[]> {\n581\t    return listOutbox(this.#db, filter);\n582\t  }\n583\t\n584\t  /** An operator's retry of a failed effect: back to pending (attempts, last error kept), then performed now. */\n585\t  async retryOutbox(id: string, by: string): Promise<OutboxRecord> {\n586\t    return this.#gate.shared(async () => {\n587\t      await retryOutboxRecord(this.#db, id, by);\n588\t      const record = (await this.#db.collection<OutboxRecord & { __version: number }>(OUTBOX_COLLECTION).get(id))!;\n589\t      await this.#performAs(record as OutboxRecord & { __version: number });\n590\t      const { __version: _v, ...after } = (await this.#db.collection<OutboxRecord & { __version: number }>(OUTBOX_COLLECTION).get(id))! as OutboxRecord & { __version: number };\n591\t      return after as OutboxRecord;\n592\t    });\n593\t  }\n594\t\n595\t  /** Run due jobs now (tests, and the worker's timer). */\n596\t  runDueJobs(): Promise<void> {\n597\t    return this.#tick();\n598\t  }\n599\t\n600\t  /** Administration, under the shared gate (a backup sees all of an operation or none of it). */"
+      },
+      "id": "mwvy6jewf58656a9e6e9",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:15.887Z",
+      "digest": "06738e11945d94ec",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 386,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 9288,
+        "latencyMs": 6670,
+        "messageId": "msg_011ChPSkmjZogxk7v4iwLTUm"
+      },
+      "id": "mwvy6p811b7f27f15a16",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:15.889Z",
+      "digest": "9117f88917b445ea",
+      "data": {
+        "n": 9,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/host.ts\",\"startLine\":528,\"endLine\":570}",
+        "resultJson": null,
+        "rationale": "See how #performAs uses performOutbox and its return value, including the failure path when a caller is gone."
+      },
+      "id": "mwvy6p83224af2146bb1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:15.916Z",
+      "digest": "aeca8c7bf165f942",
+      "data": {
+        "n": 9,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/host.ts",
+          "startLine": 528,
+          "endLine": 570
+        },
+        "summary": "packages/appboundry-host/src/host.ts lines 528-570 of 963:\n528\t  async #performAs(record: OutboxRecord & { __version: number }): Promise<\"done\" | \"failed\" | \"skipped\"> {\n529\t    // In the tenant the caller worked in, through the live membership only; no membership: not performed.\n530\t    const account = await this.identity.resolveDurable(record.principalId);\n531\t    const inTenant = account && record.tenantId ? await this.withTenant(account, record.tenantId) : account;\n532\t    const principal = inTenant && record.tenantId && inTenant.tenant?.id !== record.tenantId ? null : inTenant;\n533\t    const requestId = `outbox_${record.id}`;\n534\t    if (!principal) {\n535\t      return performOutbox(this.#db as never, record.id, async () => {\n536\t        throw new HostError(\"UNAUTHORIZED\", `${record.principalId} could not be resolved to a current principal, so the effect was not performed.`);\n537\t      });\n538\t    }\n539\t    const release = this.#services.enter(requestId, principal);\n540\t    try {\n541\t      const outcome = await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, principal, requestId), message => this.#logger.warn(message));\n542\t      const call = serviceCall(record);\n543\t      const collection = SERVICE_COLLECTIONS[call.service];\n544\t      if (collection && SERVICE_WRITES.has(call.method)) this.#emit(new Set([collection]));\n545\t      return outcome;\n546\t    } finally {\n547\t      release();\n548\t    }\n549\t  }\n550\t\n551\t  /**\n552\t   * Perform one after-commit effect as `principal`. A job or webhook event is created in the same\n553\t   * FeltDB transaction as `complete(result)`, the record's done write (exactly once per committed\n554\t   * effect); a notification is sent directly with the record id as its idempotency key.\n555\t   */\n556\t  async #effect(claim: OutboxRecord, complete: (result: Record<string, unknown>) => Record<string, unknown>, principal: Principal | null, requestId: string): Promise<Record<string, unknown>> {\n557\t    const call = serviceCall(claim);\n558\t    if (claim.effect.service === \"jobs\" || claim.effect.service === \"webhooks\") return this.#services.performInTransaction(call, { principal, requestId }, complete);\n559\t    return effectResult(claim, await this.#services.perform(call, { principal, requestId, writable: true, reads: new Set() }));\n560\t  }\n561\t\n562\t  /** After-commit effects, newest first (optionally only one state). */\n563\t  /**\n564\t   * The provider-side invocation ledger and service (application participation, contract 3), bound to this state's application\n565\t   * incarnation. `authority` is the platform: it attributes and authorizes requests.\n566\t   */\n567\t  /** The provider's authority fence (contract 3): the platform installs, revokes and closes through it; invocation commits are guarded by it. */\n568\t  authorityFence(clock?: () => Date): AuthorityFence { return new AuthorityFence(this.#db, clock); }\n569\t\n570\t  /** `options.fence`: the provider fence to guard commits with (default: this host's own); a harness can observe or pace it. */"
+      },
+      "id": "mwvy6p90332d14b97da4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:26.007Z",
+      "digest": "df8b23f2a5cd1fe5",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 763,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 10441,
+        "latencyMs": 9793,
+        "messageId": "msg_011ChPSmHkbRpKy9atTdmt3J"
+      },
+      "id": "mwvy6x158ec713e5874a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:26.009Z",
+      "digest": "608c79f554f4db84",
+      "data": {
+        "n": 10,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"expectedVersion|ifVersion\",\"path\":\"packages/appboundry-host/src\"}",
+        "resultJson": null,
+        "rationale": "completion() uses `expectedVersion` while put() and sequences use `ifVersion`; need to see which guard key the transaction/services layer honours."
+      },
+      "id": "mwvy6x1873b1d62f6f60",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:26.036Z",
+      "digest": "6a799090d63f41f3",
+      "data": {
+        "n": 10,
+        "action": "search",
+        "input": {
+          "pattern": "expectedVersion|ifVersion",
+          "path": "packages/appboundry-host/src"
+        },
+        "summary": "packages/appboundry-host/src/admin.ts:103:     return sessions.map(s => ({ collection: SESSIONS_COLLECTION, id: s.id, ifVersion: s.__version }));\npackages/appboundry-host/src/admin.ts:125:       existing ? { collection: OPERATORS_COLLECTION, id, ifVersion: existing.__version, value: record } : { collection: OPERATORS_COLLECTION, id, requireAbsent: true, value: record },\npackages/appboundry-host/src/admin.ts:169:       { collection: OPERATORS_COLLECTION, id, ifVersion: operator.__version, value: { ...stripVersion(operator), disabled: true, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) } },\npackages/appboundry-host/src/admin.ts:204:     await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.set-roles\", id, { from: user.roles, to: roles })]);\npackages/appboundry-host/src/admin.ts:214:       { collection: USERS_COLLECTION, id, ifVersion: user.__version, value: { ...stripVersion(user), disabled: true, updatedAt: new Date().toISOString(), updatedBy: actorName(actor) } },\npackages/appboundry-host/src/admin.ts:225:     await this.#write([{ collection: USERS_COLLECTION, id, ifVersion: user.__version, value: next }, this.#audit(actor, \"users.enable\", id)]);\npackages/appboundry-host/src/authority-fence.ts:118:     const guards: Array<Record<string, unknown>> = [{ collection: AUTHORITY_COLLECTION, id: grant.id, ifVersion: grant.__version }];\npackages/appboundry-host/src/authority-fence.ts:123:       guards.push(p ? { collection: AUTHORITY_COLLECTION, id: p.id, ifVersion: p.__version } : { collection: AUTHORITY_COLLECTION, id: principalFenceId(side.applicationId, side.incarnation), requireAbsent: true });\npackages/appboundry-host/src/backup.ts:187:\n…\nid: LEASE_ID, ifVersion: lease.__version, value: this.#leaseValue(Date.parse(lease.acquiredAt), now) }] });\npackages/appboundry-host/src/managed.ts:395:         ...(lease ? { preconditions: [...(request.preconditions ?? []), { collection: RUNTIME_COLLECTION, id: LEASE_ID, ifVersion: lease.__version }] } : {})\npackages/appboundry-host/src/managed.ts:417:         if (lease) tx.require({ collection: RUNTIME_COLLECTION, id: LEASE_ID, ifVersion: lease.__version });\npackages/appboundry-host/src/services.ts:439:     if (row) await this.#db.transaction({ operations: [{ collection: FILE_CONTENT_COLLECTION, id, ifVersion: row.__version }] } as never);\npackages/appboundry-host/src/state.ts:204:     ? { collection: STATE_COLLECTION, id: \"artifact\", ifVersion: previous.__version, value: next }\npackages/appboundry-host/src/tenancy.ts:73:           ? { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key), value: { ...w.value, id: w.id } }\npackages/appboundry-host/src/tenancy.ts:74:           : { collection: w.collection, id: w.id, ifVersion: this.#seen.get(key) }\npackages/appboundry-host/src/transactions.ts:76:       out.push(s.version === null ? { collection: SEQUENCES_COLLECTION, id: s.id, requireAbsent: true, value } : { collection: SEQUENCES_COLLECTION, id: s.id, ifVersion: s.version, value });\npackages/appboundry-host/src/transactions.ts:157:   await db.transaction({ operations: [{ collection: OUTBOX_COLLECTION, id, ifVersion: version, value: strip(value) }] } as never);\npackages/appboundry-host/src/transactions.ts:167:   return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };"
+      },
+      "id": "mwvy6x2f3b21c4acfb64",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:30.236Z",
+      "digest": "dbc90ba395c7eb48",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 254,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 12043,
+        "latencyMs": 4022,
+        "messageId": "msg_011ChPSn2Rdb1ipm4euhqP8h"
+      },
+      "id": "mwvy70am9a9719be8715",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:30.238Z",
+      "digest": "d376fb17666b4cd2",
+      "data": {
+        "n": 11,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"expectedVersion|performInTransaction\",\"path\":\"packages\"}",
+        "resultJson": null,
+        "rationale": "completion() guards the done write with `expectedVersion`, while every other guarded write in the host uses `ifVersion`. I need to see how performInTransaction consumes it and whether anything honors `expectedVersion`."
+      },
+      "id": "mwvy70ao10b73ef2916f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:30.269Z",
+      "digest": "e7a172c4ba8463e1",
+      "data": {
+        "n": 11,
+        "action": "search",
+        "input": {
+          "pattern": "expectedVersion|performInTransaction",
+          "path": "packages"
+        },
+        "summary": "packages/appboundry-host/src/collections.ts:76:   expectedVersion?: number;\npackages/appboundry-host/src/collections.ts:535:         writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });\npackages/appboundry-host/src/collections.ts:538:         writes.push({ collection: pending.collection, id: pending.id, op: \"delete\", expectedVersion: pending.baseVersion! });\npackages/appboundry-host/src/contract.ts:284:         const guard = version === undefined ? { requireAbsent: true } : { expectedVersion: version };\npackages/appboundry-host/src/host.ts:558:     if (claim.effect.service === \"jobs\" || claim.effect.service === \"webhooks\") return this.#services.performInTransaction(call, { principal, requestId }, complete);\npackages/appboundry-host/src/services.ts:379:   async performInTransaction(call: ServiceCall, context: { principal: Principal | null; requestId: string }, completion: (result: Record<string, unknown>) => Record<string, unknown>): Promise<Record<string, unknown>> {\npackages/appboundry-host/src/transactions.ts:167:   return { collection: OUTBOX_COLLECTION, id: claim.id, expectedVersion: claim.__version, value: { ...rest, state: \"done\", updatedAt: Date.now(), ...(Object.keys(result).length ? { result } : {}) } };\npackages/appboundry-runtime/src/provider-contract.ts:42:   | { readonly operation: \"write\"; readonly collection: string; readonly id: string; readonly value: JsonValue; readonly expectedVersion?: number }\npackages/appboundry-runtime/src/provider-contract.ts:43:   | { readonly operation: \"delete\"; readonly collection: string; readonly id: string; readonly expectedVersion?: number };\npackages/appboundry/portal/app.js:77: const withVersion = (body, version) => typeof version === \"number\" ? { ...body, expectedVersion: version } : body;\npackages/appboundry/test/artifact-durable-writes.test.ts:7:  * it as done. The artifact now forwards the caller's expectedVersion when given\npackages/appboundry/test/artifact-durable-writes.test.ts:32:       expect(writeStep(plan(name, { id: \"x\", expectedVersion: 3 }))).toMatchObject({ operation: \"write\", expectedVersion: \"$input.expectedVersion\" });\npackages/appboundry/test/artifact-durable-writes.test.ts:33:       expect(writeStep(plan(name, { id: \"x\" }))).not.toHaveProperty(\"expectedVersion\");"
+      },
+      "id": "mwvy70bme701bc0884cf",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:35.419Z",
+      "digest": "68fa8691ae0a3358",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 240,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 13000,
+        "latencyMs": 4193,
+        "messageId": "msg_011ChPSnPsjNCCa3zaSErJF4"
+      },
+      "id": "mwvy74al7676a25a147d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:35.421Z",
+      "digest": "36006652182a2773",
+      "data": {
+        "n": 12,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/services.ts\", \"startLine\": 370, \"endLine\": 440}",
+        "resultJson": null,
+        "rationale": "completion() guards the done write with `expectedVersion`, while every other guarded write in the host uses `ifVersion`. I need to see how performInTransaction hands that operation to the database, to tell whether the guard is actually enforced."
+      },
+      "id": "mwvy74am29ebccefdba3",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:35.432Z",
+      "digest": "2078fafba0cc58c6",
+      "data": {
+        "n": 12,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/services.ts",
+          "startLine": 370,
+          "endLine": 440
+        },
+        "summary": "packages/appboundry-host/src/services.ts lines 370-440 of 465:\n370\t  }\n371\t\n372\t  /**\n373\t   * An after-commit job or webhook event, created in one FeltDB transaction with `completion`:\n374\t   * the caller's record that the effect is done (transactions.ts). AppPort Services' transaction\n375\t   * context writes the job, or the deliveries to the endpoints subscribed to the event, with their\n376\t   * audit record and authority evidence; all of it commits with the completion, or none of it.\n377\t   * Authorized as `principal`, with the same checks as the direct call.\n378\t   */\n379\t  async performInTransaction(call: ServiceCall, context: { principal: Principal | null; requestId: string }, completion: (result: Record<string, unknown>) => Record<string, unknown>): Promise<Record<string, unknown>> {\n380\t    const input = isRecord(call.input) ? call.input : {};\n381\t    const service = call.service as ServiceName;\n382\t    if (!this.#granted.has(service)) throw new HostError(\"FORBIDDEN\", `The artifact is not permitted to use service ${JSON.stringify(service)} (granted: ${[...this.#granted].join(\", \") || \"none\"}).`);\n383\t    const verified = this.#verified(context.principal, context.requestId);\n384\t    if (call.service === \"jobs\" && call.method === \"enqueue\") {\n385\t      const type = input.type;\n386\t      if (typeof type !== \"string\" || !type) throw new HostError(\"INVALID_ARGUMENT\", \"enqueue() needs a job type.\");\n387\t      if (!this.#jobHandlers[type]) throw new HostError(\"INVALID_ARGUMENT\", `No handler for job type \"${type}\". The artifact declares: ${Object.keys(this.#jobHandlers).join(\", \") || \"none\"}.`);\n388\t      const options = isRecord(input.options) ? input.options : {};\n389\t      const authorized = await this.#record(this.#o\n…\n: string; checksum: string }> {\n419\t    const checksum = createHash(\"sha256\").update(bytes).digest(\"hex\");\n420\t    const id = randomUUID();\n421\t    await this.#db.transaction({ operations: [{ collection: FILE_CONTENT_COLLECTION, id, requireAbsent: true, value: { id, data: Buffer.from(bytes).toString(\"base64\"), size: bytes.byteLength, checksum } }] } as never);\n422\t    return { storageKey: `${CONTENT_PREFIX}${id}`, checksum };\n423\t  }\n424\t\n425\t  async #readContent(fileId: string, storageKey: string, checksum?: string): Promise<Uint8Array> {\n426\t    if (!storageKey.startsWith(CONTENT_PREFIX)) throw new HostError(\"NOT_FOUND\", `File ${fileId} has no stored content.`);\n427\t    const record = await this.#db.collection<{ data: string; checksum: string }>(FILE_CONTENT_COLLECTION).get(storageKey.slice(CONTENT_PREFIX.length));\n428\t    if (!record) throw new HostError(\"NOT_FOUND\", `The content for file ${fileId} is missing.`);\n429\t    const bytes = new Uint8Array(Buffer.from(record.data, \"base64\"));\n430\t    const digest = createHash(\"sha256\").update(bytes).digest(\"hex\");\n431\t    if (digest !== record.checksum || (checksum && digest !== checksum)) throw new HostError(\"INTERNAL\", `File ${fileId} failed its checksum; the stored bytes do not match the recorded digest.`);\n432\t    return bytes;\n433\t  }\n434\t\n435\t  async #releaseContent(storageKey: string): Promise<void> {\n436\t    if (!storageKey.startsWith(CONTENT_PREFIX)) return;\n437\t    const id = storageKey.slice(CONTENT_PREFIX.length);\n438\t    const row = await this.#db.collection<{ __version: number }>(FILE_CONTENT_COLLECTION).get(id);\n439\t    if (row) await this.#db.transaction({ operations: [{ collection: FILE_CONTENT_COLLECTION, id, ifVersion: row.__version }] } as never);\n440\t  }"
+      },
+      "id": "mwvy74b4a83b79e9eb52",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:43.588Z",
+      "digest": "f253f55652e08ebb",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 488,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 14470,
+        "latencyMs": 7366,
+        "messageId": "msg_011ChPSnmYUJzmpahCbFmrpy"
+      },
+      "id": "mwvy7ali06fd0b734363",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:43.590Z",
+      "digest": "a9b793391fa4e000",
+      "data": {
+        "n": 13,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/services.ts\",\"startLine\":388,\"endLine\":418}",
+        "resultJson": null,
+        "rationale": "See how the completion write is committed with the job/webhook creation, to judge whether performOutbox's 'completed' flag reliably means done was recorded."
+      },
+      "id": "mwvy7alk020fbdbc315d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:43.604Z",
+      "digest": "681782de04dc0323",
+      "data": {
+        "n": 13,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/services.ts",
+          "startLine": 388,
+          "endLine": 418
+        },
+        "summary": "packages/appboundry-host/src/services.ts lines 388-418 of 465:\n388\t      const options = isRecord(input.options) ? input.options : {};\n389\t      const authorized = await this.#record(this.#official.authorize(\"jobs.create\", verified, { type: \"job\", attributes: { jobType: type } } as never));\n390\t      return this.#record(this.#official.transaction(async tx => {\n391\t        const jobId = tx.queueJob({\n392\t          tenantId: this.#tenantId,\n393\t          type,\n394\t          payload: isRecord(input.payload) ? input.payload : {},\n395\t          ...(typeof options.runAt === \"string\" ? { runAt: options.runAt } : {}),\n396\t          ...(typeof options.maxAttempts === \"number\" ? { maxAttempts: options.maxAttempts } : {})\n397\t        }, authorized);\n398\t        const result = { jobId };\n399\t        if (context.principal?.tenant) tx.addOperation(jobContextOperation(jobId, context.principal.tenant.id, context.principal.id, context.requestId) as never);\n400\t        tx.addOperation(completion(result) as never);\n401\t        return result;\n402\t      }));\n403\t    }\n404\t    if (call.service === \"webhooks\" && call.method === \"emit\") {\n405\t      const type = String(input.type);\n406\t      const authorized = await this.#record(this.#official.authorize(\"webhooks.emit\", verified, { type: \"webhook_event\", attributes: { eventType: type } } as never));\n407\t      const endpoints = (await this.#official.webhooks.listWebhookEndpoints(this.#tenantId)).filter(e => e.applicationId === this.#manifest.application.id && !e.disabledAt && e.events.includes(type));\n408\t      return this.#record(this.#official.transaction(async tx => {\n409\t        if (endpoints.length) await tx.queueWebhookDeliveries(endpoints.map(e => e.id), { tenantId: this.#tenantId, type, payload: isRecord(input.payload) ? input.payload : {} }, authorized);\n410\t        const result = { deliveries: endpoints.length };\n411\t        tx.addOperation(completion(result) as never);\n412\t        return result;\n413\t      }));\n414\t    }\n415\t    throw new HostError(\"INVALID_ARGUMENT\", `${String(call.service)}.${String(call.method)} is not created in a transaction.`);\n416\t  }\n417\t\n418\t  async #storeContent(bytes: Uint8Array): Promise<{ storageKey: string; checksum: string }> {"
+      },
+      "id": "mwvy7am335bc44ad7d73",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:55:53.307Z",
+      "digest": "99574b93f54a8258",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 765,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 15362,
+        "latencyMs": 9077,
+        "messageId": "msg_011ChPSoMSuTPp3HrcQcpyJn"
+      },
+      "id": "mwvy7i3h37a89a7ddbee",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:55:53.309Z",
+      "digest": "f3d2724ff8082364",
+      "data": {
+        "n": 14,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/collections.ts\", \"startLine\": 60, \"endLine\": 110}",
+        "resultJson": null,
+        "rationale": "The outbox done write in completion() uses `expectedVersion` while every other guarded write in the host uses `ifVersion`. I need to see which guard field the transaction operation shape actually honors."
+      },
+      "id": "mwvy7i3jc50ff896e350",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:55:53.320Z",
+      "digest": "161257be849ed2ad",
+      "data": {
+        "n": 14,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 60,
+          "endLine": 110
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 60-110 of 560:\n60\t  field: string;\n61\t  direction: \"asc\" | \"desc\";\n62\t}\n63\t\n64\tinterface Pending {\n65\t  collection: string;\n66\t  id: string;\n67\t  op: \"insert\" | \"update\" | \"delete\";\n68\t  value?: Record<string, unknown>;\n69\t  baseVersion?: number;\n70\t}\n71\t\n72\texport interface CommittedWrite {\n73\t  collection: string;\n74\t  id: string;\n75\t  op: \"insert\" | \"update\" | \"delete\";\n76\t  expectedVersion?: number;\n77\t}\n78\t\n79\texport function newId(): string {\n80\t  return `${Date.now().toString(36)}${randomBytes(6).toString(\"hex\")}`;\n81\t}\n82\t\n83\tconst isRecord = (value: unknown): value is Record<string, unknown> => typeof value === \"object\" && value !== null && !Array.isArray(value);\n84\t\n85\tfunction stripSystem(value: Record<string, unknown>): Record<string, unknown> {\n86\t  const { id: _id, __version: _v, ...rest } = value;\n87\t  return rest;\n88\t}\n89\t\n90\tfunction compare(a: unknown, b: unknown): number {\n91\t  if (a === b) return 0;\n92\t  if (a === undefined || a === null) return -1;\n93\t  if (b === undefined || b === null) return 1;\n94\t  if (typeof a === \"number\" && typeof b === \"number\") return a - b;\n95\t  return String(a) < String(b) ? -1 : 1;\n96\t}\n97\t\n98\tfunction matchesWhere(record: Record<string, unknown>, where: WhereClause[]): boolean {\n99\t  return where.every(clause => {\n100\t    const value = record[clause.field];\n101\t    if (\"eq\" in clause && clause.eq !== undefined && value !== clause.eq) return false;\n102\t    if (\"neq\" in clause && clause.neq !== undefined && value === clause.neq) return false;\n103\t    if (clause.lt !== undefined && !(compare(value, clause.lt) < 0)) return false;\n104\t    if (clause.lte !== undefined && !(compare(value, clause.lte) <= 0)) return false;\n105\t    if (clause.gt !== undefined && !(compare(value, clause.gt) > 0)) return false;\n106\t    if (clause.gte !== undefined && !(compare(value, clause.gte) >= 0)) return false;\n107\t    return true;\n108\t  });\n109\t}\n110\t"
+      },
+      "id": "mwvy7i3y592739e4d66d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:01.483Z",
+      "digest": "cb6c9127b6e7a40c",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 535,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16239,
+        "latencyMs": 7242,
+        "messageId": "msg_011ChPSp6KbTtEwU8QnRWCnw"
+      },
+      "id": "mwvy7oel37b040241c2c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:01.485Z",
+      "digest": "a9823aec083aa653",
+      "data": {
+        "n": 15,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\": \"expectedVersion|ifVersion\", \"path\": \"node_modules/@appport/services\"}",
+        "resultJson": null,
+        "rationale": "The outbox completion op uses expectedVersion while every other guarded write uses ifVersion; check what AppPort Services' tx.addOperation honors."
+      },
+      "id": "mwvy7oen44a83e8b9448",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:01.502Z",
+      "digest": "9fe24971b5c0028e",
+      "data": {
+        "n": 15,
+        "action": "search",
+        "input": {
+          "pattern": "expectedVersion|ifVersion",
+          "path": "node_modules/@appport/services"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy7of3745a5f618ee6",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:08.321Z",
+      "digest": "eb18a42b26abb554",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 421,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16283,
+        "latencyMs": 6080,
+        "messageId": "msg_011ChPSpgUvf8beazt2nvxBZ"
+      },
+      "id": "mwvy7toia497a106156a",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:08.322Z",
+      "digest": "a3773a3aaac90349",
+      "data": {
+        "n": 16,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"addOperation\",\"path\":\"node_modules/@appport\"}",
+        "resultJson": null,
+        "rationale": "Need to see how AppPort Services' transaction applies operations added via addOperation, to know whether the completion's `expectedVersion` guard is honored (transactions.ts uses ifVersion elsewhere)."
+      },
+      "id": "mwvy7tok112b80461a81",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:08.338Z",
+      "digest": "9342c0f8e6023259",
+      "data": {
+        "n": 16,
+        "action": "search",
+        "input": {
+          "pattern": "addOperation",
+          "path": "node_modules/@appport"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy7toz389d167df6ed",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:18.425Z",
+      "digest": "0a6035ea4508bb27",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 788,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16316,
+        "latencyMs": 9172,
+        "messageId": "msg_011ChPSqCWCYhLPmujYQMktJ"
+      },
+      "id": "mwvy81h7368d12c9769b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:18.427Z",
+      "digest": "ba433aa1593851b6",
+      "data": {
+        "n": 17,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"expectedVersion\",\"path\":\"node_modules/@appport\"}",
+        "resultJson": null,
+        "rationale": "completion() guards the done write with `expectedVersion` while every other host write uses `ifVersion`; check which key AppPort's transaction addOperation honors."
+      },
+      "id": "mwvy81h954ec0f46c3cb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:18.447Z",
+      "digest": "16aa471901c25324",
+      "data": {
+        "n": 17,
+        "action": "search",
+        "input": {
+          "pattern": "expectedVersion",
+          "path": "node_modules/@appport"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy81ht027a6675f2c8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:25.480Z",
+      "digest": "ed72ff31ea76ecf2",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 464,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16351,
+        "latencyMs": 6227,
+        "messageId": "msg_011ChPSqwBz2t8vHx33Bbe7Z"
+      },
+      "id": "mwvy86x6e56af45d0a7d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:25.482Z",
+      "digest": "b549a8a68229ddc9",
+      "data": {
+        "n": 18,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"ifVersion\",\"path\":\"node_modules\"}",
+        "resultJson": null,
+        "rationale": "Need to see whether the underlying FeltDB transaction honours `expectedVersion` (used by completion()) or only `ifVersion` (used everywhere else), to judge whether the outbox done-write is actually guarded."
+      },
+      "id": "mwvy86x77876a00e1331",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:25.509Z",
+      "digest": "19492824c0b7b189",
+      "data": {
+        "n": 18,
+        "action": "search",
+        "input": {
+          "pattern": "ifVersion",
+          "path": "node_modules"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy86xz7090c64012ca",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:42.817Z",
+      "digest": "41c1fdc97d67d890",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 1389,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16381,
+        "latencyMs": 16556,
+        "messageId": "msg_011ChPSrT8oAc9tj2SrxqoKB"
+      },
+      "id": "mwvy8karc05a8a12ea64",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:42.819Z",
+      "digest": "20bfd6d685015ad1",
+      "data": {
+        "n": 19,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"requireAbsent|ifVersion|expectedVersion\",\"path\":\"node_modules/@feltdb\"}",
+        "resultJson": null,
+        "rationale": "Determine whether the FeltDB transaction operation honors `expectedVersion` (used by completion()) as well as `ifVersion` (used by put())."
+      },
+      "id": "mwvy8kat8601877ebc17",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:42.841Z",
+      "digest": "5567be15b8f2549c",
+      "data": {
+        "n": 19,
+        "action": "search",
+        "input": {
+          "pattern": "requireAbsent|ifVersion|expectedVersion",
+          "path": "node_modules/@feltdb"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy8kbe65b6e5a78697",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:50.009Z",
+      "digest": "8b11c0eb9f194170",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 556,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16431,
+        "latencyMs": 6718,
+        "messageId": "msg_011ChPSsiPMKbsniSdRWEoh6"
+      },
+      "id": "mwvy8pujb71314707e9e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:50.011Z",
+      "digest": "320df813db55abdc",
+      "data": {
+        "n": 20,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"ifVersion|requireAbsent|async transaction\\\\(\",\"path\":\"packages/appboundry-host/src/collections.ts\"}",
+        "resultJson": null,
+        "rationale": "Check which version-guard key the host's FeltDB transaction honors, to see whether completion()'s `expectedVersion` guard is enforced."
+      },
+      "id": "mwvy8pul1d534cc5aad5",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:50.038Z",
+      "digest": "e3d9365587960a16",
+      "data": {
+        "n": 20,
+        "action": "search",
+        "input": {
+          "pattern": "ifVersion|requireAbsent|async transaction\\(",
+          "path": "packages/appboundry-host/src/collections.ts"
+        },
+        "summary": "packages/appboundry-host/src/collections.ts:11:  *   - inserts are `requireAbsent` creates;\npackages/appboundry-host/src/collections.ts:12:  *   - updates and deletes carry `ifVersion` = the version the call observed;\npackages/appboundry-host/src/collections.ts:241:         await this.#db.transaction({ operations: [{ collection: COLLECTION_MARKERS, id: name, requireAbsent: true, value: { id: name, transactionId: \"appboundry.markers\", changedAt: Date.now() } }] } as never);\npackages/appboundry-host/src/collections.ts:531:         operations.push({ collection: pending.collection, id: pending.id, requireAbsent: true, value: { ...pending.value, id: pending.id } });\npackages/appboundry-host/src/collections.ts:534:         operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion, value: { ...pending.value, id: pending.id } });\npackages/appboundry-host/src/collections.ts:537:         operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion });\npackages/appboundry-host/src/collections.ts:549:       preconditions.push(observed.version === null ? { collection: observed.collection, id: observed.id, requireAbsent: true } : { collection: observed.collection, id: observed.id, ifVersion: observed.version });"
+      },
+      "id": "mwvy8pvfc7156dc4e913",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:56:59.164Z",
+      "digest": "23017c73324e17b0",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 615,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 16977,
+        "latencyMs": 8877,
+        "messageId": "msg_011ChPStDsPbZ3B2NKCs6R4Z"
+      },
+      "id": "mwvy8wwu66aad597f6b8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:56:59.166Z",
+      "digest": "a10287a3d4accd72",
+      "data": {
+        "n": 21,
+        "kind": "act",
+        "action": "search",
+        "inputJson": "{\"pattern\":\"addOperation|expectedVersion\",\"path\":\"node_modules\"}",
+        "resultJson": null,
+        "rationale": "The outbox completion write (transactions.ts:167) is guarded by `expectedVersion`, unlike every other host write, which uses `ifVersion`. I need to know whether AppPort's tx.addOperation honours that field. The scoped @appport search found nothing, so I'm searching all of node_modules."
+      },
+      "id": "mwvy8www1fd02ed6b6f4",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:56:59.194Z",
+      "digest": "51627d8394a074c6",
+      "data": {
+        "n": 21,
+        "action": "search",
+        "input": {
+          "pattern": "addOperation|expectedVersion",
+          "path": "node_modules"
+        },
+        "summary": "no matches"
+      },
+      "id": "mwvy8wxn39fae839bc51",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:57:08.515Z",
+      "digest": "0a9e90e5e5241d68",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 678,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 17014,
+        "latencyMs": 9238,
+        "messageId": "msg_011ChPSttHhBzfqoMfwJa8cq"
+      },
+      "id": "mwvy944kfc5f765dc632",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:57:08.516Z",
+      "digest": "2f395be0dc917c7f",
+      "data": {
+        "n": 22,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"packages/appboundry-host/test\"}",
+        "resultJson": null,
+        "rationale": "The open question is whether completion()'s `expectedVersion` guard (transactions.ts:167) is honored, while every other FeltDB operation in the host uses `ifVersion`. The dependency source isn't searchable, so I'm looking for an existing outbox/transactions test that would show the behavior."
+      },
+      "id": "mwvy944m651201f42407",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:57:08.533Z",
+      "digest": "3290f5c3c1f6e846",
+      "data": {
+        "n": 22,
+        "action": "list",
+        "input": {
+          "path": "packages/appboundry-host/test"
+        },
+        "summary": "packages/appboundry-host/test: artifact-host.test.ts  backup-integrity.test.ts  capabilities.test.ts  components.test.ts  crypto.test.ts  events.test.ts  feltdb-authority.mjs  fixtures/  helpers.ts  identity-declarations.test.ts  incarnation-binding.test.ts  isolation-boundary.test.ts  large-collections.test.ts  managed-acceptance.test.ts  mcp.test.ts  memory-boundary.test.ts  migrations.test.ts  production-acceptance.test.ts  production-ops.test.ts  requirements.test.ts  state-contract.test.ts  tenancy-work.test.ts  tenancy.test.ts  transactional-effects.test.ts  transactions.test.ts"
+      },
+      "id": "mwvy945550addf27a61d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:57:19.795Z",
+      "digest": "de646198514a0fd1",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 907,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 17303,
+        "latencyMs": 10504,
+        "messageId": "msg_011ChPSudBNVPSn3WqnKoz7N"
+      },
+      "id": "mwvy9ctx4929edf2f4a8",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:57:19.797Z",
+      "digest": "71cefc6709812cd0",
+      "data": {
+        "n": 23,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/contract.ts\", \"startLine\": 270, \"endLine\": 300}",
+        "resultJson": null,
+        "rationale": "completion() in transactions.ts guards the done write with `expectedVersion`, but every other FeltDB operation in this package uses `ifVersion`. contract.ts:284 is the only other use of `expectedVersion`, so I'm checking which API it feeds to see whether that key is a real FeltDB guard."
+      },
+      "id": "mwvy9cu0a14a0aa25fa0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:57:19.812Z",
+      "digest": "97ca767466cff4d1",
+      "data": {
+        "n": 23,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/contract.ts",
+          "startLine": 270,
+          "endLine": 300
+        },
+        "summary": "packages/appboundry-host/src/contract.ts lines 270-300 of 345:\n270\t    from,\n271\t    to: { version: next.version, hash: next.hash },\n272\t    changes,\n273\t    migrations: pending,\n274\t    writes,\n275\t    authorizedBy: options.authorizedBy ?? \"startup\",\n276\t    artifact: { id: manifest.application.id, version: manifest.application.version, manifestSha256: artifact.manifestSha256 },\n277\t    appliedAt: new Date().toISOString()\n278\t  };\n279\t  type Tx = { collection(name: string): { set(id: string, value: unknown, guard?: unknown): void; delete(id: string, guard?: unknown): void } };\n280\t  const stageWrites = (tx: Tx) => {\n281\t    for (const [collection, changesFor] of overlay) {\n282\t      for (const [id, value] of changesFor) {\n283\t        const version = versions.get(collection)?.get(id);\n284\t        const guard = version === undefined ? { requireAbsent: true } : { expectedVersion: version };\n285\t        if (value === null) {\n286\t          if (version !== undefined) tx.collection(collection).delete(id, guard);\n287\t        } else tx.collection(collection).set(id, value, guard);\n288\t      }\n289\t    }\n290\t  };\n291\t  const history = (tx: Tx) => tx.collection(CONTRACT_HISTORY).set(record.id, record);\n292\t  try {\n293\t    if (same) {\n294\t      // Data-only migrations: the contract is unchanged.\n295\t      await db.transaction(((tx: Tx) => { stageWrites(tx); history(tx); }) as never);\n296\t    } else if (intermediate) {\n297\t      // The migrations are recorded with the step that commits their writes, so a stop between\n298\t      // the two steps never runs them again; the next start only drops the emptied collections.\n299\t      const step = intermediate;\n300\t      await db.stateContract.evolve(step, tx => {"
+      },
+      "id": "mwvy9cujed530fe40996",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:57:29.935Z",
+      "digest": "9e0870d4f1d7433d",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 754,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 18003,
+        "latencyMs": 9617,
+        "messageId": "msg_011ChPSvSLnbU3DSFG9tjj3d"
+      },
+      "id": "mwvy9knkd068f72d5acb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:57:29.936Z",
+      "digest": "9db08316dce3c877",
+      "data": {
+        "n": 24,
+        "kind": "act",
+        "action": "run",
+        "inputJson": "{\"check\": \"test\", \"target\": \"packages/appboundry-host/test/transactional-effects.test.ts\"}",
+        "resultJson": null,
+        "rationale": "See whether the outbox and after-commit tests pass today before writing findings about performOutbox."
+      },
+      "id": "mwvy9knn62d49853504b",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:57:32.752Z",
+      "digest": "b657bc3702dcabfa",
+      "data": {
+        "n": 24,
+        "action": "run",
+        "input": {
+          "check": "test",
+          "target": "packages/appboundry-host/test/transactional-effects.test.ts"
+        },
+        "summary": "test packages/appboundry-host/test/transactional-effects.test.ts: exit 0 in 3 s\n(node:10922) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10934) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90m/home/user/eve2/experiments/eve2-on-appboundry/.state/workspaces/ws_5f71698283ed\u001b[39m\n\n(node:10968) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10975) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10969) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10968) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10968) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10968) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n(node:10968) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n \u001b[32m✓\u001b[39m packages/appboundry-host/test/transactional-effects.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 732\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m   Start at \u001b[22m 09:57:30\n\u001b[2m   Duration \u001b[22m 2.06s\u001b[2m (transform 523ms, setup 0ms, collect 1.06s, tests 732ms, environment 0ms, prepare 56ms)\u001b[22m\n\n(node:11035) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      },
+      "id": "mwvy9mtz43865e197994",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:57:43.087Z",
+      "digest": "e80c30f05e8564a9",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 878,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 19123,
+        "latencyMs": 9790,
+        "messageId": "msg_011ChPSwPmnAmuLo3RfaE3vN"
+      },
+      "id": "mwvy9usxd6a9ac0fe45c",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:57:43.089Z",
+      "digest": "dbb0b2953725370a",
+      "data": {
+        "n": 25,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/host.ts\", \"startLine\": 730, \"endLine\": 800}",
+        "resultJson": null,
+        "rationale": "See how the mutation path performs staged outbox records after commit (line 768), in particular errors and concurrency with recovery."
+      },
+      "id": "mwvy9usz8df6b2f40d6e",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:57:43.108Z",
+      "digest": "4656b2ab3228168a",
+      "data": {
+        "n": 25,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/host.ts",
+          "startLine": 730,
+          "endLine": 800
+        },
+        "summary": "packages/appboundry-host/src/host.ts lines 730-800 of 963:\n730\t            this.#emit(serviceWrites);\n731\t            return fail(hooked.refuse);\n732\t          }\n733\t          const extra = [\n734\t            ...(idempotency ? [this.#idempotencyOperation(idempotency, options.principal, name, value, requestId)] : []),\n735\t            ...attempt.sequences.operations(requestId),\n736\t            ...attempt.outbox.map(record => ({ collection: OUTBOX_COLLECTION, id: record.id, requireAbsent: true, value: record })),\n737\t            ...(hooked?.operations ?? [])\n738\t          ];\n739\t          try {\n740\t            const commit = await db.commit(requestId, extra, [...(hooked?.guards ?? [])]);\n741\t            for (const write of commit.writes) changed.add(write.collection);\n742\t          } catch (error) {\n743\t            // A concurrent call with the same key committed first: this one wrote nothing; answer with its result.\n744\t            if (idempotency && error instanceof HostError && error.code === \"CONFLICT\") {\n745\t              const committed = ((await this.#db.collection<IdempotencyRecord>(IDEMPOTENCY_COLLECTION).get(idempotency.id)) ?? null) as IdempotencyRecord | null;\n746\t              const replay = committed && committed.requestId !== requestId ? this.#replay(committed, idempotency.inputSha256, name, requestId) : null;\n747\t              if (replay) {\n748\t                this.#emit(changed);\n749\t                return replay.ok ? replay : fail(replay.error);\n750\t              }\n751\t            }\n752\t            // A guard the hook set changed concurrently (an authority fence moved): the call's own explanation replaces the conflict.\n753\t            if (hooked?.guards?.length && options.onGuardConflict && error instanceof\n…\nttempt.events) for (const listener of this.#eventListeners) listener(event);\n776\t        return { ok: true, value, reads: [...new Set([...db.reads, ...serviceReads])], requestId, ...(retries ? { retries } : {}) };\n777\t      }\n778\t    } catch (error) {\n779\t      if (db instanceof CollectionTransaction) db.abandon();\n780\t      // Service effects commit on their own (as in FeltKit); say what changed even when the call failed.\n781\t      this.#emit(serviceWrites);\n782\t      if (error instanceof ExecutionLimitError) {\n783\t        this.#logger.error(`${name} (${requestId}): ${error.message} Nothing it wrote was committed.`);\n784\t        return fail({ code: \"EXECUTION_LIMIT\", message: `${error.message} Nothing it wrote was committed.`, details: { limit: error.limit, ms: error.ms, function: name } });\n785\t      }\n786\t      if (error instanceof MemoryLimitError) {\n787\t        this.#logger.error(`${name} (${requestId}): ${error.message}`);\n788\t        return fail({ code: \"EXECUTION_LIMIT\", message: error.message.replace(/ \\(.*\\)$/s, \"\"), details: { limit: \"memory\", maxMemoryBytes: error.maxMemoryBytes, function: name } });\n789\t      }\n790\t      if (error instanceof HostError) return fail(error.toJSON());\n791\t      if (error instanceof GuestFault) {\n792\t        this.#logger.error(`${name} (${requestId}): ${error.message}`);\n793\t        return fail({ code: \"INTERNAL\", message: this.environment === \"production\" ? `Internal error (request ${requestId}).` : error.message });\n794\t      }\n795\t      this.#logger.error(`${name} (${requestId}): ${(error as Error).stack ?? String(error)}`);\n796\t      return fail({ code: \"INTERNAL\", message: `Internal error (request ${requestId}).` });\n797\t    } finally {\n798\t      release();\n799\t    }\n800\t  }"
+      },
+      "id": "mwvy9utpff5196ed20c1",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:57:54.548Z",
+      "digest": "de44ff414a016800",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 775,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 20494,
+        "latencyMs": 11232,
+        "messageId": "msg_011ChPSx8cUvD1JK9RsGe86V"
+      },
+      "id": "mwvya3nac5a3ff041be7",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:57:54.550Z",
+      "digest": "5797edbac5f96cc5",
+      "data": {
+        "n": 26,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/host.ts\", \"startLine\": 753, \"endLine\": 776}",
+        "resultJson": null,
+        "rationale": "See how the mutation path uses performOutbox's result after commit, to judge the impact of performOutbox returning done/failed when its final state write failed (transactions.ts 205-210)."
+      },
+      "id": "mwvya3nc99310ab09c22",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:57:54.564Z",
+      "digest": "886fcb5f71c7e57a",
+      "data": {
+        "n": 26,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/host.ts",
+          "startLine": 753,
+          "endLine": 776
+        },
+        "summary": "packages/appboundry-host/src/host.ts lines 753-776 of 963:\n753\t            if (hooked?.guards?.length && options.onGuardConflict && error instanceof HostError && error.code === \"CONFLICT\") {\n754\t              const guarded = new Set(hooked.guards.map(g => `${g[\"collection\"]}\\u0000${g[\"id\"]}`));\n755\t              const failed = (error.details as { failure?: { collection?: string; id?: string } } | undefined)?.failure;\n756\t              if (!failed || guarded.has(`${failed.collection}\\u0000${failed.id}`)) {\n757\t                const replaced = await options.onGuardConflict();\n758\t                if (replaced) { this.#emit(changed); return fail(replaced); }\n759\t              }\n760\t            }\n761\t            const failure = error instanceof HostError && error.code === \"CONFLICT\" ? (error.details as { failure?: { collection?: string; predicate?: string } } | undefined)?.failure : undefined;\n762\t            if (failure?.collection === SEQUENCES_COLLECTION && failure.predicate !== \"fence\" && fn.entry.retry && !attempt.usedServices && retries < fn.entry.retry.sequenceConflicts) continue;\n763\t            throw error;\n764\t          }\n765\t          // Committed: its after-commit effects are performed now, as the caller.\n766\t          for (const record of attempt.outbox) {\n767\t            const call = serviceCall(record);\n768\t            await performOutbox(this.#db as never, record.id, (claim, complete) => this.#effect(claim, complete, options.principal, requestId), message => this.#logger.warn(`${name} (${requestId}): ${message}`));\n769\t            const collection = SERVICE_COLLECTIONS[call.service];\n770\t            if (collection && SERVICE_WRITES.has(call.method)) changed.add(collection);\n771\t          }\n772\t        }\n773\t        this.#emit(changed);\n774\t        // Ephemeral events (events@1): published only now that the call succeeded (and committed).\n775\t        for (const event of attempt.events) for (const listener of this.#eventListeners) listener(event);\n776\t        return { ok: true, value, reads: [...new Set([...db.reads, ...serviceReads])], requestId, ...(retries ? { retries } : {}) };"
+      },
+      "id": "mwvya3nv221c0d07ff8d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:58:12.165Z",
+      "digest": "a0f79bcb9dc1e540",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 1567,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 21308,
+        "latencyMs": 16852,
+        "messageId": "msg_011ChPSy1zeMBH5EQELQViRZ"
+      },
+      "id": "mwvyah8oe81fa35d712f",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:58:12.168Z",
+      "digest": "b0c930c571ba7e76",
+      "data": {
+        "n": 27,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/src/transactions.ts\", \"startLine\": 84, \"endLine\": 148}",
+        "resultJson": null,
+        "rationale": "Read the unseen middle of transactions.ts (OutboxRecord, stagedRecords, isRecoverable, strip). It shows how records are created and recovered, which I need to judge the impact of performOutbox returning a state it did not record (lines 205-210)."
+      },
+      "id": "mwvyah8qa0d9a5fa7067",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:58:12.189Z",
+      "digest": "8629bfb0f796c859",
+      "data": {
+        "n": 27,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/transactions.ts",
+          "startLine": 84,
+          "endLine": 148
+        },
+        "summary": "packages/appboundry-host/src/transactions.ts lines 84-148 of 259:\n84\t  | { service: \"webhooks\"; method: \"emit\"; type: string; payload: Record<string, unknown> }\n85\t  | { service: \"jobs\"; method: \"enqueue\"; type: string; payload: Record<string, unknown>; options?: { runAt?: string; maxAttempts?: number } };\n86\t\n87\texport interface OutboxRecord {\n88\t  id: string;\n89\t  requestId: string;\n90\t  function: string;\n91\t  principalId: string;\n92\t  /** The tenant the caller worked in (tenancy@1): a recovered effect is performed there, through the live membership only. */\n93\t  tenantId?: string;\n94\t  effect: OutboxEffect;\n95\t  state: \"pending\" | \"performing\" | \"done\" | \"failed\";\n96\t  createdAt: number;\n97\t  updatedAt: number;\n98\t  attempts: number;\n99\t  error?: { code: string; message: string };\n100\t  result?: Record<string, unknown>;\n101\t  retriedBy?: string;\n102\t  __version?: number;\n103\t}\n104\t\n105\tconst isObject = (v: unknown): v is Record<string, unknown> => typeof v === \"object\" && v !== null && !Array.isArray(v);\n106\tconst text = (v: unknown) => typeof v === \"string\" && v.trim().length > 0;\n107\t\n108\t/**\n109\t * The outbox records a guest staged (`outbox.stage { effects: [{ id, effect }] }`), validated: the\n110\t * effect's shape, and its service enabled in the manifest. Caller, request and function come from\n111\t * the call, never from the guest.\n112\t */\n113\texport function stagedRecords(input: unknown, call: { fn: string; principalId: string | null; tenantId?: string | null; requestId: string; services: readonly string[] }, now = Date.now()): OutboxRecord[] {\n114\t  const effects = isObject(input) && Array.isArray(input.effects) ? input.effects : null;\n115\t  if (!effects) throw new HostError(\"INVALID_ARGUMENT\", \"outbox.stage nee\n…\n? {}) as Record<string, unknown> };\n127\t    } else if (effect.service === \"jobs\" && effect.method === \"enqueue\" && text(effect.type) && isObject(effect.payload ?? {}) && (effect.options === undefined || isObject(effect.options))) {\n128\t      valid = { service: \"jobs\", method: \"enqueue\", type: effect.type as string, payload: (effect.payload ?? {}) as Record<string, unknown>, ...(effect.options ? { options: effect.options as { runAt?: string; maxAttempts?: number } } : {}) };\n129\t    } else {\n130\t      throw new HostError(\"INVALID_ARGUMENT\", \"An after-commit effect is notifications.send { recipient, type, title }, webhooks.emit { type, payload } or jobs.enqueue { type, payload, options? }.\");\n131\t    }\n132\t    if (!call.services.includes(valid.service)) {\n133\t      throw new HostError(\"CONFIGURATION\", `The ${valid.service[0]!.toUpperCase()}${valid.service.slice(1)} service is not enabled.`);\n134\t    }\n135\t    return { id, requestId: call.requestId, function: call.fn, principalId: call.principalId!, ...(call.tenantId ? { tenantId: call.tenantId } : {}), effect: JSON.parse(JSON.stringify(valid)) as OutboxEffect, state: \"pending\", createdAt: now, updatedAt: now, attempts: 0 };\n136\t  });\n137\t}\n138\t\n139\texport function isRecoverable(record: Pick<OutboxRecord, \"state\" | \"updatedAt\">, now: number): boolean {\n140\t  return (record.state === \"pending\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \"performing\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\n141\t}\n142\t\n143\tfunction strip(record: OutboxRecord): OutboxRecord {\n144\t  const { __version: _v, ...rest } = record;\n145\t  return rest;\n146\t}\n147\t\n148\texport function retried(record: OutboxRecord, by: string, now = Date.now()): OutboxRecord {"
+      },
+      "id": "mwvyah9j9fb99e167a17",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:58:24.865Z",
+      "digest": "b86c1c787e734f03",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 1062,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 22813,
+        "latencyMs": 12536,
+        "messageId": "msg_011ChPSzGbkgNMYJdv5qhcu7"
+      },
+      "id": "mwvyar1fdf79a07af271",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:58:24.867Z",
+      "digest": "eac00f837fd5bf52",
+      "data": {
+        "n": 28,
+        "kind": "act",
+        "action": "list",
+        "inputJson": "{\"path\": \"node_modules/@appport\"}",
+        "resultJson": null,
+        "rationale": "The outbox completion write (transactions.ts:167) uses `expectedVersion`, while every other FeltDB operation in the host uses `ifVersion`. I need the services and FeltDB source to see whether that guard is honoured."
+      },
+      "id": "mwvyar1h609b9a0a0b91",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:58:24.880Z",
+      "digest": "bd523a789defa0c7",
+      "data": {
+        "n": 28,
+        "action": "list",
+        "input": {
+          "path": "node_modules/@appport"
+        },
+        "summary": "failed: NOT_FOUND node_modules/@appport is not a directory."
+      },
+      "id": "mwvyar1u53f5bae7e698",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:58:40.320Z",
+      "digest": "5761f681f67a6fe8",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 1352,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 22858,
+        "latencyMs": 14987,
+        "messageId": "msg_011ChPT1EJNiUXCv9QHg4jhk"
+      },
+      "id": "mwvyb2yq0170d07a7fec",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:58:40.322Z",
+      "digest": "4d6e64aa178c429b",
+      "data": {
+        "n": 29,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\": \"packages/appboundry-host/package.json\"}",
+        "resultJson": null,
+        "rationale": "Find the real dependency names (AppPort Services / FeltDB) to check whether tx.addOperation honors the `expectedVersion` key used by completion() while every other host write uses `ifVersion`."
+      },
+      "id": "mwvyb2ys718f0aabe236",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:58:40.342Z",
+      "digest": "f8d272784d7cb875",
+      "data": {
+        "n": 29,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/package.json"
+        },
+        "summary": "packages/appboundry-host/package.json lines 1-51 of 51:\n1\t{\n2\t  \"name\": \"@appport/appboundry-host\",\n3\t  \"version\": \"0.1.0\",\n4\t  \"private\": true,\n5\t  \"description\": \"AppBoundry's artifact host: verify, authorize and run a self-contained .app (manifest.json + module.wasm) with FeltDB state and AppPort Services.\",\n6\t  \"license\": \"Apache-2.0\",\n7\t  \"type\": \"module\",\n8\t  \"main\": \"./dist/index.js\",\n9\t  \"types\": \"./dist/index.d.ts\",\n10\t  \"exports\": {\n11\t    \".\": {\n12\t      \"types\": \"./dist/index.d.ts\",\n13\t      \"import\": \"./dist/index.js\"\n14\t    },\n15\t    \"./verify\": {\n16\t      \"types\": \"./dist/verify.d.ts\",\n17\t      \"import\": \"./dist/verify.js\"\n18\t    },\n19\t    \"./routing\": {\n20\t      \"types\": \"./dist/routing.d.ts\",\n21\t      \"import\": \"./dist/routing.js\"\n22\t    }\n23\t  },\n24\t  \"bin\": {\n25\t    \"appboundry-host\": \"dist/bin.js\"\n26\t  },\n27\t  \"files\": [\n28\t    \"dist\",\n29\t    \"README.md\"\n30\t  ],\n31\t  \"scripts\": {\n32\t    \"build\": \"tsc -b\",\n33\t    \"clean\": \"tsc -b --clean\"\n34\t  },\n35\t  \"dependencies\": {\n36\t    \"@appport/authorization\": \"1.1.1\",\n37\t    \"@appport/client\": \"1.1.8\",\n38\t    \"@appport/core\": \"1.7.1\",\n39\t    \"@appport/mcp\": \"1.3.8\",\n40\t    \"@appport/protocol\": \"1.5.0\",\n41\t    \"@appport/schema\": \"1.1.6\",\n42\t    \"@appport/server\": \"1.3.2\",\n43\t    \"@appport/services\": \"0.16.3\",\n44\t    \"@appport/transport-http\": \"1.1.8\",\n45\t    \"@feltdb/core\": \"0.21.0\"\n46\t  },\n47\t  \"engines\": {\n48\t    \"node\": \">=20\"\n49\t  }\n50\t}\n51\t"
+      },
+      "id": "mwvyb2zf9371a713f9d0",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:58:57.035Z",
+      "digest": "d79857ff6e4fd008",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 1240,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 23598,
+        "latencyMs": 15692,
+        "messageId": "msg_011ChPT2QixtZZwcS1pjXrvA"
+      },
+      "id": "mwvybfv1741fd4900104",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:58:57.037Z",
+      "digest": "94e1b745f80f1852",
+      "data": {
+        "n": 30,
+        "kind": "act",
+        "action": "read",
+        "inputJson": "{\"path\":\"packages/appboundry-host/src/collections.ts\",\"startLine\":500,\"endLine\":560}",
+        "resultJson": null,
+        "rationale": "Check the commit path that writes a mutation together with sequence and outbox operations, to see how conflicts and partial failures are reported before I settle the outbox findings."
+      },
+      "id": "mwvybfv4f11cd8566e84",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "observation",
+      "at": "2026-11-25T09:58:57.050Z",
+      "digest": "c727fe8cd81c5ab9",
+      "data": {
+        "n": 30,
+        "action": "read",
+        "input": {
+          "path": "packages/appboundry-host/src/collections.ts",
+          "startLine": 500,
+          "endLine": 560
+        },
+        "summary": "packages/appboundry-host/src/collections.ts lines 500-560 of 560:\n500\t\n501\t  async delete(collection: unknown, id: unknown): Promise<null> {\n502\t    const name = this.#write(collection);\n503\t    const { pending, base } = await this.#existing(name, id);\n504\t    const key = this.#key(name, id as string);\n505\t    if (pending?.op === \"insert\") {\n506\t      this.#pending.delete(key);\n507\t      return null;\n508\t    }\n509\t    this.#pending.set(key, { collection: name, id: id as string, op: \"delete\", ...(base !== undefined ? { baseVersion: base } : {}) });\n510\t    return null;\n511\t  }\n512\t\n513\t  /** Discard every pending write (the handler failed). */\n514\t  abandon(): void {\n515\t    this.#closed = true;\n516\t    this.#pending.clear();\n517\t  }\n518\t\n519\t  /**\n520\t   * Commit every pending write in one FeltDB transaction. `extra` operations (the host's\n521\t   * own bookkeeping, such as an idempotency record) commit in the same transaction.\n522\t   */\n523\t  /** `guards`: records this transaction does not write but whose version must be unchanged at commit (FeltDB preconditions). */\n524\t  async commit(transactionId: string, extra: Array<Record<string, unknown>> = [], guards: Array<Record<string, unknown>> = []): Promise<{ transactionId: string; writes: CommittedWrite[]; commitRevision?: number }> {\n525\t    this.#assertOpen();\n526\t    this.#closed = true;\n527\t    const writes: CommittedWrite[] = [];\n528\t    const operations: Array<Record<string, unknown>> = [];\n529\t    for (const pending of this.#pending.values()) {\n530\t      if (pending.op === \"insert\") {\n531\t        operations.push({ collection: pending.collection, id: pending.id, requireAbsent: true, value: { ...pending.value, id: pending.id } });\n532\t        writes.push({ collection:\n…\nion, value: { ...pending.value, id: pending.id } });\n535\t        writes.push({ collection: pending.collection, id: pending.id, op: \"update\", expectedVersion: pending.baseVersion! });\n536\t      } else {\n537\t        operations.push({ collection: pending.collection, id: pending.id, ifVersion: pending.baseVersion });\n538\t        writes.push({ collection: pending.collection, id: pending.id, op: \"delete\", expectedVersion: pending.baseVersion! });\n539\t      }\n540\t    }\n541\t    if (operations.length === 0 && extra.length === 0) return { transactionId, writes: [] };\n542\t    for (const collection of new Set(writes.map(w => w.collection))) {\n543\t      operations.push({ collection: COLLECTION_MARKERS, id: collection, value: { id: collection, transactionId, changedAt: Date.now() } });\n544\t    }\n545\t    operations.push(...extra);\n546\t    const preconditions: Array<Record<string, unknown>> = [...guards];\n547\t    for (const [key, observed] of this.#observed) {\n548\t      if (this.#pending.has(key)) continue;\n549\t      preconditions.push(observed.version === null ? { collection: observed.collection, id: observed.id, requireAbsent: true } : { collection: observed.collection, id: observed.id, ifVersion: observed.version });\n550\t    }\n551\t    try {\n552\t      const fences = [...this.#fences.values()];\n553\t      const result = await this.host.db.transaction({ transactionId, operations, ...(preconditions.length ? { preconditions } : {}), ...(fences.length ? { fences } : {}) } as never);\n554\t      return { transactionId: result.transactionId, writes, ...(result.commitRevision !== undefined ? { commitRevision: result.commitRevision } : {}) };\n555\t    } catch (error) {\n556\t      throw commitError(error, transactionId);\n557\t    }\n558\t  }\n559\t}\n560\t"
+      },
+      "id": "mwvybfvp03ceb58d12ec",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "model_usage",
+      "at": "2026-11-25T09:59:27.795Z",
+      "digest": "f23c1e81c409efca",
+      "data": {
+        "provider": "anthropic",
+        "requested": "claude-opus-5-5",
+        "served": "claude-opus-5-5",
+        "stopReason": "end_turn",
+        "inputTokens": 4,
+        "outputTokens": 3047,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 24978,
+        "latencyMs": 30448,
+        "messageId": "msg_011ChPT3bLi8yQin7KwCzLzz"
+      },
+      "id": "mwvyc3li5217e4dfd027",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "decision",
+      "at": "2026-11-25T09:59:27.798Z",
+      "digest": "fc28c7ff0613610c",
+      "data": {
+        "n": 31,
+        "kind": "finish",
+        "action": null,
+        "inputJson": null,
+        "resultJson": "{\"findings\":[{\"title\":\"performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'\",\"severity\":\"medium\",\"summary\":\"After the effect runs, performOutbox persists the outcome with a version-guarded put. If that write throws (a version conflict, or any store error), the error is only passed to warn() and the function still returns next.state ('done' or 'failed') as if the outcome had been recorded. The record then stays 'performing' with attempts incremented. Callers rely on the return value: recoverOutbox counts it as performed (host.ts 521-523), and retryOutbox returns the record as its state is now. Meanwhile isRecoverable only picks up a 'performing' record once it is OUTBOX_PERFORMING_STALE_MS (300 s) old. So: (a) an effect that succeeded but whose 'done' could not be written is reported done, then performed a second time about 300 s later. For notifications this depends entirely on the downstream idempotency key. (b) An effect that failed, whose 'failed' could not be written, is reported 'failed' but is silently re-run automatically. That contradicts the documented rule that a failed effect is retried only by an operator. The host sees a success or failure status that does not match durable state.\",\"evidence\":[{\"kind\":\"code\",\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":205,\"endLine\":210,\"quote\":\"  try {\\n    await put(db, id, claim.__version, next);\\n  } catch (error) {\\n    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\\n  }\\n  return next.state as \\\"done\\\" | \\\"failed\\\";\"},{\"kind\":\"code\",\"path\":\"packages/appboundry-host/src/transactions.ts\",\"startLine\":139,\"endLine\":141,\"quote\":\"export function isRecoverable(record: Pick<OutboxRecord, \\\"state\\\" | \\\"updatedAt\\\">, now: number): boolean {\\n  return (record.state === \\\"pending\\\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \\\"performing\\\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\\n}\"},{\"kind\":\"code\",\"path\":\"packages/appboundry-host/src/host.ts\",\"startLine\":521,\"endLine\":523,\"quote\":\"    for (const record of stale) {\\n      if ((await this.#performAs(record)) === \\\"done\\\") performed += 1;\\n    }\"}],\"fix\":\"When the outcome put fails, do not return next.state. Re-read the record and return its actual persisted state. If it is still 'performing', return a distinct result such as 'unrecorded' or rethrow, so callers do not count it as done. Also retry the outcome write a bounded number of times on transient errors (re-reading the version) before giving up, so a performed effect is not left eligible for automatic re-execution.\"}]}",
+        "rationale": "The decision budget is limited. I have code evidence that performOutbox swallows the failure of its outcome write and still reports success or failure. I could not settle a possible guard-key mismatch (expectedVersion versus ifVersion) in the completion operation, because the @appport sources are not present in node_modules, so I am leaving it out."
+      },
+      "id": "mwvyc3lr687971eac55d",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "finding",
+      "at": "2026-11-25T09:59:30.335Z",
+      "digest": "33e5be38d23d4caf",
+      "data": {
+        "finding": {
+          "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+          "severity": "medium",
+          "summary": "After the effect runs, performOutbox persists the outcome with a version-guarded put. If that write throws (a version conflict, or any store error), the error is only passed to warn() and the function still returns next.state ('done' or 'failed') as if the outcome had been recorded. The record then stays 'performing' with attempts incremented. Callers rely on the return value: recoverOutbox counts it as performed (host.ts 521-523), and retryOutbox returns the record as its state is now. Meanwhile isRecoverable only picks up a 'performing' record once it is OUTBOX_PERFORMING_STALE_MS (300 s) old. So: (a) an effect that succeeded but whose 'done' could not be written is reported done, then performed a second time about 300 s later. For notifications this depends entirely on the downstream idempotency key. (b) An effect that failed, whose 'failed' could not be written, is reported 'failed' but is silently re-run automatically. That contradicts the documented rule that a failed effect is retried only by an operator. The host sees a success or failure status that does not match durable state.",
+          "evidence": [
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/transactions.ts",
+              "startLine": 205,
+              "endLine": 210,
+              "quote": "  try {\n    await put(db, id, claim.__version, next);\n  } catch (error) {\n    warn(`after-commit ${id}: could not record ${next.state}: ${(error as Error).message}`);\n  }\n  return next.state as \"done\" | \"failed\";"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/transactions.ts",
+              "startLine": 139,
+              "endLine": 141,
+              "quote": "export function isRecoverable(record: Pick<OutboxRecord, \"state\" | \"updatedAt\">, now: number): boolean {\n  return (record.state === \"pending\" && now - record.updatedAt >= OUTBOX_RECOVER_AFTER_MS) || (record.state === \"performing\" && now - record.updatedAt >= OUTBOX_PERFORMING_STALE_MS);\n}"
+            },
+            {
+              "kind": "code",
+              "path": "packages/appboundry-host/src/host.ts",
+              "startLine": 521,
+              "endLine": 523,
+              "quote": "    for (const record of stale) {\n      if ((await this.#performAs(record)) === \"done\") performed += 1;\n    }"
+            }
+          ],
+          "fix": "When the outcome put fails, do not return next.state. Re-read the record and return its actual persisted state. If it is still 'performing', return a distinct result such as 'unrecorded' or rethrow, so callers do not count it as done. Also retry the outcome write a bounded number of times on transient errors (re-reading the version) before giving up, so a performed effect is not left eligible for automatic re-execution."
+        },
+        "proven": true,
+        "verifications": [
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/transactions.ts:205-210 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/transactions.ts:139-141 contains the quoted code"
+          },
+          {
+            "finding": 0,
+            "ok": true,
+            "why": "packages/appboundry-host/src/host.ts:521-523 contains the quoted code"
+          }
+        ]
+      },
+      "id": "mwvyc5ko6c440a5022cb",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvy5fde3b87b4b4a9b3",
+      "kind": "artifact",
+      "at": "2026-11-25T09:59:34.696Z",
+      "digest": "04e894fd9e083470",
+      "data": {
+        "kind": "issue",
+        "number": 99,
+        "url": "https://github.com/rkendel1/appboundry/issues/99",
+        "title": "performOutbox reports done/failed even when the outcome write fails, leaving the record stuck in 'performing'",
+        "severity": "medium"
+      },
+      "id": "mwvyc8x6b1cc9942d7e9",
+      "__version": 1
+    }
+  ]
+}

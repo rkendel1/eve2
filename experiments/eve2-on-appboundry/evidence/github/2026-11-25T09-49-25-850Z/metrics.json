@@ -1,0 +1,18 @@
+{
+  "startedAt": "2026-11-25T09:49:26.759Z",
+  "assess": {
+    "taskId": "mwvxz7u7c03ca901ba74",
+    "status": "blocked",
+    "seconds": 227,
+    "steps": 33,
+    "decisions": 30,
+    "model": {
+      "calls": 30,
+      "inputTokens": 120,
+      "outputTokens": 13270
+    },
+    "invocations": 63,
+    "report": null
+  },
+  "finishedAt": "2026-11-25T09:53:13.935Z"
+}

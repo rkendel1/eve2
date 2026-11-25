@@ -8,36 +8,15 @@
  */
 import { s } from "@feltdb/feltkit";
 import { app, evidence, executions, policies, tasks } from "./app.js";
+import { ASSESS_STEPS, RESOLVE_STEPS } from "./work.js";
+import { MAX_STEPS, TERMINAL, WAITING, digest, halt, invoke, keep, latest, money, move, now, record, unavailable, wait, type Ctx, type Task } from "./_ops.js";
 
-type Ctx = any;
-type Task = { id: string; sourceKey: string; source: { system: string; conversation: string; message: string }; status: string; openQuestion?: string; sourceDigest?: string; intent?: Intent; plan?: Plan; planDigest?: string; reference: string; target?: { id: string; kind: string }; attempts: number; steps: number; createdAt: string; updatedAt: string };
+
 type Message = { id: string; author: { id: string; name?: string }; text: string; editedAt?: string; reactions?: Array<{ name: string; users: string[] }>; thread?: Array<{ id: string; author: { id: string; name?: string }; text: string }> };
 type Intent = { kind: string | null; party: string | null; vendorReference: string | null; amount: number | null; currency: string | null; category: string | null; date: string | null; description: string | null; approvalClaimed: boolean; unclear: string[] };
 type Plan = { kind: string; partyId: string; partyName: string; accountId: string; accountName: string; amount: number; currency: string; date: string | null; description: string; reference: string; vendorReference: string | null; memo: string };
 type Policy = { operation: string; requiresApproval: boolean; approvalReaction: string; approvers: string[]; maxAmount: number; currency: string; reconcileBeforeRetry: boolean; maxAttempts: number };
 
-const WAITING = new Set(["needs_clarification", "needs_approval", "blocked", "failed", "verification_failed"]);
-const TERMINAL = new Set(["completed"]);
-const MAX_STEPS = 60;
-const now = () => new Date().toISOString();
-
-/** FNV-1a over canonical JSON, twice with different seeds: a stable 64-bit digest the guest computes without crypto. */
-function digest(value: unknown): string {
-  const text = canonical(value);
-  let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995;
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    a = Math.imul(a ^ c, 0x01000193) >>> 0;
-    b = Math.imul(b ^ c, 0x01000193 + 2) >>> 0;
-  }
-  return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
-}
-function canonical(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  return `{${Object.keys(value as object).sort().filter((k) => (value as any)[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canonical((value as any)[k])}`).join(",")}}`;
-}
-const money = (n: number) => n.toFixed(2);
 
 /* ------------------------------------------------------------------ submit: a source delivers a request or a change */
 
@@ -75,9 +54,14 @@ export const advance = app.mutation({
     const task = (await ctx.db.get(tasks, taskId)) as Task | null;
     if (!task || WAITING.has(task.status) || TERMINAL.has(task.status)) return { taskId, status: task?.status ?? "missing", advanced: false };
     if (task.steps >= MAX_STEPS) return halt(ctx, task, "blocked", `I stopped after ${MAX_STEPS} steps without finishing; an operator needs to look at this task.`);
-    const run = STEPS[task.status];
+    const run = (task.operation === "assess" ? ASSESS_STEPS : task.operation === "resolve" ? RESOLVE_STEPS : STEPS)[task.status];
     if (!run) return halt(ctx, task, "blocked", `Unknown status ${task.status}.`);
-    return run(ctx, task);
+    try {
+      return await run(ctx, task);
+    } catch (error) {
+      // A defect in a step must not leave the task silently stuck: it stops, with the error on record for an operator.
+      return halt(ctx, task, "blocked", `I stopped at ${task.status} because of an internal error (${String((error as Error)?.message ?? error)}); an operator needs to look at this task.`);
+    }
   },
 });
 
@@ -274,57 +258,6 @@ async function report(ctx: Ctx, task: Task) {
   return move(ctx, task, "completed", "report", "Reported the verified outcome in the source.");
 }
 
-/* ------------------------------------------------------------------ helpers: every effect leaves a record */
-
-async function invoke(ctx: Ctx, task: Task, capability: string, input: unknown, idempotencyKey: string) {
-  const result = await ctx.capabilities.invoke(capability, input, { idempotencyKey });
-  const summary = result.outcome === "succeeded" ? `${capability} succeeded${result.replayed ? " (replayed)" : ""}`
-    : result.outcome === "unknown" ? `${capability}: outcome unknown (${result.reason})`
-    : `${capability} ${result.outcome}: ${result.error.code} ${result.error.message}`;
-  await ctx.db.insert(executions, {
-    taskId: task.id, seq: task.steps, at: now(), from: task.status, to: task.status, kind: "invoke", summary, capability, idempotencyKey, outcome: result.outcome,
-    ...(result.outboundId ? { outboundId: result.outboundId } : {}),
-    ...(result.outcome === "failed" || result.outcome === "refused" ? { detail: result.error } : {}),
-  });
-  return result;
-}
-
-async function record(ctx: Ctx, task: Task, kind: string, from: string, to: string, summary: string, detail?: unknown) {
-  await ctx.db.insert(executions, { taskId: task.id, seq: task.steps, at: now(), from, to, kind, summary, ...(detail !== undefined ? { detail } : {}) });
-}
-
-async function keep(ctx: Ctx, task: Task, kind: string, data: unknown) {
-  await ctx.db.insert(evidence, { taskId: task.id, kind, at: now(), digest: digest(data), data });
-}
-
-async function latest(ctx: Ctx, task: Task, kind: string) {
-  const rows = (await ctx.db.find(evidence, { taskId: task.id, kind })) as Array<{ at: string; data: any }>;
-  return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0]?.data ?? null;
-}
-
-async function move(ctx: Ctx, task: Task, to: string, kind: string, summary: string, detail?: unknown) {
-  await record(ctx, task, kind, task.status, to, summary, detail);
-  await ctx.db.patch(tasks, task.id, { status: to, steps: task.steps + 1, updatedAt: now(), openQuestion: undefined });
-  ctx.afterCommit.jobs.enqueue("eve.advance", { taskId: task.id }, { maxAttempts: 3 });
-  return { taskId: task.id, status: to };
-}
-
-/** Stop and ask (or explain), in the source, where the person who asked will see it. Eve keeps the task. */
-async function wait(ctx: Ctx, task: Task, to: string, question: string, detail?: unknown) {
-  await record(ctx, task, "wait", task.status, to, question, detail);
-  await ctx.db.patch(tasks, task.id, { status: to, openQuestion: question, steps: task.steps + 1, updatedAt: now() });
-  await invoke(ctx, { ...task, steps: task.steps + 1 }, "conversation.messages.reply", { conversation: task.source.conversation, message: task.source.message, text: question }, `${task.id}:ask:${task.steps}`);
-  return { taskId: task.id, status: to, question };
-}
-
-const halt = (ctx: Ctx, task: Task, to: string, why: string) => wait(ctx, task, to, why);
-
-/** A capability that did not answer usefully: say exactly which, and keep the task. */
-function unavailable(ctx: Ctx, task: Task, capability: string, result: any) {
-  const why = result.outcome === "unknown" ? `it did not answer (${result.reason})` : `${result.error.code}: ${result.error.message}`;
-  return wait(ctx, task, "blocked", `I couldn't use ${capability}: ${why}. Nothing was entered; I'll continue when it is available.`);
-}
-
 function normalize(raw: Partial<Intent> | null | undefined): Intent {
   const r = raw ?? {};
   const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -375,7 +308,7 @@ export const capabilities = app.query({ access: "tasks.read", handler: (ctx: Ctx
 
 export const setPolicy = app.mutation({
   access: "policies.write",
-  args: { operation: s.string(), requiresApproval: s.boolean(), approvalReaction: s.string(), approvers: s.array(s.string()), maxAmount: s.number(), currency: s.string(), reconcileBeforeRetry: s.boolean(), maxAttempts: s.number() },
+  args: { operation: s.string(), requiresApproval: s.boolean(), approvalReaction: s.optional(s.string()), approvers: s.optional(s.array(s.string())), maxAmount: s.optional(s.number()), currency: s.optional(s.string()), reconcileBeforeRetry: s.boolean(), maxAttempts: s.number(), limits: s.optional(s.unknown()) },
   handler: async (ctx: Ctx, policy: Policy) => {
     const [existing] = (await ctx.db.find(policies, { operation: policy.operation })) as Array<{ id: string }>;
     if (existing) await ctx.db.replace(policies, existing.id, policy);

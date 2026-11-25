@@ -15,9 +15,10 @@ export const app = feltkit({
   roles: {
     // A source connector delivers requests (and their later changes: approvals, edits, replies). Eve's steps run as
     // jobs enqueued by the call that delivered the request, so the connector also holds tasks.advance.
-    source: ["tasks.submit", "tasks.advance", "tasks.read"],
-    // People who operate Eve: they set the policies that bound what it may do, and read everything it did.
-    operator: ["tasks.*", "policies.*"],
+    source: ["tasks.submit", "tasks.advance", "tasks.read", "jobs.create", "jobs.execute"],
+    // People who operate Eve: they set the policies that bound what it may do, assign work (a repository to assess,
+    // an item to resolve; Eve's steps then run as the assigner), and read everything it did.
+    operator: ["tasks.*", "policies.*", "jobs.create", "jobs.execute"],
   },
   dev: {
     users: [
@@ -27,20 +28,20 @@ export const app = feltkit({
   },
   services: { jobs: { handlers: { "eve.advance": "tasks:advance" } } },
   requires: [
-    { name: "conversation.messages.get", versions: "1", purpose: "read the request, its thread and its approvals" },
-    { name: "conversation.messages.reply", versions: "1", purpose: "ask for what is missing and report the outcome where the request was made" },
     { name: "reasoning.interpret", versions: "1", purpose: "turn a person's request into a structured intent" },
-    { name: "finance.parties.find", versions: "1", purpose: "resolve the vendor or customer a request names" },
-    { name: "finance.accounts.find", versions: "1", purpose: "resolve the category a request names" },
-    { name: "finance.documents.find", versions: "1", purpose: "detect duplicates and reconcile uncertain outcomes" },
-    { name: "finance.documents.create", versions: "1", purpose: "record the approved document" },
-    { name: "finance.documents.get", versions: "1", purpose: "verify the recorded document independently" },
+    { name: "reasoning.decide", versions: "1", optional: true, purpose: "choose the next action toward an objective from the actions offered" },
+    ...["conversation.messages.get", "conversation.messages.reply"].map((name) => ({ name, versions: "1", optional: true, purpose: "read requests and answer where they were made" })),
+    ...["finance.parties.find", "finance.accounts.find", "finance.documents.find", "finance.documents.create", "finance.documents.get"].map((name) => ({ name, versions: "1", optional: true, purpose: "record and verify documents in a ledger" })),
+    ...["tracker.items.get", "tracker.items.find", "tracker.items.create", "tracker.items.comment"].map((name) => ({ name, versions: "1", optional: true, purpose: "read, file and answer work items" })),
+    ...["code.workspace.open", "code.workspace.list", "code.workspace.read", "code.workspace.search", "code.workspace.write", "code.workspace.run", "code.workspace.result", "code.workspace.diff"].map((name) => ({ name, versions: "1", optional: true, purpose: "investigate and change a working copy, and run its declared checks" })),
+    ...["code.changes.publish", "code.changes.get"].map((name) => ({ name, versions: "1", optional: true, purpose: "propose changes for review (never merge) and read them back" })),
   ],
 });
 
 /** Statuses a task moves through. Waiting statuses resume when the source delivers a change. */
 export const STATUSES = [
   "received", "authorizing", "resolving", "ready", "reconciling", "verifying", "reporting",
+  "opening", "preparing", "investigating", "proving", "filing", "implementing", "checking", "publishing",
   "needs_clarification", "needs_approval", "blocked",
   "completed", "verification_failed", "failed",
 ] as const;
@@ -49,6 +50,8 @@ export const STATUSES = [
 export const tasks = app.collection("tasks", {
   sourceKey: s.string(),
   source: s.object({ system: s.string(), conversation: s.string(), message: s.string() }),
+  /** record (a document into a ledger), assess (a repository, filing proven gaps), resolve (a work item, as a proposed change). */
+  operation: s.optional(s.string()),
   status: s.enum(STATUSES),
   /** What Eve is waiting for, or why it stopped, in words for the person who asked. */
   openQuestion: s.optional(s.string()),
@@ -62,6 +65,10 @@ export const tasks = app.collection("tasks", {
   target: s.optional(s.object({ id: s.string(), kind: s.string() })),
   attempts: s.number(),
   steps: s.number(),
+  /** The operation's working state: its workspace, decisions taken, a check it is waiting for. */
+  work: s.optional(s.unknown()),
+  /** What Eve reports when it is done: the artifacts it produced, with their verification. */
+  report: s.optional(s.unknown()),
   createdAt: s.string(),
   updatedAt: s.string(),
 }, { unique: [["sourceKey"]] });
@@ -85,7 +92,7 @@ export const executions = app.collection("executions", {
 /** Facts Eve relies on, as captured: the source record, the approval, the target record, the verification, model usage. */
 export const evidence = app.collection("evidence", {
   taskId: s.string(),
-  kind: s.enum(["source_record", "approval", "target_record", "verification", "model_usage", "duplicate", "change"] as const),
+  kind: s.enum(["source_record", "approval", "target_record", "verification", "model_usage", "duplicate", "change", "decision", "observation", "finding", "check_result", "artifact"] as const),
   at: s.string(),
   digest: s.string(),
   data: s.unknown(),
@@ -96,12 +103,14 @@ export const policies = app.collection("policies", {
   operation: s.string(),
   /** Approval is a fact in the source system (a reaction by a named approver), never a claim in the request's text. */
   requiresApproval: s.boolean(),
-  approvalReaction: s.string(),
-  approvers: s.array(s.string()),
+  approvalReaction: s.optional(s.string()),
+  approvers: s.optional(s.array(s.string())),
   /** Above this amount Eve does not act; it hands the request to a person. */
-  maxAmount: s.number(),
-  currency: s.string(),
-  /** After an unknown outcome, Eve resends only once the destination shows the document is absent. */
+  maxAmount: s.optional(s.number()),
+  currency: s.optional(s.string()),
+  /** After an unknown outcome, Eve resends only once the destination shows the effect is absent. */
   reconcileBeforeRetry: s.boolean(),
   maxAttempts: s.number(),
+  /** Operation-specific bounds: repositories, how many decisions, issues or changed files, which paths are off limits. */
+  limits: s.optional(s.unknown()),
 }, { unique: [["operation"]] });

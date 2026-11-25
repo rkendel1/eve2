@@ -1,0 +1,26 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:assess-1795599742372",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "assess-1795599742372"
+    },
+    "operation": "assess",
+    "status": "received",
+    "reference": "EVE-262A301D6C05",
+    "attempts": 0,
+    "steps": 0,
+    "work": {
+      "objective": "Review rkendel1/appboundry for unresolved reliability gaps, starting with packages/appboundry-host (the artifact host: guest execution, collections and transactions, identity, backups). Find problems you can substantiate, with evidence.",
+      "decisions": 0,
+      "gateAttempts": 0
+    },
+    "createdAt": "2026-11-25T09:42:22.376Z",
+    "updatedAt": "2026-11-25T09:42:22.376Z",
+    "id": "mwvxq4dnf6384b511889",
+    "__version": 1
+  },
+  "executions": [],
+  "evidence": []
+}

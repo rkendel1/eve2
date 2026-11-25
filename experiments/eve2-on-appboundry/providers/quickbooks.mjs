@@ -107,7 +107,7 @@ const capabilities = [
   defineCapability({
     name: "finance.documents.create", version: 1, description: "Record a vendor bill. Idempotent on the AppPort idempotency key (Intuit requestid).",
     input: s.object({ kind: s.string(), partyId: s.string(), reference: s.string(), vendorReference: s.optional(s.string()), date: s.optional(s.string()), currency: s.string(), memo: s.string(), lines: s.array(s.object({ accountId: s.string(), amount: s.number(), description: s.string() })) }),
-    output: s.unknown(), authorization: [], idempotency: "required",
+    output: s.unknown(), authorization: [], idempotency: "supported",
     handler: async (input, context) => {
       onlyBills(input.kind);
       const requestId = createHash("sha256").update(context.idempotencyKey ?? JSON.stringify(input)).digest("hex").slice(0, 36);
