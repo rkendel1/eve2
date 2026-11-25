@@ -11,7 +11,7 @@ Eve2, built by FeltKit and running as an `appboundry.app/1` artifact on the AppB
 | resolve | 23 decisions; 2 files (+73 −6); Eve re-ran 3 test files; pushed `eve/issue-99-dce978aa`; opened the PR; read it back; commented on #99 | [#100](https://github.com/rkendel1/appboundry/pull/100) is open and not merged. The 3 new tests fail with `transactions.ts` reverted to `main` and pass with the fix. The full host suite passes on the branch (127 passed, 15 skipped) |
 | CI | the PR's "published, pinned runtime" check fails on a 1.12.0/1.13.0 pin mismatch already in the gap register (X1). `main`'s `CI` and `cloud-portal` have failed on every run since at least Nov 18 | the failures predate Eve's change |
 
-Cost of the passing resolve run: 24 Claude calls (`claude-opus-5-5`), 304 s end to end.
+Cost of the passing resolve run: 24 Claude calls (`claude-opus-5-5`), 303 s end to end, 62 capability invocations. Tokens: 39k uncached input, 23k cache writes, 309k cache reads, 23k output (about $0.85 at Opus 5.5 rates).
 
 It took eight runs. Every failure stopped honestly (`blocked`, with the reason on record, and on the issue when
 there was one), and every one was a defect in the stack rather than in the model:
