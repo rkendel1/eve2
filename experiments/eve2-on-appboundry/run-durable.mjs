@@ -82,7 +82,7 @@ await until("http://127.0.0.1:5410/"); await until("http://127.0.0.1:5440/");
 
 const operator = (await post("/api/auth/dev", { userId: "operator" })).token;
 const call = async (kind, name, args) => { const r = await post(`/api/${kind}/${name}`, { args }, operator); if (!r.ok) throw new Error(`${name}: ${r.error?.code} ${r.error?.message}`); return r.value; };
-await call("mutation", "tasks:setPolicy", { operation: "assess.repository", requiresApproval: false, reconcileBeforeRetry: true, maxAttempts: 2, limits: { repositories: [REPOSITORY], maxDecisions: 40, maxIssues: 1, autoResolve: true } });
+await call("mutation", "tasks:setPolicy", { operation: "assess.repository", requiresApproval: false, reconcileBeforeRetry: true, maxAttempts: 2, limits: { repositories: [REPOSITORY], maxDecisions: Number(process.env.EVE_ASSESS_DECISIONS ?? 40), maxIssues: 1, autoResolve: true } });
 await call("mutation", "tasks:setPolicy", { operation: "resolve.repository", requiresApproval: false, reconcileBeforeRetry: true, maxAttempts: 2, limits: { repositories: [REPOSITORY], maxDecisions: 40, maxFiles: 5, forbiddenPaths: [".github/", "pnpm-lock.yaml", "package-lock.json", "package.json"], maxGateAttempts: 2 } });
 
 const objective = process.env.EVE_OBJECTIVE ?? [
