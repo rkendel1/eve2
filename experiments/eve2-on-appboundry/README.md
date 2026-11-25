@@ -37,7 +37,7 @@ survives provider and host restarts at every stage without losing work or duplic
 
   The pull request carries the verified tree and states what was not verified.
 
-### Fault-injection suite: 8/8 on the final code
+### Fault-injection suite: 10/10 on the final code
 
 `test/fault/faults.test.mjs` runs on real processes and real persistence:
 - the AppBoundry host, with FeltDB on disk;
@@ -46,7 +46,7 @@ survives provider and host restarts at every stage without losing work or duplic
 Two stand-ins replace external systems: `github-standin.mjs` for GitHub (REST subset plus a bare git repository) and
 `scripted-reasoning.mjs` for the model. Every scenario asserts exactly one issue, one `eve/` branch, one pull request
 and one report comment. It also asserts that the published commit is the verified tree, that the new test fails on the
-base, that task identity is stable, and that recovery is on record. Result: `evidence/fault-suite/2026-11-25-final.tap`.
+base, that task identity is stable, and that recovery is on record. Result: `evidence/fault-suite/2026-11-25-reconcile.tap`.
 
 | Scenario | Result |
 |---|---|
@@ -57,6 +57,8 @@ base, that task identity is stable, and that recovery is on record. Result: `evi
 | provider killed as the gate's test run starts | pass |
 | branch pushed, provider killed before the pull request | pass (branch reconciled) |
 | pull request created, answer lost | pass (found by operation) |
+| issue created, answer lost, provider still down at reconcile, lists lagging 20 s | pass (two issues on the old code) |
+| pull request created, answer lost, provider still down at reconcile, lists lagging 20 s | pass |
 | host killed mid-resolution, resumed twice concurrently | pass |
 
 Limits of the suite:

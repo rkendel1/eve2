@@ -11,3 +11,60 @@ ok 2 - provider killed during assessment (right after it wrote the reproduction)
   duration_ms: 32626.065641
   type: 'test'
   ...
+# Subtest: issue created, answer lost (provider killed after creating it): reconciled by marker, not filed twice
+ok 3 - issue created, answer lost (provider killed after creating it): reconciled by marker, not filed twice
+  ---
+  duration_ms: 37063.802654
+  type: 'test'
+  ...
+# Subtest: issue created, answer lost, the provider still down when Eve reconciles and GitHub's list lagging: one issue, never re-sent blind
+ok 4 - issue created, answer lost, the provider still down when Eve reconciles and GitHub's list lagging: one issue, never re-sent blind
+  ---
+  duration_ms: 37001.472118
+  type: 'test'
+  ...
+# Subtest: provider killed during implementation after the fix was checkpointed: rebuilt from the checkpoint at the same tree
+ok 5 - provider killed during implementation after the fix was checkpointed: rebuilt from the checkpoint at the same tree
+  ---
+  duration_ms: 32467.426911
+  type: 'test'
+  ...
+# Subtest: interrupted during verification (provider killed as the gate's test run starts): the run is redone on the same tree
+ok 6 - interrupted during verification (provider killed as the gate's test run starts): the run is redone on the same tree
+  ---
+  duration_ms: 37349.505556
+  type: 'test'
+  ...
+# Subtest: branch pushed, then the provider killed before the pull request: the branch is reconciled, one pull request
+ok 7 - branch pushed, then the provider killed before the pull request: the branch is reconciled, one pull request
+  ---
+  duration_ms: 38034.939871
+  type: 'test'
+  ...
+# Subtest: pull request created, answer lost (provider killed after creating it): found by its operation, not opened twice
+ok 8 - pull request created, answer lost (provider killed after creating it): found by its operation, not opened twice
+  ---
+  duration_ms: 37382.208841
+  type: 'test'
+  ...
+# Subtest: pull request created, answer lost, the provider still down when Eve reconciles and GitHub's list lagging: one pull request
+ok 9 - pull request created, answer lost, the provider still down when Eve reconciles and GitHub's list lagging: one pull request
+  ---
+  duration_ms: 37084.870291
+  type: 'test'
+  ...
+# Subtest: the host itself killed mid-resolution and restarted on the same state: same tasks, resumed (twice, concurrently), completed once
+ok 10 - the host itself killed mid-resolution and restarted on the same state: same tasks, resumed (twice, concurrently), completed once
+  ---
+  duration_ms: 23351.141526
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 343969.773996
