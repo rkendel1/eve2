@@ -1,0 +1,153 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:durable-1795609998075",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "durable-1795609998075"
+    },
+    "operation": "assess",
+    "status": "blocked",
+    "reference": "EVE-F05BA28BB845",
+    "attempts": 0,
+    "steps": 3,
+    "work": {
+      "decisions": 0,
+      "gateAttempts": 0,
+      "restores": 0,
+      "objective": "Review rkendel1/appboundry for an unresolved reliability defect in packages/appboundry-host (the artifact host: guest execution and limits, collections and transactions, identity and sessions, backups, the capability ledger). The after-commit outbox (performOutbox, recoverOutbox, retryOutbox) is already tracked in issue #99; look elsewhere. Find one defect you can prove with a failing test.",
+      "sha": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+      "base": "main",
+      "checks": [
+        "build",
+        "test"
+      ],
+      "checkpoint": {
+        "files": {},
+        "seq": 0,
+        "tree": "961f4b029e569c7ed36f5b1425ebef9e42ae6a5d",
+        "at": "2026-11-25T12:33:21.073Z"
+      },
+      "resumeAt": "investigating"
+    },
+    "createdAt": "2026-11-25T12:33:18.081Z",
+    "updatedAt": "2026-11-25T12:33:36.859Z",
+    "openQuestion": "I couldn't use reasoning.decide: INTERNAL_ERROR: Internal error. Nothing was entered; I'll continue when it is available.",
+    "id": "mww3txqd6dbe3f335662",
+    "__version": 4
+  },
+  "executions": [
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "seq": 0,
+      "at": "2026-11-25T12:33:21.071Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mww3txqd6dbe3f335662:open",
+      "outcome": "succeeded",
+      "outboundId": "out.53dbf265f2fbe96a901eaca7278db8f7b36e487fabaa6c9f31ed3351cd6359ed",
+      "id": "mww3u01dbadbcd3ab835",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "seq": 0,
+      "at": "2026-11-25T12:33:21.080Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at cd32300380a6; preparing it.",
+      "id": "mww3u01laae7066fbf3d",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "seq": 1,
+      "at": "2026-11-25T12:33:36.283Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.status succeeded",
+      "capability": "code.workspace.status",
+      "idempotencyKey": "mww3txqd6dbe3f335662:status:1",
+      "outcome": "succeeded",
+      "outboundId": "out.779cb4b5db24bca00e98d2cdae33267dd9db6a3baf57017fa3ee2a34c0bd5a30",
+      "id": "mww3ubrxc642282970ca",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "seq": 1,
+      "at": "2026-11-25T12:33:36.285Z",
+      "from": "preparing",
+      "to": "investigating",
+      "kind": "observe",
+      "summary": "Working copy prepared.",
+      "id": "mww3ubrz3945fff2c033",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "seq": 2,
+      "at": "2026-11-25T12:33:36.856Z",
+      "from": "investigating",
+      "to": "investigating",
+      "kind": "invoke",
+      "summary": "reasoning.decide failed: INTERNAL_ERROR Internal error",
+      "capability": "reasoning.decide",
+      "idempotencyKey": "mww3txqd6dbe3f335662:decide:0",
+      "outcome": "failed",
+      "outboundId": "out.44ef473b5e7f863520285da3a6c0afa40038b79ef4ecdce49c4b695c6fdcb38a",
+      "detail": {
+        "code": "INTERNAL_ERROR",
+        "message": "Internal error"
+      },
+      "id": "mww3uc7ubac04b1503f3",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "seq": 2,
+      "at": "2026-11-25T12:33:36.858Z",
+      "from": "investigating",
+      "to": "blocked",
+      "kind": "wait",
+      "summary": "I couldn't use reasoning.decide: INTERNAL_ERROR: Internal error. Nothing was entered; I'll continue when it is available.",
+      "id": "mww3uc7v2666fedefb04",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "kind": "checkpoint",
+      "at": "2026-11-25T12:33:21.076Z",
+      "digest": "80a2368d74b76f3a",
+      "data": {
+        "seq": 0,
+        "base": "cd32300380a6ac5735b02891218f56814dfa8ac5",
+        "tree": "961f4b029e569c7ed36f5b1425ebef9e42ae6a5d",
+        "files": 0,
+        "seeded": []
+      },
+      "id": "mww3u01ic755da1614ea",
+      "__version": 1
+    },
+    {
+      "taskId": "mww3txqd6dbe3f335662",
+      "kind": "observation",
+      "at": "2026-11-25T12:33:21.078Z",
+      "digest": "13165d20d75678ef",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main cd32300380a6; checks: build, test."
+      },
+      "id": "mww3u01kbb57593a4cc9",
+      "__version": 1
+    }
+  ]
+}
