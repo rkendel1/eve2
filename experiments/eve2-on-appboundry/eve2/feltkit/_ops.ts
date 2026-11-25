@@ -62,7 +62,9 @@ export async function latest(ctx: Ctx, task: Task, kind: string) {
 
 export async function move(ctx: Ctx, task: Task, to: string, kind: string, summary: string, detail?: unknown) {
   await record(ctx, task, kind, task.status, to, summary, detail);
-  await ctx.db.patch(tasks, task.id, { status: to, steps: task.steps + 1, updatedAt: now(), openQuestion: undefined });
+  // Progress clears the count of transient retries.
+  if (task.work?.transient) task.work = { ...task.work, transient: 0 };
+  await ctx.db.patch(tasks, task.id, { status: to, steps: task.steps + 1, updatedAt: now(), openQuestion: undefined, ...(task.work ? { work: task.work } : {}) });
   ctx.afterCommit.jobs.enqueue("eve.advance", { taskId: task.id }, { maxAttempts: 3 });
   return { taskId: task.id, status: to };
 }
@@ -70,7 +72,9 @@ export async function move(ctx: Ctx, task: Task, to: string, kind: string, summa
 /** Stop and ask (or explain), where the request came from when there is somewhere to say it. Eve keeps the task. */
 export async function wait(ctx: Ctx, task: Task, to: string, question: string, detail?: unknown) {
   await record(ctx, task, "wait", task.status, to, question, detail);
-  await ctx.db.patch(tasks, task.id, { status: to, openQuestion: question, steps: task.steps + 1, updatedAt: now() });
+  // A blocked task remembers where it stopped, so an operator's resume continues there.
+  if (to === "blocked" && task.work) task.work = { ...task.work, resumeAt: task.status };
+  await ctx.db.patch(tasks, task.id, { status: to, openQuestion: question, steps: task.steps + 1, updatedAt: now(), ...(task.work ? { work: task.work } : {}) });
   await notify(ctx, { ...task, steps: task.steps + 1 }, question, `ask:${task.steps}`);
   return { taskId: task.id, status: to, question };
 }
@@ -79,14 +83,32 @@ export async function wait(ctx: Ctx, task: Task, to: string, question: string, d
 export async function notify(ctx: Ctx, task: Task, text: string, key: string) {
   const { system, conversation, message } = task.source;
   if (system === "operator") return null;
-  if (system === "tracker") return invoke(ctx, task, "tracker.items.comment", { repository: conversation, number: Number(message), body: text }, `${task.id}:${key}`);
+  if (system === "tracker") return invoke(ctx, task, "tracker.items.comment", { repository: conversation, number: Number(message), operation: `${task.id}:${key}`, body: text }, `${task.id}:${key}`);
   return invoke(ctx, task, "conversation.messages.reply", { conversation, message, text }, `${task.id}:${key}`);
 }
 
 export const halt = (ctx: Ctx, task: Task, to: string, why: string) => wait(ctx, task, to, why);
 
-/** A capability that did not answer usefully: say exactly which, and keep the task. */
-export function unavailable(ctx: Ctx, task: Task, capability: string, result: any) {
+/** Whether an outcome may clear up by itself: a provider that is down or restarting, an unknown outcome, a concurrent attempt. */
+export const transient = (result: any) => result.outcome === "unknown"
+  || (result.outcome === "failed" && ["UNAVAILABLE", "RATE_LIMITED", "TIMEOUT"].includes(result.error?.code))
+  || (result.outcome === "refused" && result.error?.code === "CONFLICT");
+export const MAX_TRANSIENT = 6;
+
+/**
+ * A capability that did not answer usefully. A transient failure is retried later, a bounded number of times, the step
+ * re-reading what it needs (it never assumes the earlier attempt did nothing); anything else, or too many, blocks with
+ * exactly which capability and why. The task is kept either way.
+ */
+export async function unavailable(ctx: Ctx, task: Task, capability: string, result: any) {
   const why = result.outcome === "unknown" ? `it did not answer (${result.reason})` : `${result.error.code}: ${result.error.message}`;
+  const tries = (task.work?.transient ?? 0) + 1;
+  if (transient(result) && tries <= MAX_TRANSIENT) {
+    task.work = { ...(task.work ?? {}), transient: tries };
+    await record(ctx, task, "wait", task.status, task.status, `${capability}: ${why}. Trying this step again (${tries} of ${MAX_TRANSIENT}).`);
+    await ctx.db.patch(tasks, task.id, { steps: task.steps + 1, updatedAt: now(), work: task.work });
+    ctx.afterCommit.jobs.enqueue("eve.advance", { taskId: task.id }, { maxAttempts: 3, runAt: new Date(Date.now() + 5_000 * tries).toISOString() });
+    return { taskId: task.id, status: task.status, retrying: tries };
+  }
   return wait(ctx, task, "blocked", `I couldn't use ${capability}: ${why}. Nothing was entered; I'll continue when it is available.`);
 }
