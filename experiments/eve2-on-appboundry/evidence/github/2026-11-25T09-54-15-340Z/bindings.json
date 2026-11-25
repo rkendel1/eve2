@@ -1,0 +1,212 @@
+{
+  "bindings": [
+    {
+      "capability": "reasoning.interpret",
+      "version": 1,
+      "provider": {
+        "applicationId": "reasoning-claude",
+        "url": "http://127.0.0.1:5410/appport"
+      },
+      "credentialEnv": "TOKEN_REASONING",
+      "grant": {
+        "id": "grant-eve2-reasoning.interpret"
+      },
+      "timeoutMs": 120000
+    },
+    {
+      "capability": "reasoning.decide",
+      "version": 1,
+      "provider": {
+        "applicationId": "reasoning-claude",
+        "url": "http://127.0.0.1:5410/appport"
+      },
+      "credentialEnv": "TOKEN_REASONING",
+      "grant": {
+        "id": "grant-eve2-reasoning.decide"
+      },
+      "timeoutMs": 120000
+    },
+    {
+      "capability": "tracker.items.get",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-tracker.items.get"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "tracker.items.find",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-tracker.items.find"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "tracker.items.create",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-tracker.items.create"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "tracker.items.comment",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-tracker.items.comment"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "code.workspace.open",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.open"
+      },
+      "timeoutMs": 120000
+    },
+    {
+      "capability": "code.workspace.list",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.list"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "code.workspace.read",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.read"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "code.workspace.search",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.search"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "code.workspace.write",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.write"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "code.workspace.diff",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.diff"
+      },
+      "timeoutMs": 30000
+    },
+    {
+      "capability": "code.workspace.run",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.run"
+      },
+      "timeoutMs": 45000
+    },
+    {
+      "capability": "code.workspace.result",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.workspace.result"
+      },
+      "timeoutMs": 40000
+    },
+    {
+      "capability": "code.changes.publish",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.changes.publish"
+      },
+      "timeoutMs": 60000
+    },
+    {
+      "capability": "code.changes.get",
+      "version": 1,
+      "provider": {
+        "applicationId": "github",
+        "url": "http://127.0.0.1:5440/appport"
+      },
+      "credentialEnv": "TOKEN_GITHUB",
+      "grant": {
+        "id": "grant-eve2-code.changes.get"
+      },
+      "timeoutMs": 30000
+    }
+  ]
+}
