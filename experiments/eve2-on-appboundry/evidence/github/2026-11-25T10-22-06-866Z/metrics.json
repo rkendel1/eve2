@@ -1,0 +1,42 @@
+{
+  "startedAt": "2026-11-25T10:22:07.775Z",
+  "resolve": {
+    "taskId": "mwvz58yu6557b3109850",
+    "status": "completed",
+    "seconds": 303,
+    "steps": 36,
+    "decisions": 23,
+    "model": {
+      "calls": 24,
+      "inputTokens": 39288,
+      "cacheWriteTokens": 22629,
+      "cacheReadTokens": 309307,
+      "outputTokens": 22544
+    },
+    "invocations": 62,
+    "report": {
+      "pullRequest": {
+        "number": 100,
+        "url": "https://github.com/rkendel1/appboundry/pull/100",
+        "headSha": "4edf189b6be56e398bc8518ef475e85e5a184bd4",
+        "ci": []
+      },
+      "tests": [
+        {
+          "target": "packages/appboundry-host/test/outbox-outcome.test.ts",
+          "exitCode": 0
+        },
+        {
+          "target": "packages/appboundry-host/test/transactions.test.ts",
+          "exitCode": 0
+        },
+        {
+          "target": "packages/appboundry-host/test/transactional-effects.test.ts",
+          "exitCode": 0
+        }
+      ],
+      "summary": "performOutbox (packages/appboundry-host/src/transactions.ts) wrote the outcome (done or failed) with a version-guarded put. If that write threw, it only called warn() and still returned next.state. The caller was then told 'done' or 'failed' while the durable record stayed 'performing'. recoverOutbox counted it as performed, retryOutbox reported it, and about 300 s later recovery could perform it again.\n\nFix: the outcome write is now retried, up to OUTCOME_WRITE_ATTEMPTS = 3, but only while a re-read shows the claim still holds (same __version, still 'performing'). If the write still cannot be recorded, it warns as before ('could not record <state>') and returns 'skipped'. 'done' or 'failed' is now returned only after the record has been written with that state. The doc comment describes the new 'skipped' case. I did not change host.ts: its callers already treat 'skipped' as not performed.\n\nNew test packages/appboundry-host/test/outbox-outcome.test.ts uses an in-memory store whose outcome writes fail. It checks three cases: an unrecordable done returns 'skipped' and warns; an unrecordable failed returns 'skipped'; a transiently failing write is retried and recorded as done. All three tests failed before the change and pass after it. The existing transactions.test.ts and transactional-effects.test.ts still pass, and the build (tsc -b) succeeds."
+    }
+  },
+  "finishedAt": "2026-11-25T10:27:11.280Z"
+}

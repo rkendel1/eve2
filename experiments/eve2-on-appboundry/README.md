@@ -1,5 +1,39 @@
 # Eve2 on AppBoundry
 
+## First live result (2026-11-25): issue → PR on a real repository
+
+Eve2, built by FeltKit and running as an `appboundry.app/1` artifact on the AppBoundry host, worked on
+`rkendel1/appboundry` through two AppPort providers: Claude (`reasoning.*`) and GitHub (`tracker.*`, `code.*`).
+
+| Step | What happened | Checked independently |
+|---|---|---|
+| assess | 30 decisions; one finding proposed; its 3 code citations re-read and confirmed by Eve; filed | [#99](https://github.com/rkendel1/appboundry/issues/99) exists. Its claim holds against `main`: a failed effect whose `failed` write is lost is re-run by recovery, against the documented operator-only retry |
+| resolve | 23 decisions; 2 files (+73 −6); Eve re-ran 3 test files; pushed `eve/issue-99-dce978aa`; opened the PR; read it back; commented on #99 | [#100](https://github.com/rkendel1/appboundry/pull/100) is open and not merged. The 3 new tests fail with `transactions.ts` reverted to `main` and pass with the fix. The full host suite passes on the branch (127 passed, 15 skipped) |
+| CI | the PR's "published, pinned runtime" check fails on a 1.12.0/1.13.0 pin mismatch already in the gap register (X1). `main`'s `CI` and `cloud-portal` have failed on every run since at least Nov 18 | the failures predate Eve's change |
+
+Cost of the passing resolve run: 24 Claude calls (`claude-opus-5-5`), 304 s end to end.
+
+It took eight runs. Every failure stopped honestly (`blocked`, with the reason on record, and on the issue when
+there was one), and every one was a defect in the stack rather than in the model:
+
+| Run | Stopped at | Cause | Fixed in |
+|---|---|---|---|
+| 1–3 | received | Eve's roles lacked `jobs.create`, then `jobs.execute`. FeltKit's reference host does not authorize jobs, so the isolated tests could not catch it. A job denied at execute is logged only in the host's job audit | Eve2 roles |
+| 3 | preparing | the host sent an AppPort idempotency key to read capabilities, which AppPort refuses | AppBoundry `capabilities@1` |
+| 4 | investigating | 30 decisions on one hypothesis the model could not settle: dependencies were not searchable, and the budget was not stated | Eve2 (budget), provider (dependency search) |
+| 5 | publishing | a lost update in Eve's own step code erased the saved diff | Eve2 |
+| 6 | publishing | the providers declared idempotency `required`, which is not an AppPort value | providers, host check |
+| 7 | publishing | this environment's proxy refuses GitHub Git Data API writes | provider publishes by `git push`, PR by API |
+| 8 | completed | | |
+
+Open limits:
+- Code-quote evidence proves the citation, not the behavior. A behavioral finding should carry a failing check.
+- Eve checks that its tests pass after the change, not that they fail before it. The PR's own claim was checked by
+  hand.
+- Working copies live in the provider's memory, so a provider restart loses them.
+- The host serves one application per process.
+- GitHub sees `rkendel1`, not Eve2.
+
 An experiment: can an agent application be built with the real product stack (FeltKit), run as an AppBoundry
 artifact on the shared runtime with no companion process and no credentials of its own, and do consequential work
 across real systems through AppPort?
