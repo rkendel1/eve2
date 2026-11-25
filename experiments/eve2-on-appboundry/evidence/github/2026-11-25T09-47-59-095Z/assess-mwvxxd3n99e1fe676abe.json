@@ -1,0 +1,110 @@
+{
+  "task": {
+    "sourceKey": "operator:rkendel1/appboundry:assess-1795600080264",
+    "source": {
+      "system": "operator",
+      "conversation": "rkendel1/appboundry",
+      "message": "assess-1795600080264"
+    },
+    "operation": "assess",
+    "status": "blocked",
+    "reference": "EVE-1243054FFB9E",
+    "attempts": 0,
+    "steps": 2,
+    "work": {
+      "objective": "Review rkendel1/appboundry for unresolved reliability gaps, starting with packages/appboundry-host (the artifact host: guest execution, collections and transactions, identity, backups). Find problems you can substantiate, with evidence.",
+      "decisions": 0,
+      "gateAttempts": 0,
+      "workspace": "ws_f76f77218c9b",
+      "sha": "ec75dbd921ef327ea9a2cb9a599beae5d48d6193",
+      "base": "main",
+      "checks": [
+        "prepare",
+        "build",
+        "test"
+      ],
+      "pending": {
+        "run": "run_39c43d93",
+        "purpose": "prepare"
+      }
+    },
+    "createdAt": "2026-11-25T09:48:00.270Z",
+    "updatedAt": "2026-11-25T09:48:22.160Z",
+    "openQuestion": "I couldn't use code.workspace.result: INVALID_REQUEST: Capability code.workspace.result@1 does not declare idempotency support; idempotencyKey would be ignored. Nothing was entered; I'll continue when it is available.",
+    "id": "mwvxxd3n99e1fe676abe",
+    "__version": 3
+  },
+  "executions": [
+    {
+      "taskId": "mwvxxd3n99e1fe676abe",
+      "seq": 0,
+      "at": "2026-11-25T09:48:21.580Z",
+      "from": "opening",
+      "to": "opening",
+      "kind": "invoke",
+      "summary": "code.workspace.open succeeded",
+      "capability": "code.workspace.open",
+      "idempotencyKey": "mwvxxd3n99e1fe676abe:open",
+      "outcome": "succeeded",
+      "outboundId": "out.31e60ad576db6870eb7f77639f0d24fe43e883d1fc52375382e42299ac3ed849",
+      "id": "mwvxxtjjfa2937c72959",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxxd3n99e1fe676abe",
+      "seq": 0,
+      "at": "2026-11-25T09:48:21.588Z",
+      "from": "opening",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "Opened a working copy at ec75dbd921ef; preparing it (install and build).",
+      "id": "mwvxxtjpb6730e69a629",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxxd3n99e1fe676abe",
+      "seq": 1,
+      "at": "2026-11-25T09:48:22.156Z",
+      "from": "preparing",
+      "to": "preparing",
+      "kind": "invoke",
+      "summary": "code.workspace.result failed: INVALID_REQUEST Capability code.workspace.result@1 does not declare idempotency support; idempotencyKey would be ignored",
+      "capability": "code.workspace.result",
+      "idempotencyKey": "mwvxxd3n99e1fe676abe:result:run_39c43d93:1",
+      "outcome": "failed",
+      "outboundId": "out.d941a2c08e7fc3b7e30798f69f97fcfe8f8d804ba5f4f7fb846f5ef6158664fd",
+      "detail": {
+        "code": "INVALID_REQUEST",
+        "message": "Capability code.workspace.result@1 does not declare idempotency support; idempotencyKey would be ignored"
+      },
+      "id": "mwvxxtzjd99ea1b2b945",
+      "__version": 1
+    },
+    {
+      "taskId": "mwvxxd3n99e1fe676abe",
+      "seq": 1,
+      "at": "2026-11-25T09:48:22.159Z",
+      "from": "preparing",
+      "to": "blocked",
+      "kind": "wait",
+      "summary": "I couldn't use code.workspace.result: INVALID_REQUEST: Capability code.workspace.result@1 does not declare idempotency support; idempotencyKey would be ignored. Nothing was entered; I'll continue when it is available.",
+      "id": "mwvxxtzk459e05008cb1",
+      "__version": 1
+    }
+  ],
+  "evidence": [
+    {
+      "taskId": "mwvxxd3n99e1fe676abe",
+      "kind": "observation",
+      "at": "2026-11-25T09:48:21.583Z",
+      "digest": "ddbf6f0d3e0f7d54",
+      "data": {
+        "n": 0,
+        "action": "open",
+        "summary": "Working copy of rkendel1/appboundry at main ec75dbd921ef; checks: prepare, build, test."
+      },
+      "id": "mwvxxtjmb745f37585de",
+      "__version": 1
+    }
+  ]
+}
