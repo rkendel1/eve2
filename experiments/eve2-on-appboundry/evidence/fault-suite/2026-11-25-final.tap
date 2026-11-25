@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: baseline: the whole workflow, uninterrupted, produces one issue, one branch, one pull request
+ok 1 - baseline: the whole workflow, uninterrupted, produces one issue, one branch, one pull request
+  ---
+  duration_ms: 31534.416622
+  type: 'test'
+  ...
+# Subtest: provider killed during assessment (right after it wrote the reproduction): the write is redone, the workflow completes once
+ok 2 - provider killed during assessment (right after it wrote the reproduction): the write is redone, the workflow completes once
+  ---
+  duration_ms: 32244.886918
+  type: 'test'
+  ...
+# Subtest: issue created, answer lost (provider killed after creating it): reconciled by marker, not filed twice
+ok 3 - issue created, answer lost (provider killed after creating it): reconciled by marker, not filed twice
+  ---
+  duration_ms: 37015.992716
+  type: 'test'
+  ...
+# Subtest: provider killed during implementation after the fix was checkpointed: rebuilt from the checkpoint at the same tree
+ok 4 - provider killed during implementation after the fix was checkpointed: rebuilt from the checkpoint at the same tree
+  ---
+  duration_ms: 32054.225617
+  type: 'test'
+  ...
+# Subtest: interrupted during verification (provider killed as the gate's test run starts): the run is redone on the same tree
+ok 5 - interrupted during verification (provider killed as the gate's test run starts): the run is redone on the same tree
+  ---
+  duration_ms: 37374.841193
+  type: 'test'
+  ...
+# Subtest: branch pushed, then the provider killed before the pull request: the branch is reconciled, one pull request
+ok 6 - branch pushed, then the provider killed before the pull request: the branch is reconciled, one pull request
+  ---
+  duration_ms: 37409.015828
+  type: 'test'
+  ...
+# Subtest: pull request created, answer lost (provider killed after creating it): found by its operation, not opened twice
+ok 7 - pull request created, answer lost (provider killed after creating it): found by its operation, not opened twice
+  ---
+  duration_ms: 37059.667022
+  type: 'test'
+  ...
+# Subtest: the host itself killed mid-resolution and restarted on the same state: same tasks, resumed (twice, concurrently), completed once
+ok 8 - the host itself killed mid-resolution and restarted on the same state: same tasks, resumed (twice, concurrently), completed once
+  ---
+  duration_ms: 23814.137818
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 268627.045058

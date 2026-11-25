@@ -1,5 +1,84 @@
 # Eve2 on AppBoundry
 
+## Durable issue-to-PR (in progress, 2026-11-25)
+
+Goal: Eve independently discovers a defect, files it, resolves it, proves the fix and opens a pull request, and
+survives provider and host restarts at every stage without losing work or duplicating an external effect.
+
+### Contract: who owns what
+
+| Component | Owns |
+|---|---|
+| FeltDB (Eve's state) | tasks, executions, evidence, policies, and `blobs`: every file Eve wrote, by SHA-256. A checkpoint is a base commit, path → digest, and the provider's content tree |
+| Eve | decisions, policy, proof gates, reconciliation, recovery records (`executions` kind `recover`, `evidence` kind `recovery`) |
+| AppBoundry `capabilities@1` | outbound ledger: an attempt is committed before it is sent. A host restart turns an in-flight attempt into `unknown`, never `failed` and never a permanent conflict |
+| GitHub provider | disposable. Working copies are rebuilt from base + checkpoint. Issues, comments and pull requests carry an operation marker and are found before being created again. Commits are deterministic. An existing branch is reconciled by tree, never force-pushed. There is no merge capability |
+
+### Recovery rules
+
+| Interruption | What Eve does |
+|---|---|
+| Working copy gone (provider restarted) | rebuild it from base + checkpointed files. It must come back at the checkpointed tree, or Eve stops |
+| Check run lost | run it again. Results are bound to the tree they ran on |
+| Issue creation unknown | find the issue by its operation marker; send again only if none exists (same key) |
+| Publish unknown or failed | find the branch and pull request for the operation. A pull request found is used. Otherwise publishing again reconciles the branch by content |
+| Report comment unknown | sent again with the same marker; the provider returns the existing comment |
+| Transient failure (`*.UNAVAILABLE`, `TIMEOUT`, `RATE_LIMITED`, unknown) | retry the step with bounded backoff (6 tries), re-reading what it needs |
+| Host restarted | in-flight outbound attempts become `unknown`. An operator `tasks:resume` re-queues the task, keeping its identity, and records it |
+
+### Proof gates
+
+- **assess** files a finding only if it has a test Eve wrote and checkpointed, and that test fails on its assertions on
+  the unmodified code. A load or setup error does not count. Findings without one are kept as hypotheses.
+- **resolve** proposes a change only when:
+  - the diff is bounded, within policy, and includes a test;
+  - every named test passes on the exact checkpointed tree;
+  - every test file the change adds or modifies fails on the base, on its assertions.
+
+  The pull request carries the verified tree and states what was not verified.
+
+### Fault-injection suite: 8/8 on the final code
+
+`test/fault/faults.test.mjs` runs on real processes and real persistence:
+- the AppBoundry host, with FeltDB on disk;
+- the GitHub provider, killed at a boundary with `FAULT_EXIT_AFTER=<boundary>#<n>` and restarted.
+
+Two stand-ins replace external systems: `github-standin.mjs` for GitHub (REST subset plus a bare git repository) and
+`scripted-reasoning.mjs` for the model. Every scenario asserts exactly one issue, one `eve/` branch, one pull request
+and one report comment. It also asserts that the published commit is the verified tree, that the new test fails on the
+base, that task identity is stable, and that recovery is on record. Result: `evidence/fault-suite/2026-11-25-final.tap`.
+
+| Scenario | Result |
+|---|---|
+| baseline | pass |
+| provider killed after writing the reproduction (assessment) | pass |
+| issue created, answer lost | pass (reconciled by marker) |
+| provider killed after the fix was checkpointed | pass (rebuilt at the same tree) |
+| provider killed as the gate's test run starts | pass |
+| branch pushed, provider killed before the pull request | pass (branch reconciled) |
+| pull request created, answer lost | pass (found by operation) |
+| host killed mid-resolution, resumed twice concurrently | pass |
+
+Limits of the suite:
+- GitHub and the model are stand-ins.
+- The protections are layered, so removing one mechanism usually still leaves the outcome exactly-once. The suite
+  shows the outcome, not each mechanism in isolation.
+
+Defects found on the way, all fixed:
+- `NODE_TEST_CONTEXT` leaked into checks and made a failing `node --test` exit 0.
+- Providers used a non-protocol error code (`UNAVAILABLE`).
+- `git add` failed once `node_modules` existed.
+- A host left an outbound attempt `sending` forever after a stop.
+- A lost update in Eve's step code.
+- Harness faults.
+
+### Live run: blocked
+
+`run-durable.mjs` runs the workflow on `rkendel1/appboundry` with real Claude and GitHub. It kills the provider after
+the issue is created, after a fix checkpoint, after the push, and after the pull request. It is blocked: the session's
+environment has no `BENCH_API_KEY` since its container restarted.
+
+
 ## First live result (2026-11-25): issue → PR on a real repository
 
 Eve2, built by FeltKit and running as an `appboundry.app/1` artifact on the AppBoundry host, worked on
