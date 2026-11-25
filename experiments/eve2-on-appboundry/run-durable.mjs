@@ -120,14 +120,22 @@ try {
     if (Date.now() - changedAt > 600_000) { note("stalled", { lines }); break; }
     await new Promise((r) => setTimeout(r, 3_000));
   }
+} catch (error) {
+  note("harness.error", { message: String(error.message ?? error) });
 } finally {
   const views = {};
+  try {
   for (const t of await call("query", "tasks:list", {})) { views[t.id] = await call("query", "tasks:get", { taskId: t.id }); writeFileSync(join(runDir, `${t.operation}-${t.id}.json`), JSON.stringify(views[t.id], null, 2)); }
   const usage = Object.values(views).flatMap((v) => v.evidence.filter((e) => e.kind === "model_usage").map((e) => e.data)).reduce((a, u) => ({ calls: a.calls + 1, inputTokens: a.inputTokens + (u.inputTokens ?? 0), cacheWriteTokens: a.cacheWriteTokens + (u.cacheWriteTokens ?? 0), cacheReadTokens: a.cacheReadTokens + (u.cacheReadTokens ?? 0), outputTokens: a.outputTokens + (u.outputTokens ?? 0) }), { calls: 0, inputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 });
   const summary = { startedAt: new Date(started).toISOString(), seconds: Math.round((Date.now() - started) / 1000), providerLives: life, timeline, tasks: Object.values(views).map((v) => ({ id: v.task.id, operation: v.task.operation, status: v.task.status, steps: v.task.steps, decisions: v.task.work?.decisions, restores: v.task.work?.restores, report: v.task.report ?? null, recoveries: v.executions.filter((e) => e.kind === "recover").map((e) => e.summary) })), model: usage };
   writeFileSync(join(runDir, "summary.json"), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify({ ...summary, timeline: undefined }, null, 2));
   console.log(`Evidence: ${runDir}`);
-  stopping = true;
-  for (const c of children) c.kill("SIGTERM");
+  } catch (error) {
+    note("export.error", { message: String(error.message ?? error) });
+  } finally {
+    // Cleanup never depends on the host answering.
+    stopping = true;
+    for (const c of children) c.kill("SIGTERM");
+  }
 }
