@@ -3,8 +3,8 @@
 //   code.workspace.*  a working copy: open, status, list, read, search, write, run (declared checks only), result, diff
 //   code.changes.*    publish a working copy's changes as a branch and pull request; read a pull request back
 //
-// GitHub access is this provider's. Here the environment's proxy authenticates api.github.com and github.com; elsewhere
-// GITHUB_TOKEN is read. Bounds are the provider's, whatever the consumer asks: an allowlist of repositories, branches
+// GitHub access is this provider's. Here the environment's proxy authenticates api.github.com and github.com (run with
+// NODE_USE_ENV_PROXY=1 so fetch uses it); elsewhere EVE_GITHUB_TOKEN is read. An ambient GITHUB_TOKEN is never used. Bounds are the provider's, whatever the consumer asks: an allowlist of repositories, branches
 // under eve/, no merge capability at all, no workflow files, and only the checks declared per repository.
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -37,7 +37,7 @@ function repository(name) {
 
 async function gh(method, path, body) {
   const headers = { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "eve2-github-provider" };
-  if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  if (process.env.EVE_GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.EVE_GITHUB_TOKEN}`;
   if (body) headers["content-type"] = "application/json";
   const response = await fetch(`https://api.github.com${path}`, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) });
   const json = response.status === 204 ? null : await response.json().catch(() => null);

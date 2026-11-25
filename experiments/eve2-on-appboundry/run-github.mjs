@@ -37,7 +37,7 @@ const post = async (path, body, token) => (await fetch(`${base}${path}`, { metho
 
 const tokens = { reasoning: randomBytes(24).toString("hex"), github: randomBytes(24).toString("hex") };
 start("provider-reasoning", [join(here, "providers/reasoning.mjs")], { PORT: "5410", CONSUMER_TOKEN: tokens.reasoning });
-start("provider-github", [join(here, "providers/github.mjs")], { PORT: "5440", CONSUMER_TOKEN: tokens.github, GITHUB_REPOSITORIES: REPOSITORY, GITHUB_WORKDIR: join(here, ".state/workspaces") });
+start("provider-github", [join(here, "providers/github.mjs")], { NODE_USE_ENV_PROXY: "1", GITHUB_TOKEN: "", GH_TOKEN: "", PORT: "5440", CONSUMER_TOKEN: tokens.github, GITHUB_REPOSITORIES: REPOSITORY, GITHUB_WORKDIR: join(here, ".state/workspaces") });
 const bind = (capability, port, provider, env, timeoutMs) => ({ capability, version: 1, provider: { applicationId: provider, url: `http://127.0.0.1:${port}/appport` }, credentialEnv: env, grant: { id: `grant-eve2-${capability}` }, timeoutMs });
 const bindings = { bindings: [
   bind("reasoning.interpret", 5410, "reasoning-claude", "TOKEN_REASONING", 120_000), bind("reasoning.decide", 5410, "reasoning-claude", "TOKEN_REASONING", 120_000),
@@ -64,12 +64,15 @@ await call("mutation", "tasks:setPolicy", { operation: "resolve.repository", req
 const metrics = { startedAt: new Date().toISOString() };
 async function follow(taskId, label) {
   const started = Date.now();
-  let last = "";
+  let last = "", lastProgress = "", changedAt = Date.now();
   for (;;) {
     const view = (await call("query", "tasks:get", { taskId })).value;
     const t = view.task;
     const line = `${t.status}${t.work?.decisions ? ` decisions=${t.work.decisions}` : ""}${t.openQuestion ? ` — ${t.openQuestion}` : ""}`;
+    const progress = `${line} ${t.steps}`;
+    if (progress !== lastProgress) { lastProgress = progress; changedAt = Date.now(); }
     if (line !== last) { console.log(`[${label} ${Math.round((Date.now() - started) / 1000)}s] ${line}`); last = line; }
+    if (Date.now() - changedAt > 300_000) { console.log(`[${label}] STALLED: no progress for 5 minutes at ${t.status}`); writeFileSync(join(runDir, `${label}-${taskId}.json`), JSON.stringify(view, null, 2)); metrics[label] = { taskId, status: `stalled at ${t.status}` }; return t; }
     if (["completed", "blocked", "failed", "verification_failed", "needs_clarification", "needs_approval"].includes(t.status)) {
       writeFileSync(join(runDir, `${label}-${taskId}.json`), JSON.stringify(view, null, 2));
       metrics[label] = { taskId, status: t.status, seconds: Math.round((Date.now() - started) / 1000), steps: t.steps, decisions: t.work?.decisions ?? 0,
