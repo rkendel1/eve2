@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import type { EveEvalResult, EveEvalRunSummary } from "eve/evals";
 import type { EvalReporter } from "eve/evals/reporters";
 import type { SessionStreamEvent } from "eve/client";
+import type { HookEvent } from "eve/hooks";
 import { emptySessionView, foldEvents } from "eve/events";
 import { z } from "zod";
 import { traceTimelineRows } from "@agent/subagents/browser-agent/lib/trace/timeline";
@@ -193,6 +194,19 @@ export async function reportBrowserBenchmarkActivity(
   }));
 }
 
+// Session events hooks never receive. The trace timeline renders what hooks see, so it skips
+// these; eve versions without one of them simply never emit it.
+const NON_HOOK_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "child.sent",
+  "turn.held",
+]);
+
+function isHookEvent(
+  event: SessionStreamEvent
+): event is Extract<SessionStreamEvent, { readonly type: HookEvent["type"] }> {
+  return !NON_HOOK_EVENT_TYPES.has(event.type);
+}
+
 async function writeLiveTrace(
   taskName: string,
   sessionId: string,
@@ -210,14 +224,13 @@ async function writeLiveTrace(
     `${JSON.stringify(
       {
         events: events.flatMap((event) =>
-          // Hooks never receive child.sent, so the trace timeline skips it.
-          event.type === "child.sent"
-            ? []
-            : traceTimelineRows(event, {
+          isHookEvent(event)
+            ? traceTimelineRows(event, {
                 now: new Date(event.meta.at),
                 position: event.meta.position,
                 view,
               })
+            : []
         ),
         sessionId,
         taskName,

@@ -94,6 +94,7 @@ async function deliver(
   const from: RouteContext["from"] = vi.fn(() => ({
     send: dispatch,
     respond: unsupported,
+    resume: unsupported,
     cancel: unsupported,
     compact: unsupported,
     clear: unsupported,

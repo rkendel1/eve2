@@ -303,9 +303,10 @@ function attachedSession(id: string, send = vi.fn<Session["send"]>()): Session {
     id,
     prewarm: vi.fn<Session["prewarm"]>(),
     respond: vi.fn<Session["respond"]>(),
+    resume: vi.fn(),
     send,
     stream: vi.fn<Session["stream"]>(),
-  };
+  } as Session;
 }
 
 function scheduledClaim(): Awaited<

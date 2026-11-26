@@ -44,7 +44,7 @@
     "async-sema": "3.1.1",
     "ulid": "~3.0.2",
     "undici": "7.30.2",
-    "zod": "~4.6.7"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@feltdb/core": "0.25.0",
