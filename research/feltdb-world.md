@@ -493,26 +493,48 @@ yet released.
 `eve start`, kills the whole process group with `SIGKILL`, starts a new `eve start` on the same directory, and continues
 the same session through the eve channel. Nothing from the first process is reused: no Workflow addresses, no memory.
 
-| Case               | Crash point                                         | After restart                                                                                                                                                            |
-| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Completed effect   | after the tool returned, during the next model call | the tool's counter stays 1; the model receives the recorded output                                                                                                       |
-| Interrupted effect | while the tool was running                          | **intermittent**: usually not run again, and the model is told the call "may or may not have taken effect"; see the known defect below                                   |
-| Pending approval   | after the step that opened it committed             | the same approval is open; a person without session access can't reach it; a delegate with access is refused as an approver; the requester's approval runs the tool once |
-| Two sessions       | between turns                                       | each continues with only its own history                                                                                                                                 |
-| Unreadable state   | state written in a newer FeltDB format              | `eve start` fails with `UNSUPPORTED_DURABLE_FORMAT`; the file is untouched; restoring it restores the session                                                            |
-| Two owners         | a second host on a live or paused owner             | refused with `STATE_LOCKED`                                                                                                                                              |
+| Case               | Crash point                                           | After restart                                                                                                                                                                               |
+| ------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Completed effect   | after the tool returned, during the next model call   | the tool's counter stays 1; the model receives the recorded output                                                                                                                          |
+| Interrupted effect | while the tool was running, its start still unflushed | not run again; the model is told the call "may or may not have taken effect" (deterministic: Workflow's stream flush window is widened to 1.5 s, so the kill always lands before the flush) |
+| Pending approval   | after the step that opened it committed               | the same approval is open; a person without session access can't reach it; a delegate with access is refused as an approver; the requester's approval runs the tool once                    |
+| Two sessions       | between turns                                         | each continues with only its own history                                                                                                                                                    |
+| Unreadable state   | state written in a newer FeltDB format                | `eve start` fails with `UNSUPPORTED_DURABLE_FORMAT`; the file is untouched; restoring it restores the session                                                                               |
+| Two owners         | a second host on a live or paused owner               | refused with `STATE_LOCKED`                                                                                                                                                                 |
 
 How it works is Workflow's own recovery over durable World state, not a new mechanism: the restarted process
 re-enqueues active runs, Workflow replays the session program from its event log, and the step that was running
 at the crash runs again with `attempt` 2. eve then reads the session lines that step wrote (`readOrphanedLines`),
 adopts settled calls, and reports unsettled ones as interrupted (`recoverInterruptedStep`).
 
-**Known defect (open): an interrupted effect can run twice.** On `main` at `674046e` (#36), the interrupted-effect case
-failed in 2 of 4 runs, and in 2 of 3 on the branch that adds session access. In a failing run, the successor's first
-read of the session stream returned no lines (`getInfo` count 0, no chunks) although the dead process had committed
-six, and a later read in the same process returned all six. The retried step therefore saw no `call.started`,
-concluded the call had not run, and ran it again. The cause of the stale first read (in this World or in FeltDB) is
-not yet found. Until it is, recovery of an interrupted effect on this World is not safe to rely on.
+**An effect could run twice (fixed in #38).** Between #36 and #38 the interrupted-effect case failed intermittently
+(2 of 4 runs on `674046e`): the successor ran the transfer again. #37 attributed this to a stale first read in the
+successor. That was wrong. Instrumented runs showed one World instance in the successor, opened after the dead
+owner's lock cleared, and both of its reads empty, because the dead owner had never committed the lines; the lines
+#37 took for the dead owner's were the successor's own. The successor read the durable state correctly.
+
+The cause is on the write side. Workflow's step writable acknowledges `write()` when a chunk enters its group-commit
+buffer, not when the World has committed it; its durability barrier runs only when the step ends
+(`@workflow/core` `serialization.js`, "Group-commit buffering"). eve awaited `write()` for `call.started` and then ran
+the tool inside the same step, so a host killed in that window lost the record that the call had started. The
+retried step then saw no evidence, concluded the call had not run, and ran it.
+
+eve now waits for that barrier after writing a line that starts a call, before the call runs. eve's build exposes
+Workflow's own `drainFlushableSnapshot` on the step writable (`scripts/vendor-compiled/@workflow/core.mjs`, which fails
+the build if the patched source changes), and the session publisher awaits it after any line carrying `call.started`.
+If the barrier fails, publishing fails and the call does not run.
+
+**What a successor can trust:**
+
+- A line a predecessor committed is visible to the successor's first read, and every later read returns the same
+  lines (`world.scenario.test.ts`, three kill-and-reopen cycles). FeltDB acknowledges a commit only after its bytes
+  are durable, and a successor opens only after the predecessor's lock clears.
+- A call that started is recorded durably before it runs. A retried step that finds `call.started` without
+  `call.settled` reports the call as interrupted and does not run it.
+- A call whose `call.settled` was still buffered at the crash is reported as interrupted, not as completed and not run
+  again: an outcome is restored only when its record was committed.
+- A gap or a mismatch in the stream fails the step (`readOrphanedLines`: "Cannot reconcile an unreadable or missing
+  session line", "Session stream ended before its reported tail"); it is never read as an empty history.
 
 **What remains non-durable or unproven:**
 
