@@ -6,6 +6,7 @@ import { EVE_ROUTE_PREFIX } from "#protocol/routes.js";
 import type { SessionAuthContext, SessionParent, SessionTraceSeed } from "#channel/types.js";
 import { internalSession, type Session } from "#channel/session.js";
 import { resolveForwardedPrincipal } from "#channel/forwarded-principal.js";
+import { canAccessSession, sessionAccessDenial } from "#eve-channel/session-access.js";
 import { handleConnectionCallbackRequest } from "#execution/connections/callback-route.js";
 import { handleSessionCallbackRequest } from "#subagents/callback-route.js";
 import {
@@ -399,6 +400,7 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
                 earlierCallerProtocol,
                 continuationToken: operationToken,
                 initiatorAuth: forwarded.accepted ? forwarded.initiatorAuth : undefined,
+                sessionOwner: auth,
                 input: attachClientContext(
                   {
                     message: body.message,
@@ -451,6 +453,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         const payload = await parseOptionalJsonRequest(req);
         if (payload instanceof Response) return payload;
         if (Object.keys(payload).length === 0) {
+          const denied = await sessionAccessDenial(
+            attachSession(sessionId),
+            sessionAuthFromResult(authResult),
+            "prepare",
+            input.sessionAccess,
+          );
+          if (denied !== undefined) return denied;
           try {
             const result = await attachSession(sessionId).prewarm();
             return Response.json(
@@ -476,6 +485,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (forwarded instanceof Response) return forwarded;
         const body = parseSessionMessageBody(payload);
         if (body instanceof Response) return body;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          body.answers === undefined ? "message" : "respond",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
 
         const policyRejection = checkUploadPolicy(body, uploadPolicy);
         if (policyRejection !== null) return policyRejection;
@@ -545,6 +561,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (sessionId instanceof Response) return sessionId;
         const body = await parseCancelTurnBody(req);
         if (body instanceof Response) return body;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          "control",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         let result: Awaited<ReturnType<Session["cancel"]>>;
         try {
           result = await attachSession(sessionId).cancel({
@@ -570,6 +593,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (sessionId instanceof Response) return sessionId;
         const body = await parseSessionControlBody(req);
         if (body instanceof Response) return body;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          "control",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         let result: Awaited<ReturnType<Session["compact"]>>;
         try {
           result = await attachSession(sessionId).compact({
@@ -594,6 +624,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (sessionId instanceof Response) return sessionId;
         const body = await parseSessionControlBody(req);
         if (body instanceof Response) return body;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          "control",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         let result: Awaited<ReturnType<Session["clear"]>>;
         try {
           result = await attachSession(sessionId).clear({
@@ -618,6 +655,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (sessionId instanceof Response) return sessionId;
         const body = await parseSessionControlBody(req);
         if (body instanceof Response) return body;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          "control",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         let result: Awaited<ReturnType<Session["resume"]>>;
         try {
           result = await attachSession(sessionId).resume({
@@ -643,6 +687,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
           if (sessionId instanceof Response) return sessionId;
           const body = await parseResetBody(req);
           if (body instanceof Response) return body;
+          const denied = await sessionAccessDenial(
+            attachSession(sessionId),
+            sessionAuthFromResult(authResult),
+            "control",
+            input.sessionAccess,
+          );
+          if (denied !== undefined) return denied;
           let result: Awaited<ReturnType<Session["end"]>>;
           try {
             result = await attachSession(sessionId).end({
@@ -662,7 +713,7 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         }),
       ),
 
-      GET(EVE_SESSION_STUBS_ROUTE_PATTERN, async (req, { params }) => {
+      GET(EVE_SESSION_STUBS_ROUTE_PATTERN, async (req, { attachSession, params }) => {
         const authResult = await routeAuth(req, input.auth);
         if (authResult instanceof Response) return authResult;
         if (authResult.allowToolStubs !== true) {
@@ -673,6 +724,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         }
         const sessionId = requireSessionId(params);
         if (sessionId instanceof Response) return sessionId;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          "read",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         try {
           const [{ getRun }, { readStubFailure, readMatchedStubRules }] = await Promise.all([
             import("#internal/workflow/runtime.js"),
@@ -704,6 +762,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (authResult instanceof Response) return authResult;
         const sessionId = requireSessionId(params);
         if (sessionId instanceof Response) return sessionId;
+        const denied = await sessionAccessDenial(
+          attachSession(sessionId),
+          sessionAuthFromResult(authResult),
+          "read",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         return await createSessionStreamResponse(req, attachSession(sessionId));
       }),
 
@@ -712,9 +777,17 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         if (authResult instanceof Response) return authResult;
         const sessionId = requireSessionId(args.params);
         if (sessionId instanceof Response) return sessionId;
+        const root = args.attachSession(sessionId);
+        const denied = await sessionAccessDenial(
+          root,
+          sessionAuthFromResult(authResult),
+          "read",
+          input.sessionAccess,
+        );
+        if (denied !== undefined) return denied;
         return descendantStreamResponse({
           request: req,
-          root: args.attachSession(sessionId),
+          root,
           attachSession: args.attachSession,
           resolveHeaders: readRemoteAgentStreamHeadersResolver(args),
         });
@@ -746,6 +819,13 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         let binding: RemoteAgentBinding;
         try {
           const parent = args.attachSession(parentSessionId);
+          const allowed = await canAccessSession(
+            parent,
+            sessionAuthFromResult(authResult),
+            "read",
+            input.sessionAccess,
+          );
+          if (!allowed) throw new Error("Remote subagent binding not found.");
           const found = await findRemoteAgentBinding({
             callId,
             childSessionId,

@@ -493,19 +493,26 @@ yet released.
 `eve start`, kills the whole process group with `SIGKILL`, starts a new `eve start` on the same directory, and continues
 the same session through the eve channel. Nothing from the first process is reused: no Workflow addresses, no memory.
 
-| Case               | Crash point                                         | After restart                                                                                                                            |
-| ------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Completed effect   | after the tool returned, during the next model call | the tool's counter stays 1; the model receives the recorded output                                                                       |
-| Interrupted effect | while the tool was running                          | the tool is not run again; the model is told the call "may or may not have taken effect"                                                 |
-| Pending approval   | after the step that opened it committed             | the same approval is open; another person's answer is refused (`response.settled: refused`); the requester's approval runs the tool once |
-| Two sessions       | between turns                                       | each continues with only its own history                                                                                                 |
-| Unreadable state   | state written in a newer FeltDB format              | `eve start` fails with `UNSUPPORTED_DURABLE_FORMAT`; the file is untouched; restoring it restores the session                            |
-| Two owners         | a second host on a live or paused owner             | refused with `STATE_LOCKED`                                                                                                              |
+| Case               | Crash point                                         | After restart                                                                                                                                                            |
+| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Completed effect   | after the tool returned, during the next model call | the tool's counter stays 1; the model receives the recorded output                                                                                                       |
+| Interrupted effect | while the tool was running                          | **intermittent**: usually not run again, and the model is told the call "may or may not have taken effect"; see the known defect below                                   |
+| Pending approval   | after the step that opened it committed             | the same approval is open; a person without session access can't reach it; a delegate with access is refused as an approver; the requester's approval runs the tool once |
+| Two sessions       | between turns                                       | each continues with only its own history                                                                                                                                 |
+| Unreadable state   | state written in a newer FeltDB format              | `eve start` fails with `UNSUPPORTED_DURABLE_FORMAT`; the file is untouched; restoring it restores the session                                                            |
+| Two owners         | a second host on a live or paused owner             | refused with `STATE_LOCKED`                                                                                                                                              |
 
 How it works is Workflow's own recovery over durable World state, not a new mechanism: the restarted process
 re-enqueues active runs, Workflow replays the session program from its event log, and the step that was running
 at the crash runs again with `attempt` 2. eve then reads the session lines that step wrote (`readOrphanedLines`),
 adopts settled calls, and reports unsettled ones as interrupted (`recoverInterruptedStep`).
+
+**Known defect (open): an interrupted effect can run twice.** On `main` at `674046e` (#36), the interrupted-effect case
+failed in 2 of 4 runs, and in 2 of 3 on the branch that adds session access. In a failing run, the successor's first
+read of the session stream returned no lines (`getInfo` count 0, no chunks) although the dead process had committed
+six, and a later read in the same process returned all six. The retried step therefore saw no `call.started`,
+concluded the call had not run, and ran it again. The cause of the stale first read (in this World or in FeltDB) is
+not yet found. Until it is, recovery of an interrupted effect on this World is not safe to rely on.
 
 **What remains non-durable or unproven:**
 

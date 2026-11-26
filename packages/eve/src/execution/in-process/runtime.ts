@@ -21,6 +21,17 @@ import { bootInitialOwner } from "#execution/session/owner-boot.js";
 import type { InitialWorkflowEntryInput } from "#execution/session/entry-input.js";
 import { runPreparedSession } from "#execution/session/program.js";
 import { createUlid } from "#shared/ulid.js";
+import { runInputOwnerKey } from "#channel/session-owner.js";
+import { readParentLineage } from "#execution/eve-workflow-attributes.js";
+
+type SessionOwner = string | null | { readonly root: string };
+const ownersByHost = new WeakMap<InProcessHost, Map<string, SessionOwner>>();
+
+function sessionOwners(host: InProcessHost): Map<string, SessionOwner> {
+  let owners = ownersByHost.get(host);
+  if (owners === undefined) ownersByHost.set(host, (owners = new Map()));
+  return owners;
+}
 import { createInProcessHost, type InProcessHost, type InProcessHostOptions } from "./host.js";
 import type { WorkflowFunction } from "./runs.js";
 
@@ -55,6 +66,7 @@ export function createInProcessRuntime(
 
 function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcessRuntime {
   const { inboxes, lines, running } = host;
+  const owners = sessionOwners(host);
 
   const startEntry = (
     entry: Omit<InitialWorkflowEntryInput, "ownerDeploymentId">,
@@ -66,6 +78,7 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
     continuationToken: string | undefined,
   ): Promise<{ readonly sessionId: string; readonly claimedContinuation: boolean }> => {
     const sessionId = `session_${createUlid()}`;
+    owners.set(sessionId, null);
     const sessionWritable = lines.open(sessionId);
     host.onDispose(registerSessionLineStore(sessionId, lines));
     const boot = await bootInitialOwner(
@@ -100,6 +113,17 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
     async createSession(input: RunInput): Promise<RunHandle> {
       const prepared = await prepareInitialEntry(config, input);
       const started = await startEntry(prepared.entry, input.continuationToken);
+      if (started.claimedContinuation) {
+        const { rootSessionId, sessionId: parentId } = readParentLineage(
+          prepared.serializedContext,
+        );
+        owners.set(
+          started.sessionId,
+          parentId === undefined
+            ? (runInputOwnerKey(input) ?? null)
+            : { root: rootSessionId ?? parentId },
+        );
+      }
       const delivery = prepared.input.delivery;
       if (!started.claimedContinuation) {
         return {
@@ -152,6 +176,13 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
 
     async getStreamTailIndex(sessionId) {
       return await readSessionStreamTailIndex(sessionId);
+    },
+
+    async readSessionOwnerKey(sessionId) {
+      const owner = owners.get(sessionId);
+      if (owner === null || typeof owner !== "object") return owner;
+      const root = owners.get(owner.root);
+      return typeof root === "string" ? root : root === undefined ? undefined : null;
     },
 
     async settled(sessionId) {

@@ -195,6 +195,28 @@ Neither admits browser users or external clients in production. For a public app
 
 For the full auth model and helper list, see [Auth & route protection](../guides/auth-and-route-protection).
 
+## Session access
+
+A session belongs to the caller that created it. Only that caller may read its stream, send it messages, answer its requests, or cancel, compact, clear, resume, end, or reset it. Knowing a session ID grants nothing: anyone else gets the same response as for a session that doesn't exist, `409 session_not_active` on the message and control routes and `404 session_not_found` on the stream routes. A subagent's session follows its root session.
+
+The owner is the identity `auth` returned for the create request: its authenticator, issuer, principal type, principal ID, and subject. A session that an anonymous caller started, or that has no owner because an earlier eve version started it, is refused to everyone.
+
+To share sessions on purpose, pass `sessionAccess`. It replaces the default for every session route and runs on every request, so it can read your own records, and revoking access takes effect on the next request:
+
+```ts title="agent/channels/eve.ts"
+import { eveChannel } from "eve/channels/eve";
+import { myAuth } from "../lib/auth";
+import { canAccessSession } from "../lib/sharing";
+
+export default eveChannel({
+  auth: [myAuth()],
+  sessionAccess: ({ caller, operation, owner, sessionId }) =>
+    owner || canAccessSession(sessionId, caller.principalId, operation),
+});
+```
+
+`operation` is `read`, `message`, `respond`, `control`, or `prepare`. eve doesn't ask about a session that doesn't exist. Access to `respond` doesn't make someone an approver: a tool's [approval response policy](/docs/human-in-the-loop#authorizing-approval-responses) still decides who may answer its approvals. For a public demo with `none()`, where anyone holding a session ID may continue it, return `true`.
+
 ## Web Chat with Sign in with Vercel
 
 To let your team sign in to a browser chat, run `eve add channel/web` or select **Web Chat** from the terminal UI's channel picker. Then choose **Next.js**, a hosting layout, and **Sign in with Vercel**. Sign in with Vercel is available only for the Next.js Web Chat app. Setup creates a Vercel App on the linked project that only members of the project's team can sign in to.

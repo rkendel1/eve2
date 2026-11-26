@@ -9,7 +9,7 @@ export default eveChannel({
     localDev(),
     // This placeholder will not allow browser requests in production.
     // Replace it with your app's auth provider, like Auth.js or Clerk,
-    // or use none() for a public demo.
+    // or use none() and sessionAccess: () => true for a public demo.
     placeholderAuth(),
   ],
 });

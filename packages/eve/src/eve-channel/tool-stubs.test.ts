@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { sessionOwnerKey } from "#channel/session-owner.js";
 import { eveChannel } from "#eve-channel/index.js";
 import type { EveChannelConfig } from "#eve-channel/types.js";
 import type { RouteHandlerArgs } from "#channel/routes.js";
@@ -229,9 +230,8 @@ async function request(
     params,
     waitUntil: () => undefined,
     requestIp: "127.0.0.1",
-    attachSession: () => {
-      throw new Error("Unauthorized session access reached the runtime.");
-    },
+    attachSession: (sessionId: string) =>
+      ({ id: sessionId, readOwnerKey: async () => sessionOwnerKey(alice) }) as never,
     to: () => {
       throw new Error("Unexpected remote dispatch.");
     },

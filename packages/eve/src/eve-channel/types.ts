@@ -109,6 +109,28 @@ export function defaultEveAuth(ctx: EveMessageContext): SessionAuthContext | nul
 }
 
 /**
+ * What a request does to a session: `read` its stream or tool stubs, send a `message`,
+ * `respond` to its requests, `control` it (cancel, compact, clear, resume, end, reset), or
+ * `prepare` it to answer.
+ */
+export type SessionOperation = "read" | "message" | "respond" | "control" | "prepare";
+
+/** The request {@link EveChannelConfig.sessionAccess} decides. */
+export interface SessionAccessRequest {
+  /** The authenticated caller of this request. */
+  readonly caller: SessionAuthContext;
+  /** What the request does to the session. */
+  readonly operation: SessionOperation;
+  /** Whether the caller is the one that created the session. */
+  readonly owner: boolean;
+  /** The session the request names. */
+  readonly sessionId: string;
+}
+
+/** Decides whether a caller may perform an operation on a session; return `true` to allow it. */
+export type SessionAccessPolicy = (request: SessionAccessRequest) => boolean | Promise<boolean>;
+
+/**
  * Configuration for {@link eveChannel}. Only {@link auth} is required;
  * `uploadPolicy`, `onMessage`, and `events` refine the default HTTP behavior.
  */
@@ -164,6 +186,14 @@ export interface EveChannelConfig {
    * remote lineage.
    */
   readonly trustedForwarders?: TrustedForwarders;
+  /**
+   * Who may act on an existing session. By default only the caller that created the session may
+   * read it, message it, answer its requests, or control it; knowing a session ID grants nothing.
+   * The policy replaces that default for every session route and runs on every request, so it can
+   * consult your own records and a revoked grant takes effect on the next request. It is not
+   * asked about a session that doesn't exist, which every caller sees as unknown.
+   */
+  readonly sessionAccess?: SessionAccessPolicy;
   /**
    * Attachment policy for inbound file parts. Omit for the framework default (25 MB cap, all media
    * types); `"disabled"` rejects every attachment; a partial config is merged onto the default. Violations in the

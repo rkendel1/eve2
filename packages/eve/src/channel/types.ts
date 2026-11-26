@@ -346,6 +346,7 @@ export interface RunInput {
   readonly continuationToken?: string;
   readonly continuationConflictCommand?: Extract<SessionCommand, { readonly kind: "send" }>;
   readonly initiatorAuth?: SessionAuthContext | null;
+  readonly sessionOwner?: SessionAuthContext | null;
   readonly input: {
     readonly message?: MessageContent;
     readonly context?: readonly string[];
@@ -413,6 +414,8 @@ export interface Runtime {
   ): Promise<RemoteChildBinding | undefined>;
 
   hasRunnableOwner?(sessionId: string): Promise<boolean>;
+
+  readSessionOwnerKey?(sessionId: string): Promise<string | null | undefined>;
 }
 
 export type { SessionStreamOptions } from "#shared/session.js";

@@ -26,7 +26,7 @@ function route(
   path: string,
   input: Parameters<typeof eveChannel>[0] = { auth: none() },
 ) {
-  const found = eveChannel(input).routes.find(
+  const found = eveChannel({ sessionAccess: () => true, ...input }).routes.find(
     (candidate) => candidate.method === method && candidate.path === path,
   );
   if (found === undefined || !("handler" in found)) throw new Error(`Missing ${method} ${path}`);
@@ -53,6 +53,7 @@ function createFixedSession(overrides: Partial<Session> = {}): Session {
     getLineStream: vi.fn().mockResolvedValue(new ReadableStream()),
     getStreamTailIndex: vi.fn().mockResolvedValue(-1),
     hasRunnableOwner: vi.fn().mockResolvedValue(true),
+    readOwnerKey: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
 }

@@ -28,6 +28,7 @@ import {
   buildSubagentRootAttributes,
   EVE_VERSION_ATTRIBUTE,
   EVE_PREWARM_ATTRIBUTE,
+  EVE_ROOT_ATTRIBUTE,
   readParentLineage,
 } from "#execution/eve-workflow-attributes.js";
 import { resolveInstalledPackageInfo } from "#internal/application/package.js";
@@ -45,6 +46,7 @@ import { assertStartClaims, pinRunId } from "#internal/workflow/start-claim.js";
 import type { SessionPredecessor } from "#protocol/session-events/families/session.js";
 import { runtimeNodeId } from "#runtime/sessions/session-agent.js";
 import { normalizeEveAttributes } from "#runtime/attributes/normalize.js";
+import { runInputOwnerKey, SESSION_OWNER_ATTRIBUTE } from "#channel/session-owner.js";
 import {
   assertSessionHistoryReadable,
   readSessionEventHistory,
@@ -148,8 +150,10 @@ export function createWorkflowRuntime(config: SessionRuntimeConfig): Runtime {
             rootSessionId: parentLineage.rootSessionId ?? parentLineage.sessionId,
             serializedContext,
           });
+    const ownerKey = parentLineage.sessionId === undefined ? runInputOwnerKey(input) : undefined;
     const attributes = {
       ...sessionAttributes,
+      ...(ownerKey !== undefined && { [SESSION_OWNER_ATTRIBUTE]: ownerKey }),
       [EVE_PREWARM_ATTRIBUTE]: "1",
       ...(input.externalInvocation === undefined
         ? {}
@@ -291,6 +295,22 @@ export function createWorkflowRuntime(config: SessionRuntimeConfig): Runtime {
 
     async readChildBinding(sessionId: string, childSessionId: string) {
       return await readRemoteChildBinding(sessionId, childSessionId);
+    },
+
+    async readSessionOwnerKey(sessionId: string): Promise<string | null | undefined> {
+      try {
+        const world = await getWorld();
+        const run = await world.runs.get(sessionId, { resolveData: "none" });
+        const root = run.attributes?.[EVE_ROOT_ATTRIBUTE];
+        const owner =
+          root === undefined || root === sessionId
+            ? run
+            : await world.runs.get(root, { resolveData: "none" });
+        return owner.attributes?.[SESSION_OWNER_ATTRIBUTE] ?? null;
+      } catch (error) {
+        if (WorkflowRunNotFoundError.is(error) || RunExpiredError.is(error)) return undefined;
+        throw error;
+      }
     },
 
     async hasRunnableOwner(sessionId: string): Promise<boolean> {
