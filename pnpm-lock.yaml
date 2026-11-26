@@ -1986,6 +1986,9 @@ importers:
       '@ai-sdk/provider-utils':
         specifier: 'catalog:'
         version: 5.0.81(zod@4.6.7)
+      '@appport/eve-world-feltdb':
+        specifier: workspace:*
+        version: link:../eve-world-feltdb
       '@cfworker/json-schema':
         specifier: 4.1.6
         version: 4.1.6

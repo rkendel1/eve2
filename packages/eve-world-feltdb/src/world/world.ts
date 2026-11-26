@@ -162,6 +162,41 @@ export function createFeltDBWorld(options: FeltDBWorldOptions): FeltDBWorld {
   } as FeltDBWorld;
 }
 
+const DEFAULT_OWNER_WAIT_MS = 15_000;
+const OWNER_RETRY_MS = 200;
+
+function ownerWaitMs(): number {
+  const raw = process.env.EVE_FELTDB_OWNER_WAIT_MS;
+  const waitMs = raw === undefined ? DEFAULT_OWNER_WAIT_MS : Number(raw);
+  if (!Number.isInteger(waitMs) || waitMs < 0) {
+    throw new FeltDBWorldConfigurationError(
+      `EVE_FELTDB_OWNER_WAIT_MS must be a nonnegative integer of milliseconds, not "${raw}"`,
+    );
+  }
+  return waitMs;
+}
+
+async function openOwnedState(
+  statePath: string,
+  retainMs: number,
+  waitMs: number,
+): Promise<StateFirstDB> {
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    try {
+      return createFeltDB({
+        path: statePath,
+        access: "exclusive",
+        journal: { retainOperations: 1000, retainTransactionIdsMs: retainMs },
+      });
+    } catch (error) {
+      const locked = (error as { code?: unknown } | null)?.code === "STATE_LOCKED";
+      if (!locked || Date.now() >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, OWNER_RETRY_MS));
+    }
+  }
+}
+
 function payloadsFor(backend: string, db: StateFirstDB, dataDir: string): PayloadStore {
   if (backend === "folder") return folderPayloads({ db, root: path.join(dataDir, "payloads") });
   if (backend === "feltdb-record") return feltdbRecordPayloads({ db });
@@ -176,9 +211,11 @@ function payloadsFor(backend: string, db: StateFirstDB, dataDir: string): Payloa
  * `EVE_FELTDB_PATH` (required: the directory for FeltDB state, payloads and the queue key),
  * `EVE_FELTDB_PAYLOADS` (`folder`, the default, `feltdb-record` or `feltdb-content`) and
  * `EVE_FELTDB_TRANSACTION_ID_RETENTION_MS` (default 24 hours). It opens FeltDB's Node file
- * runtime exclusively: one process per directory.
+ * runtime exclusively: one process per directory. A directory still held by a process that is
+ * exiting (a host killed moments ago) is waited for, up to `EVE_FELTDB_OWNER_WAIT_MS` (default
+ * 15 seconds); a directory held by a live process is refused with FeltDB's `STATE_LOCKED` error.
  */
-export function createWorld(): FeltDBWorld {
+export async function createWorld(): Promise<FeltDBWorld> {
   const dataDir = process.env.EVE_FELTDB_PATH;
   if (!dataDir) {
     throw new FeltDBWorldConfigurationError(
@@ -194,10 +231,7 @@ export function createWorld(): FeltDBWorld {
     );
   }
   const absolute = path.resolve(dataDir);
-  const db = createFeltDB({
-    path: path.join(absolute, "state"),
-    journal: { retainOperations: 1000, retainTransactionIdsMs: retainMs },
-  });
+  const db = await openOwnedState(path.join(absolute, "state"), retainMs, ownerWaitMs());
   return createFeltDBWorld({
     db,
     dataDir: absolute,

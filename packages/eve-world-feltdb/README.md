@@ -1,7 +1,10 @@
 # @appport/eve-world-feltdb
 
-FeltDB storage for eve's Workflow World. **Status: payload storage only.** The World itself (queue, sessions, events,
-fences, memory) is not implemented yet; see [`research/feltdb-world.md`](../../research/feltdb-world.md).
+eve's Workflow World on FeltDB: runs, events, queue, hooks, streams, payloads and memory, with no SQL database. Select
+it in `agent/agent.ts` with `experimental: { workflow: { world: "@appport/eve-world-feltdb" } }` and set
+`EVE_FELTDB_PATH`; eve refuses to start without it. One process owns a directory at a time, and a session survives the
+death of that process. See [`research/feltdb-world.md`](../../research/feltdb-world.md) for the design and what
+recovery covers.
 
 Published as `@appport/eve-world-feltdb`, the same name it has in this workspace, and versioned independently of
 `eve`. Nothing is published under `@eve`, which is upstream's npm scope.
