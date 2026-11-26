@@ -21,4 +21,5 @@ export default {
   entry: "build/esm/index.js",
   declaration: await loadDeclaration("@opentelemetry/api.d.ts"),
   plugins: [preserveApiSingleton],
+  sharedSpecifiers: { "@opentelemetry/api": "index" },
 };

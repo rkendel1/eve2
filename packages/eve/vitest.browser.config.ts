@@ -8,7 +8,7 @@ export default defineConfig({
     alias: [
       {
         find: /^#platform\/(.+)\.js$/,
-        replacement: new URL("./src/platform/neutral/$1.ts", import.meta.url).pathname,
+        replacement: new URL("./src/platform/node/$1.ts", import.meta.url).pathname,
       },
       {
         find: /^#compiled\/(.+)\.js$/,
