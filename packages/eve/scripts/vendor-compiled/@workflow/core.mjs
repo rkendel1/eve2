@@ -162,10 +162,40 @@ function stubCoreQuickJSEntrypoint() {
   };
 }
 
+const STREAM_DURABLE_KEY = "eve.workflow.stream.durable";
+
+function exposeStepStreamDurability() {
+  const source = "    };\n    return tracked;\n}";
+  const replacement =
+    "    };\n" +
+    `    Object.defineProperty(tracked, Symbol.for(${JSON.stringify(STREAM_DURABLE_KEY)}), {\n` +
+    "        value: () => drainFlushableSnapshot(state),\n" +
+    "    });\n" +
+    "    return tracked;\n}";
+  let patched = false;
+  return {
+    name: "eve:expose-step-stream-durability",
+    transform(code, id) {
+      if (!id.replaceAll("\\", "/").endsWith("/@workflow/core/dist/flushable-stream.js"))
+        return null;
+      if (code.split(source).length !== 2) {
+        throw new Error(
+          "@workflow/core flushable-stream.js changed: eve can no longer expose the step stream durability barrier.",
+        );
+      }
+      patched = true;
+      return { code: code.replace(source, replacement), map: null };
+    },
+    buildEnd() {
+      if (!patched) throw new Error("@workflow/core step stream durability patch was not applied.");
+    },
+  };
+}
+
 export default {
   packageName: "@workflow/core",
   compiledPath: "@workflow/core",
-  plugins: [stubCoreWorldFactories(), stubCoreQuickJSEntrypoint()],
+  plugins: [stubCoreWorldFactories(), stubCoreQuickJSEntrypoint(), exposeStepStreamDurability()],
   entries: [
     { entry: "dist/serialization.js", outputPath: "serialization" },
     { entry: "dist/runtime/helpers.js", outputPath: "runtime/helpers" },

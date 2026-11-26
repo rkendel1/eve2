@@ -274,6 +274,19 @@ export interface WrittenEvent {
 
 interface StreamWriter extends SessionEventWriter {
   write(bytes: Uint8Array): Promise<void>;
+  durable(): Promise<void>;
+}
+
+const STREAM_DURABLE = Symbol.for("eve.workflow.stream.durable");
+
+function startsEffect(line: StoredLine): boolean {
+  return (
+    "facts" in line &&
+    line.facts.some(
+      (fact) =>
+        typeof fact === "object" && fact !== null && "type" in fact && fact.type === "call.started",
+    )
+  );
 }
 
 export interface SessionEventDispatcher {
@@ -446,6 +459,7 @@ export function openSessionEventPublisher(input: {
         committer.reset();
         throw error;
       });
+      if (startsEffect(line)) await writer.durable();
       const lineEvents = eventsOfLine(line, position, at);
       recordPublishedLine(ctx, line, position, lineEvents);
       const progress = "progress" in line;
@@ -544,6 +558,14 @@ function openSessionEventWriter(sessionWritable: WritableStream<Uint8Array>): St
   return {
     async write(bytes) {
       await streamWriter.write(bytes).catch((error: unknown) => {
+        throw new SessionStreamWriteError(error);
+      });
+    },
+    async durable() {
+      const barrier = (sessionWritable as { [STREAM_DURABLE]?: () => Promise<void> })[
+        STREAM_DURABLE
+      ];
+      await barrier?.().catch((error: unknown) => {
         throw new SessionStreamWriteError(error);
       });
     },

@@ -300,3 +300,68 @@ describe("createWorld's ownership of its directory", () => {
     );
   });
 });
+
+describe("what a successor reads after its predecessor is killed", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  async function writeThenDie(dir: string, from: number, count: number) {
+    const script = join(packageRoot, `.world-writer-${process.pid}.mjs`);
+    writeFileSync(
+      script,
+      `
+      import { createWorld } from ${JSON.stringify(join(packageRoot, "dist/index.js"))};
+      const world = await createWorld();
+      for (let i = ${from}; i < ${from + count}; i++) {
+        await world.streams.write("wrun_recovery", "strm_recovery_user", new TextEncoder().encode("line " + i));
+      }
+      console.log("written");
+      setInterval(() => {}, 1 << 30);
+      `,
+    );
+    cleanups.push(() => rmSync(script, { force: true }));
+    const child = spawn(process.execPath, [script], {
+      cwd: packageRoot,
+      env: { ...process.env, EVE_FELTDB_PATH: dir },
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    await new Promise<void>((resolveWritten, reject) => {
+      child.stdout.on("data", (chunk: Buffer) => {
+        if (String(chunk).includes("written")) resolveWritten();
+      });
+      child.once("close", () => reject(new Error("the writer exited before writing")));
+    });
+    child.kill("SIGKILL");
+  }
+
+  async function read(world: FeltDBWorld) {
+    const info = await world.streams.getInfo("wrun_recovery", "strm_recovery_user");
+    const chunks = await world.streams.getChunks("wrun_recovery", "strm_recovery_user", {
+      limit: 1000,
+    });
+    return {
+      tailIndex: info.tailIndex,
+      lines: chunks.data.map(({ data }) => new TextDecoder().decode(data)),
+    };
+  }
+
+  it("sees every line the dead owner committed on its first read, across repeated deaths", async () => {
+    const dir = scratch();
+    vi.stubEnv("EVE_FELTDB_PATH", dir);
+    const expected: string[] = [];
+    for (const cycle of [0, 1, 2]) {
+      await writeThenDie(dir, cycle * 4, 4);
+      for (let i = cycle * 4; i < cycle * 4 + 4; i++) expected.push(`line ${i}`);
+      const world = await createWorld();
+      const first = await read(world);
+      const second = await read(world);
+      await world.close?.();
+      expect(first, `restart ${cycle + 1}`).toEqual({
+        tailIndex: expected.length - 1,
+        lines: expected,
+      });
+      expect(second).toEqual(first);
+    }
+  });
+});

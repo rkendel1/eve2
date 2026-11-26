@@ -223,6 +223,9 @@ describe("eve on the FeltDB World, across the death of its host process", () => 
       await expect
         .poll(() => existsSync(s.file("record_payment.saw")), { timeout: 60_000 })
         .toBe(true);
+      expect((await attempt(server.url, ALICE.bearer, sessionId, "read")).body).toContain(
+        '"type":"call.settled"',
+      );
     } finally {
       await server.crash();
     }
@@ -246,9 +249,9 @@ describe("eve on the FeltDB World, across the death of its host process", () => 
     }
   }, 300_000);
 
-  it("does not run an effect again whose outcome the dead host never recorded, and says so", async () => {
+  it("does not run an effect again whose start the dead host had not yet flushed, and says so", async () => {
     const s = await scenarioDirectory("interrupted-effect");
-    let server = await s.start();
+    let server = await s.start({ WORKFLOW_STREAM_FLUSH_INTERVAL_MS: "1500" });
     let sessionId: string;
     try {
       const { session } = await new Client({ baseUrl: server.url, auth: ALICE }).sessions.create();
@@ -282,6 +285,58 @@ describe("eve on the FeltDB World, across the death of its host process", () => 
       await server.stop();
     }
   }, 300_000);
+
+  it("keeps a session's history and its effects through repeated deaths of its host", async () => {
+    const s = await scenarioDirectory("repeated-deaths");
+    let server = await s.start();
+    let sessionId: string;
+    try {
+      const { session } = await new Client({ baseUrl: server.url, auth: ALICE }).sessions.create();
+      sessionId = session.id;
+      await (await session.send("Alice says one.")).result();
+    } finally {
+      await server.crash();
+    }
+
+    server = await s.start({ WORKFLOW_STREAM_FLUSH_INTERVAL_MS: "1500" });
+    try {
+      await new Client({ baseUrl: server.url, auth: ALICE }).sessions
+        .attach(sessionId)
+        .send("Alice asks you to start the transfer of 40.");
+      await expect
+        .poll(() => existsSync(s.file("transfer-dispatched")), { timeout: 60_000 })
+        .toBe(true);
+    } finally {
+      await server.crash();
+    }
+
+    for (const restart of [1, 2]) {
+      server = await s.start();
+      try {
+        expect(await settledOutcome(server.url, ALICE, sessionId), `restart ${restart}`).toBe(
+          "completed",
+        );
+        expect(s.count("transfers"), `restart ${restart}`).toBe(1);
+      } finally {
+        await server.crash();
+      }
+    }
+
+    server = await s.start();
+    try {
+      const alice = new Client({ baseUrl: server.url, auth: ALICE }).sessions.attach(sessionId);
+      const reply = (await (await alice.send("Alice says two.")).result()).reply ?? "";
+      expect(reply.startsWith("Heard: Alice says one. | ")).toBe(true);
+      expect(
+        reply.endsWith(" | Alice asks you to start the transfer of 40. | Alice says two."),
+      ).toBe(true);
+      expect(await readFile(s.file("start_transfer.saw"), "utf8")).toContain(INTERRUPTED);
+      expect(s.count("transfers")).toBe(1);
+    } finally {
+      await writeFile(s.file("bank-answers"), "");
+      await server.stop();
+    }
+  }, 400_000);
 
   it("keeps a pending approval pending across the restart and runs it once when its requester approves", async () => {
     const s = await scenarioDirectory("pending-approval");
