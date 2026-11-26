@@ -3,6 +3,10 @@ import type { TestUserConfig } from "vitest/config";
 
 export const SCENARIO_ALIASES: AliasOptions = [
   {
+    find: /^#platform\/(.+)\.js$/,
+    replacement: new URL("./src/platform/node/$1.ts", import.meta.url).pathname,
+  },
+  {
     find: /^#compiled\/(.+)\.js$/,
     replacement: new URL("./.generated/compiled/$1.js", import.meta.url).pathname,
   },

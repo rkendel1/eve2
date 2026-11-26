@@ -16,7 +16,6 @@ import { toErrorMessage } from "#shared/errors.js";
 import { parseJsonValue } from "#shared/json.js";
 import type { TokenUsage } from "#shared/token-usage.js";
 import { resumeRoutedHook } from "#execution/hosts.js";
-import { postSessionCallbackRequest } from "#execution/session-callback-request.js";
 import {
   REMOTE_CALLBACK_NOT_PENDING,
   REMOTE_CALLBACK_NOT_PENDING_MESSAGE,
@@ -268,6 +267,7 @@ async function postCallbackPayload(input: {
   readonly payload: unknown;
   readonly url: string;
 }): Promise<void> {
+  const { postSessionCallbackRequest } = await import("#execution/session-callback-request.js");
   for (let attempt = 0; ; attempt += 1) {
     const response = await postSessionCallbackRequest({
       body: input.payload,

@@ -1,4 +1,11 @@
 import { join } from "node:path";
+import {
+  CONNECTION_SLUG_PATTERN,
+  SKILL_NAME_PATTERN,
+  SKILL_NAME_RULE,
+  TOOL_SLUG_PATTERN,
+  TOOL_SLUG_RULE,
+} from "#discover/slugs.js";
 
 import type { ModuleSourceRef } from "#shared/source-ref.js";
 import type { InstructionsDefinition } from "#public/definitions/instructions.js";
@@ -50,17 +57,13 @@ export const DISCOVER_HOOK_NAME_INVALID = "discover/hook-name-invalid";
 
 export const DISCOVER_EXTENSION_NAME_INVALID = "discover/extension-name-invalid";
 
-export const TOOL_SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/;
-
-export const TOOL_SLUG_RULE =
-  "Expected ASCII letters, digits, underscores, and dashes only, starting with a letter, up to 64 characters.";
-
-export const SKILL_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
-
-export const SKILL_NAME_RULE =
-  "Expected ASCII letters, digits, underscores, and dashes only, starting with a letter or digit, up to 64 characters.";
-
-export const CONNECTION_SLUG_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
+export {
+  CONNECTION_SLUG_PATTERN,
+  SKILL_NAME_PATTERN,
+  SKILL_NAME_RULE,
+  TOOL_SLUG_PATTERN,
+  TOOL_SLUG_RULE,
+};
 
 const CHANNEL_SLUG_PATTERN = /^(\.?[a-z][a-z0-9-]{0,63}|\[[a-zA-Z][a-zA-Z0-9_]{0,63}\])$/;
 

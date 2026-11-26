@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import { requireClearance, type Clearance } from "#harness/clearance.js";
 import type { RuntimeWorkflowTaskRequest } from "#shared/action-types.js";

@@ -103,10 +103,7 @@ const EXCLUDED_FILE_PATTERNS = [
   /\/execution\/workflow-host\/step-boundary\.ts$/,
 ];
 
-const EXCLUDED_DIRECTORIES = new Set([
-  join("internal", "testing"),
-  join("execution", "in-process"),
-]);
+const EXCLUDED_DIRECTORIES = new Set([join("internal", "testing")]);
 
 const EXTERNAL_PACKAGES = new Set([
   "@nuxt/kit",

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import type { ContextReader } from "#context/key.js";
 import { ContextKey } from "#context/key.js";

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import { TOOL_SESSION_KEY_MAX_LENGTH } from "#channel/invoke-tool.js";
 import { principalIdentity } from "#channel/principal-identity.js";

@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { z } from "#compiled/zod/index.js";
-import { resolveDevelopmentStateDirectory } from "#internal/application/dev-environment.js";
+import { resolveDevelopmentStateDirectory } from "#internal/application/dev-state-directory.js";
 import { httpServerUrlSchema } from "#shared/network-address.js";
 
 const STATE_FILE_NAME = "dev-server-state.v1.json";

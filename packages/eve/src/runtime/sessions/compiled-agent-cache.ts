@@ -1,7 +1,4 @@
-import { pathToFileURL } from "node:url";
-
 import type { CompiledModuleMap } from "#compiler/module-map.js";
-import { resolvePackageSourceFilePath } from "#internal/application/package.js";
 import type { ModelMetadata } from "#internal/model-catalog.js";
 import type { RuntimeTurnAgent } from "#runtime/agent/bootstrap.js";
 import { resolveRuntimeCompiledArtifactsVersionedCacheKey } from "#runtime/cache-key.js";
@@ -44,9 +41,9 @@ function isDevelopmentRuntimeSnapshotRoot(appRoot: string): boolean {
   return DEVELOPMENT_RUNTIME_SNAPSHOT_SEGMENT.test(appRoot.replaceAll("\\", "/"));
 }
 
-function normalizeCompiledArtifactsSource(
+async function normalizeCompiledArtifactsSource(
   compiledArtifactsSource: RuntimeCompiledArtifactsSource,
-): RuntimeCompiledArtifactsSource {
+): Promise<RuntimeCompiledArtifactsSource> {
   if (
     compiledArtifactsSource.kind !== "disk" ||
     compiledArtifactsSource.moduleMapLoaderPath !== undefined ||
@@ -55,6 +52,7 @@ function normalizeCompiledArtifactsSource(
     return compiledArtifactsSource;
   }
 
+  const { resolvePackageSourceFilePath } = await import("#internal/application/package.js");
   return {
     ...compiledArtifactsSource,
     moduleMapLoaderPath: resolvePackageSourceFilePath("src/internal/authored-module-map-loader.ts"),
@@ -65,7 +63,7 @@ async function loadFullBundle(
   compiledArtifactsSource: RuntimeCompiledArtifactsSource,
 ): Promise<CompiledRuntimeAgentBundle> {
   const normalizedCompiledArtifactsSource =
-    normalizeCompiledArtifactsSource(compiledArtifactsSource);
+    await normalizeCompiledArtifactsSource(compiledArtifactsSource);
   const [manifest, moduleMap] = await Promise.all([
     loadCompiledManifest({ compiledArtifactsSource: normalizedCompiledArtifactsSource }),
     loadRuntimeCompiledModuleMap(normalizedCompiledArtifactsSource),
@@ -119,6 +117,7 @@ async function loadAuthoredSourceCompiledModuleMap(
     );
   }
 
+  const { pathToFileURL } = await import("node:url");
   const loader = (await import(
     pathToFileURL(compiledArtifactsSource.moduleMapLoaderPath).href
   )) as typeof import("#internal/authored-module-map-loader.js");
@@ -132,7 +131,7 @@ async function getOrLoadFullBundle(
   compiledArtifactsSource: RuntimeCompiledArtifactsSource,
 ): Promise<CompiledRuntimeAgentBundle> {
   const normalizedCompiledArtifactsSource =
-    normalizeCompiledArtifactsSource(compiledArtifactsSource);
+    await normalizeCompiledArtifactsSource(compiledArtifactsSource);
 
   if (isCacheDisabled) {
     return loadFullBundle(normalizedCompiledArtifactsSource);

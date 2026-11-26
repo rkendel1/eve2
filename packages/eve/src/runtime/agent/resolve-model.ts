@@ -1,4 +1,4 @@
-import { localGatewayModel } from "#internal/model-auth/transport.js";
+import { getActiveRuntimeSession } from "#runtime/sessions/runtime-session.js";
 import type { LanguageModel } from "ai";
 import type { CompiledModuleMap } from "#compiler/module-map.js";
 import {
@@ -62,6 +62,12 @@ export async function resolveRuntimeModelReference(
   reference: RuntimeModelReference,
   scope?: RuntimeModelResolutionScope,
 ): Promise<LanguageModel> {
+  const hostModels = getActiveRuntimeSession().hostModels;
+
+  if (hostModels !== null) {
+    return await hostModels(reference);
+  }
+
   const bootstrapModel = resolveBootstrapRuntimeModel(reference);
 
   if (bootstrapModel !== null) {
@@ -78,6 +84,7 @@ export async function resolveRuntimeModelReference(
     return await loadSourceBackedRuntimeModelReference(reference, scope);
   }
 
+  const { localGatewayModel } = await import("#internal/model-auth/transport.js");
   return localGatewayModel(reference.id) ?? reference.id;
 }
 

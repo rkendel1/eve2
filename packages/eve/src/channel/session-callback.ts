@@ -1,4 +1,4 @@
-import { isAllowedCallbackOrigin } from "#internal/workspace/peer-auth.js";
+import { isAllowedCallbackOrigin } from "#internal/workspace/callback-origins.js";
 import { z } from "#compiled/zod/index.js";
 
 import type { SessionCallback } from "#channel/types.js";

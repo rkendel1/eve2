@@ -10,7 +10,9 @@ import {
 } from "#execution/session-inbox/runnable-owner.js";
 import { DevelopmentRunUnavailableError } from "#internal/workflow/development-run-unavailable-error.js";
 import { isOwnerDeploymentDeletedError } from "#internal/workflow/owner-deployment-deleted.js";
-import { getHookByToken, getWorld, resumeHook, type Hook } from "#internal/workflow/runtime.js";
+import type { getWorld, Hook, resumeHook } from "#internal/workflow/runtime.js";
+
+const workflowRuntime = () => import("#internal/workflow/runtime.js");
 
 export class StrandedSessionOwnerError extends Error {
   readonly hook: Hook | undefined;
@@ -38,7 +40,10 @@ export async function resumeRunnableHook(
   inbox?: string,
   remembered?: InboxHook,
 ): Promise<Awaited<ReturnType<typeof resumeHook>>> {
-  const world = inbox !== undefined || remembered !== undefined ? await getWorld() : undefined;
+  const world =
+    inbox !== undefined || remembered !== undefined
+      ? await (await workflowRuntime()).getWorld()
+      : undefined;
   if (
     world !== undefined &&
     routesToOwnerDeployment(world) &&
@@ -52,14 +57,14 @@ export async function resumeRunnableHook(
       parsed?.token === token ? parsed : remembered?.token === token ? remembered : undefined;
     if (cached !== undefined) {
       try {
-        return await resumeHook(cached, payload);
+        return await (await workflowRuntime()).resumeHook(cached, payload);
       } catch (error) {
         if (!HookNotFoundError.is(error)) throw error;
       }
     }
   }
   if (isSessionInboxHookToken(token)) await assertRunnableSessionInbox(token);
-  return await resumeHook(token, payload);
+  return await (await workflowRuntime()).resumeHook(token, payload);
 }
 
 export async function resumeSignInCallback(
@@ -74,7 +79,7 @@ export async function resumeSignInCallback(
 }
 
 export async function assertRunnableSessionInbox(token: string): Promise<void> {
-  const world = await getWorld();
+  const world = await (await workflowRuntime()).getWorld();
   if (routesToOwnerDeployment(world)) return;
   const holder = await findSessionHookHolder(token);
   if (holder !== undefined) await assertRunnableOwner(world, holder.runId, holder.hook);
@@ -84,7 +89,7 @@ export async function assertRunnableSessionOwner(holder: {
   readonly runId: string;
   readonly hook?: Hook;
 }): Promise<void> {
-  const world = await getWorld();
+  const world = await (await workflowRuntime()).getWorld();
   if (routesToOwnerDeployment(world)) return;
   await assertRunnableOwner(world, holder.runId, holder.hook);
 }
@@ -93,7 +98,7 @@ export async function findSessionHookHolder(
   token: string,
 ): Promise<{ readonly runId: string; readonly hook?: Hook } | undefined> {
   try {
-    const hook = await getHookByToken(token);
+    const hook = await (await workflowRuntime()).getHookByToken(token);
     return { hook, runId: hook.runId };
   } catch (error) {
     if (HookNotFoundError.is(error)) return undefined;
@@ -104,10 +109,10 @@ export async function findSessionHookHolder(
 
 export async function lookupSessionOwnerHook(token: string): Promise<Hook> {
   try {
-    return await getHookByToken(token);
+    return await (await workflowRuntime()).getHookByToken(token);
   } catch (error) {
     if (!DevelopmentRunUnavailableError.is(error)) throw error;
-    await assertRunnableOwner(await getWorld(), error.runId);
+    await assertRunnableOwner(await (await workflowRuntime()).getWorld(), error.runId);
     throw error;
   }
 }
@@ -115,7 +120,7 @@ export async function lookupSessionOwnerHook(token: string): Promise<Hook> {
 export async function strandedIfDeploymentDeleted(error: unknown, hook: Hook): Promise<unknown> {
   if (!isOwnerDeploymentDeletedError(error)) return error;
   try {
-    const world = await getWorld();
+    const world = await (await workflowRuntime()).getWorld();
     const ownerRun = await world.runs.get(hook.runId, { resolveData: "none" });
     return new StrandedSessionOwnerError(ownerRun, hook);
   } catch {

@@ -1,3 +1,4 @@
+import { getActiveRuntimeSession } from "#runtime/sessions/runtime-session.js";
 import { compiledDelegates } from "#execution/agent-sessions/metadata.js";
 import { compiledAgentRoster } from "#execution/agent-sessions/roster.js";
 import { resolveSessionUsageLimit } from "#execution/effective-agent-config.js";
@@ -14,7 +15,7 @@ import { connectionDefinition } from "./connections.js";
 import type { Definition } from "./definition.js";
 import { hookDefinition } from "./hooks.js";
 import { instructionsDefinition } from "./instructions.js";
-import { agentModel, loadModelDefinition } from "./model.js";
+import { agentModel, hostModel, loadModelDefinition } from "./model.js";
 import { skillDefinition } from "./skills.js";
 import { subagentDefinition } from "./subagents.js";
 import { toolDefinition, toolsDefinition } from "./tools.js";
@@ -76,8 +77,9 @@ function compiledSettings(bundle: CompiledBundle): SessionAgentSettings {
 
 export async function agentContentsOf(bundle: CompiledBundle): Promise<AgentContents> {
   const agent = bundle.resolvedAgent;
-  const model = await loadModelDefinition(bundle);
-  const staticModel = agentModel(bundle);
+  const hosted = getActiveRuntimeSession().hostModels !== null;
+  const model = hosted ? hostModel(bundle) : await loadModelDefinition(bundle);
+  const staticModel = hosted ? undefined : agentModel(bundle);
   return {
     connections: declared(agent, "connection").map(connectionDefinition),
     files: {

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import type { LanguageModel } from "ai";
 import { MockLanguageModelV3 } from "ai/test";

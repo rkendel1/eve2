@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { resolveDevelopmentStateDirectory } from "#internal/application/dev-environment.js";
+import { resolveDevelopmentStateDirectory } from "#internal/application/dev-state-directory.js";
 
 export interface DevelopmentGenerationMetadata {
   readonly runtimeAppRoot: string;

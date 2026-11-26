@@ -1,6 +1,6 @@
 import { type Span, SpanStatusCode, trace } from "#compiled/@opentelemetry/api/index.js";
 import { getErrorMessage } from "#compiled/@ai-sdk/provider/index.js";
-import { inspect } from "node:util";
+import { inspect } from "#platform/inspect.js";
 
 import { isNonEmptyString, isObject } from "#shared/guards.js";
 import type { JsonObject, JsonValue } from "#shared/json.js";

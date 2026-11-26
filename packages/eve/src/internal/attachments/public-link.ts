@@ -1,5 +1,4 @@
 import type { FetchFileResult } from "#channel/adapter.js";
-import { requestPublicUrl } from "#execution/web-fetch/request.js";
 import { EveAttachmentError } from "#internal/attachments/errors.js";
 
 const DOWNLOAD_TIMEOUT_MS = 30_000;
@@ -34,6 +33,7 @@ async function fetchPublicAttachment(
   }
   let response: Response;
   try {
+    const { requestPublicUrl } = await import("#execution/web-fetch/request.js");
     response = await requestPublicUrl(url.href, {
       headers: {},
       maxResponseSize: maxBytes,

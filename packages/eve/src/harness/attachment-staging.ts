@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { basename, dirname, extname } from "node:path";
+import { createHash } from "#platform/crypto.js";
+import { basename, dirname, extname } from "#platform/path.js";
 import type { FilePart, ModelMessage, TextPart, ToolResultPart, UserContent } from "ai";
 
 import { buildAdapterContext } from "#channel/adapter-context.js";

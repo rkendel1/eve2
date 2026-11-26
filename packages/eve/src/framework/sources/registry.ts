@@ -1,4 +1,4 @@
-import { resolveInstalledPackageInfo } from "#internal/application/package.js";
+import { eveVersion } from "#platform/package-version.js";
 import {
   createAgentSourceRegistry,
   defineProgrammaticAgentSource,
@@ -10,7 +10,7 @@ import {
 } from "#compiler/source-graph.js";
 import { DEFAULT_TOOL_MODULES, DEFAULT_TOOLS } from "#framework/sources/default-tools.js";
 
-const revision = `eve@${resolveInstalledPackageInfo().version}:compiled-manifest-v54`;
+const revision = `eve@${eveVersion()}:compiled-manifest-v54`;
 
 const localDefaults = defineProgrammaticAgentSource({
   id: "eve:defaults",

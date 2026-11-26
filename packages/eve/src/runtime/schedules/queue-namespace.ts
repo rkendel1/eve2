@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 export function deriveEveScheduleQueueTopic(application: string): string {
   const normalized = application.trim();

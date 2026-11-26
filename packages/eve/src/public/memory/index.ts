@@ -1,6 +1,6 @@
 import type { InstrumentationChannel } from "#shared/instrumentation-channel.js";
 import type { ConversationContext } from "#shared/conversation-context.js";
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import type { HistoryMessage as ModelMessage } from "#shared/history-message.js";
 

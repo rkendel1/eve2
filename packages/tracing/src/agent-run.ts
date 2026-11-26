@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { otelTelemetry } from "./adapters/otel.js";
 import { aiSdkContentSerializer } from "./adapters/serialization.js";
 import { createScopes, type LiveOperation } from "./core/scopes.js";
@@ -175,7 +174,7 @@ export function createAgentRun(input: AgentRunOptions): AgentRun {
   const live = new Map<string, Promise<LiveTurn | undefined>>();
 
   function turnKey(identity: RunIdentity): string {
-    if (checkpointer === undefined) return `turn:${randomUUID()}`;
+    if (checkpointer === undefined) return `turn:${crypto.randomUUID()}`;
     return ["turn", identity.runId, identity.turnId].map(encodeURIComponent).join(":");
   }
 
@@ -191,7 +190,7 @@ export function createAgentRun(input: AgentRunOptions): AgentRun {
             live.delete(key);
             await checkpointer.delete(key);
           } else {
-            const revision = randomUUID();
+            const revision = crypto.randomUUID();
             await checkpointer.set(key, traceSnapshot({ ...turn.root.record(), revision }));
             turn.revision = revision;
             if (turn.revisions.size < REVISIONS_PER_TURN) turn.revisions.add(revision);
@@ -357,7 +356,7 @@ export function createAgentRun(input: AgentRunOptions): AgentRun {
     const active = telemetry.active();
     const handle = await scopes.start({
       identity: data.identity,
-      key: `memory:${randomUUID()}`,
+      key: `memory:${crypto.randomUUID()}`,
       capture: data.capture ?? active?.capture ?? METADATA_ONLY,
       parent: data.parent ?? active?.reference,
       context: data.context,
@@ -390,7 +389,7 @@ export function createAgentRun(input: AgentRunOptions): AgentRun {
         ...(data.identity ?? { conversationId: "", runId: "", turnId: "" }),
         agentName: data.agentName,
       },
-      key: `decision:${randomUUID()}`,
+      key: `decision:${crypto.randomUUID()}`,
       capture: sampled ? (data.capture ?? active?.capture ?? METADATA_ONLY) : NOT_SAMPLED,
       parent,
       context: data.context,

@@ -6,15 +6,14 @@ import type {
   CompiledAgentResources,
 } from "#compiler/manifest.js";
 import { ROOT_COMPILED_AGENT_NODE_ID } from "#compiler/manifest.js";
-import {
-  type AgentSourceRegistry,
-  type CompiledModuleBinding,
-  type ProgrammaticModuleNamespace,
+import type {
+  AgentSourceRegistry,
+  CompiledModuleBinding,
+  ProgrammaticModuleNamespace,
 } from "#compiler/source-graph.js";
-import { createCompiledBindingNamespaceLoader } from "#compiler/load-binding-namespace.js";
 import { normalizeEsmImportSpecifier } from "#internal/application/import-specifier.js";
 
-export { resolveExtensionBindingMountId } from "#compiler/load-binding-namespace.js";
+export { resolveExtensionBindingMountId } from "#compiler/extension-mount-bindings.js";
 
 export type CompiledModuleMap = z.infer<typeof compiledModuleMapSchema>;
 
@@ -148,6 +147,8 @@ export async function createProgrammaticCompiledModuleMap(
   manifest: CompiledAgentManifest,
   registries: readonly AgentSourceRegistry[],
 ): Promise<CompiledModuleMap> {
+  const { createCompiledBindingNamespaceLoader } =
+    await import("#compiler/load-binding-namespace.js");
   const nodes: CompiledModuleMap["nodes"] = {};
   for (const scope of collectBoundNodeScopes(manifest)) {
     const modules: Record<string, ProgrammaticModuleNamespace> = {};

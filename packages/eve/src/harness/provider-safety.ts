@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from "#platform/crypto.js";
 
 import type { SessionAuthContext } from "#channel/types.js";
 import type { ModelProfile } from "#harness/model-profile.js";

@@ -1,16 +1,6 @@
-import { join, resolve } from "node:path";
-
 export const EVE_DEV_ENV_FLAG = "EVE_DEV";
 
 export const EVE_DEV_STATE_DIR_ENV = "EVE_DEV_STATE_DIR";
-
-export function resolveDevelopmentStateDirectory(appRoot: string): string {
-  const override = process.env[EVE_DEV_STATE_DIR_ENV];
-  if (!isEveDevEnvironment() || override === undefined || override.length === 0) {
-    return join(appRoot, ".eve");
-  }
-  return resolve(appRoot, override);
-}
 
 type ConversationEnvironment = "development" | "preview" | "production";
 
