@@ -61,7 +61,7 @@ async function openWorld(fixtureDir) {
   const worldPackage = process.env.EVE_E2E_WORKFLOW_WORLD;
   if (worldPackage) {
     const { createWorld } = await import(pathToFileURL(require.resolve(worldPackage)).href);
-    return { name: worldPackage, world: createWorld() };
+    return { name: worldPackage, world: await createWorld() };
   }
   // eve's vendored world-local is the one that wrote the data.
   const eveDir = dirname(require.resolve("eve/package.json"));

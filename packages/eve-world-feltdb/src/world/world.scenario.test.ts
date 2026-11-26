@@ -4,8 +4,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createFeltDB } from "@feltdb/core";
 import type { QueuePrefix } from "@workflow/world";
-import { afterEach, describe, expect, it } from "vitest";
-import { createFeltDBWorld, type FeltDBWorld, FeltDBWorldConfigurationError } from "../index.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createFeltDBWorld,
+  createWorld,
+  type FeltDBWorld,
+  FeltDBWorldConfigurationError,
+} from "../index.js";
 
 const packageRoot = resolve(import.meta.dirname, "../..");
 const PREFIX = "__wkf_workflow_" as QueuePrefix;
@@ -221,5 +226,77 @@ describe("FeltDB World", () => {
       read.push(new TextDecoder().decode(next.value));
     }
     expect(read).toEqual(["b", "c"]);
+  });
+});
+
+describe("createWorld's ownership of its directory", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function ownedBy(dir: string, waitMs: number) {
+    vi.stubEnv("EVE_FELTDB_PATH", dir);
+    vi.stubEnv("EVE_FELTDB_OWNER_WAIT_MS", String(waitMs));
+  }
+
+  async function ownerProcess(dir: string) {
+    const script = join(packageRoot, `.world-owner-${process.pid}.mjs`);
+    writeFileSync(
+      script,
+      `
+      import { createWorld } from ${JSON.stringify(join(packageRoot, "dist/index.js"))};
+      await createWorld();
+      console.log("owning");
+      setInterval(() => {}, 1 << 30);
+      `,
+    );
+    cleanups.push(() => rmSync(script, { force: true }));
+    const child = spawn(process.execPath, [script], {
+      cwd: packageRoot,
+      env: { ...process.env, EVE_FELTDB_PATH: dir },
+      stdio: ["ignore", "pipe", "inherit"],
+    });
+    const exited = new Promise<void>((resolveExit) => child.once("close", () => resolveExit()));
+    cleanups.push(async () => {
+      child.kill("SIGKILL");
+      await exited;
+    });
+    await new Promise<void>((resolveOwning, reject) => {
+      child.stdout.on("data", (chunk: Buffer) => {
+        if (String(chunk).includes("owning")) resolveOwning();
+      });
+      child.once("close", () => reject(new Error("the owner exited before owning the directory")));
+    });
+    return child;
+  }
+
+  it("refuses a directory another live process owns, after the owner wait", async () => {
+    const dir = scratch();
+    await ownerProcess(dir);
+    ownedBy(dir, 300);
+    const started = Date.now();
+    await expect(createWorld()).rejects.toMatchObject({ code: "STATE_LOCKED" });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(300);
+  });
+
+  it("takes a directory over from an owner killed while it waits", async () => {
+    const dir = scratch();
+    const owner = await ownerProcess(dir);
+    ownedBy(dir, 15_000);
+    const successor = createWorld();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    owner.kill("SIGKILL");
+    const world = await successor;
+    cleanups.push(() => world.close?.());
+    expect(world).toBeDefined();
+  });
+
+  it("names a wait that is not a nonnegative integer", async () => {
+    ownedBy(scratch(), 0);
+    vi.stubEnv("EVE_FELTDB_OWNER_WAIT_MS", "soon");
+    await expect(createWorld()).rejects.toThrow(FeltDBWorldConfigurationError);
+    await expect(createWorld()).rejects.toThrow(
+      /EVE_FELTDB_OWNER_WAIT_MS must be a nonnegative integer/,
+    );
   });
 });

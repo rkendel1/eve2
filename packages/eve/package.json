@@ -680,6 +680,7 @@
     "@ai-sdk/otel": "catalog:",
     "@ai-sdk/provider": "catalog:",
     "@ai-sdk/provider-utils": "catalog:",
+    "@appport/eve-world-feltdb": "workspace:*",
     "@cfworker/json-schema": "4.1.6",
     "@chat-adapter/slack": "4.44.0",
     "@chat-adapter/state-memory": "4.44.0",

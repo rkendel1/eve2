@@ -1,7 +1,7 @@
 ---
 issue: "none: EVE on FeltDB milestone, Phase A and A.2 (no tracking issue yet)"
 status: proposed
-last_updated: "2026-11-24"
+last_updated: "2026-11-26"
 ---
 
 # A FeltDB Workflow World for eve (Phase A.2: contract, design and capacity review)
@@ -471,9 +471,12 @@ yet released.
   precondition instead of applying twice. Transaction ids are used only to make a retry of a commit with an unknown
   outcome cheap and exact inside the window.
 
-- One `eve start` process owns one FeltDB directory (`EVE_FELTDB_PATH`), opened with the default exclusive lock. A second
-  process on the same directory is refused with `STATE_LOCKED`; the World turns that into a startup error that says
-  so.
+- One `eve start` process owns one FeltDB directory (`EVE_FELTDB_PATH`), opened with FeltDB's exclusive owner lock. A
+  second live process on the same directory is refused with `STATE_LOCKED`, including a paused (`SIGSTOP`) owner.
+  FeltDB judges a holder gone only when it is on the same host and its pid no longer exists, so a killed host's
+  successor can take over. A killed process can keep its pid for a moment after `SIGKILL` (until it is reaped), so
+  `createWorld()` retries `STATE_LOCKED` for up to `EVE_FELTDB_OWNER_WAIT_MS` (default 15 seconds) before failing. A lock
+  taken on another host is never judged gone; it needs an operator.
 - The queue, its claim loop, leases and the maintenance pass run in that process; eve delivers in-process through
   `registerHandler`. Leases still exist and are still checked: they are what makes a restarted process take over work
   a killed one held.
@@ -483,6 +486,40 @@ yet released.
 - **Restart** costs the FeltDB reopen time, which grows with retained state (7.2), then `reenqueueActiveRuns`.
 - **Backup:** `db.snapshot()` (Stable), or a copy of the directory while stopped. Restore is opening the copy.
 - **High availability:** none. A supervisor restarts the process; durable state makes the restart correct, not instant.
+
+### 6.5.1 Recovery after the host dies (verified)
+
+`packages/eve/test/scenarios/feltdb-restart-recovery.scenario.test.ts` builds an agent on this World, runs it with
+`eve start`, kills the whole process group with `SIGKILL`, starts a new `eve start` on the same directory, and continues
+the same session through the eve channel. Nothing from the first process is reused: no Workflow addresses, no memory.
+
+| Case               | Crash point                                         | After restart                                                                                                                            |
+| ------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Completed effect   | after the tool returned, during the next model call | the tool's counter stays 1; the model receives the recorded output                                                                       |
+| Interrupted effect | while the tool was running                          | the tool is not run again; the model is told the call "may or may not have taken effect"                                                 |
+| Pending approval   | after the step that opened it committed             | the same approval is open; another person's answer is refused (`response.settled: refused`); the requester's approval runs the tool once |
+| Two sessions       | between turns                                       | each continues with only its own history                                                                                                 |
+| Unreadable state   | state written in a newer FeltDB format              | `eve start` fails with `UNSUPPORTED_DURABLE_FORMAT`; the file is untouched; restoring it restores the session                            |
+| Two owners         | a second host on a live or paused owner             | refused with `STATE_LOCKED`                                                                                                              |
+
+How it works is Workflow's own recovery over durable World state, not a new mechanism: the restarted process
+re-enqueues active runs, Workflow replays the session program from its event log, and the step that was running
+at the crash runs again with `attempt` 2. eve then reads the session lines that step wrote (`readOrphanedLines`),
+adopts settled calls, and reports unsettled ones as interrupted (`recoverInterruptedStep`).
+
+**What remains non-durable or unproven:**
+
+- **An approval opened by a step that had not committed.** The client can see `awaiting-input` before Workflow records
+  the step. A crash in that window abandons the approval (`interaction.settled: abandoned, step-interrupted`), and the
+  rerun step asks the model again, which may request a new approval. Nothing runs without an answer, but the original
+  interaction id is gone.
+- **An effect whose outcome was never recorded is reported, not reconciled.** eve cannot tell whether it took effect;
+  the model decides, and the application must deduplicate.
+- **Single machine.** One process per directory, local files. No shared or multi-host ownership, no fencing token
+  across hosts, and a pid reused by an unrelated process keeps the lock until an operator removes it.
+- **The queue's orchestrator lease is per process** and is recovered by restart, not by another live process.
+- **Not covered by these tests:** subagents and workflow-tool runs in flight at the crash, durable timers set before
+  it, and sandbox state.
 
 ### 6.6 Package and versioning
 
