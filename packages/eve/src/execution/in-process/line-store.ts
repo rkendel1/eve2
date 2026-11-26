@@ -7,11 +7,17 @@ interface MemoryStream {
 }
 
 export interface MemoryLineStore extends SessionLineStore {
-  open(sessionId: string): WritableStream<Uint8Array>;
+  open(sessionId: string, restored?: readonly Uint8Array[]): WritableStream<Uint8Array>;
   sessions(): readonly string[];
 }
 
-export function createMemoryLineStore(): MemoryLineStore {
+export type DurableLineAppend = (
+  sessionId: string,
+  index: number,
+  line: Uint8Array,
+) => Promise<void>;
+
+export function createMemoryLineStore(append?: DurableLineAppend): MemoryLineStore {
   const streams = new Map<string, MemoryStream>();
   const streamOf = (sessionId: string): MemoryStream => {
     const stream = streams.get(sessionId);
@@ -31,13 +37,15 @@ export function createMemoryLineStore(): MemoryLineStore {
     async tail(sessionId) {
       return streamOf(sessionId).chunks.length - 1;
     },
-    open(sessionId) {
+    open(sessionId, restored = []) {
       if (streams.has(sessionId)) throw new Error(`Session "${sessionId}" already has a stream.`);
-      const stream: MemoryStream = { chunks: [], closed: false, waiters: new Set() };
+      const stream: MemoryStream = { chunks: [...restored], closed: false, waiters: new Set() };
       streams.set(sessionId, stream);
       return new WritableStream<Uint8Array>({
-        write(chunk) {
-          stream.chunks.push(chunk.slice());
+        async write(chunk) {
+          const line = chunk.slice();
+          await append?.(sessionId, stream.chunks.length, line);
+          stream.chunks.push(line);
           wake(stream);
         },
         close() {

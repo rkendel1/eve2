@@ -24,6 +24,7 @@ export interface StepAttempts {
     step: Omit<StepAttempt, "attempt">,
     prepare: (attempt: StepAttempt) => Promise<I>,
     enter: (input: I) => Promise<T>,
+    firstAttempt?: number,
   ): Promise<T>;
   writable(step: StepAttempt, stream: WritableStream<Uint8Array>): WritableStream<Uint8Array>;
 }
@@ -43,9 +44,9 @@ export function createStepAttempts(faults: StepFaults | undefined): StepAttempts
   return {
     current: () => entering,
     enter,
-    async run(step, prepare, body) {
-      for (let attempt = 1; ; attempt++) {
-        if (attempt > maxRetries + 1)
+    async run(step, prepare, body, firstAttempt = 1) {
+      for (let attempt = firstAttempt; ; attempt++) {
+        if (attempt > maxRetries + firstAttempt)
           throw new NonRetryableError(`Step "${step.name}" exceeded max retries (${retries})`);
         const current = { ...step, attempt };
         let result: Awaited<ReturnType<typeof body>>;

@@ -2,7 +2,8 @@ import { EARLIER_REMOTE_CALLER_CONTEXT_KEY_NAME } from "#context/key-names.js";
 import { formatEarlierRemoteCallerInputError } from "#protocol/remote-agent-protocol.js";
 import { controlDeliveryOf } from "#execution/session/control-delivery.js";
 
-import type { SessionCapabilities, TurnCaller } from "#channel/types.js";
+import type { DeliverHookPayload, SessionCapabilities, TurnCaller } from "#channel/types.js";
+import type { SessionTransferState } from "#execution/session/checkpoint.js";
 import { publishDispatchedCallsStep } from "#execution/coordination-dispatch-step.js";
 import type {
   CoordinationDispatchInput,
@@ -81,7 +82,15 @@ const NO_INPUT_CAPABILITY_ERROR_MESSAGE =
   "This session cannot request human input, so it cannot wait for a tool approval or question. " +
   "Configure unattended tools with an approval policy that does not require human input.";
 
+export interface SessionCheckpointSink {
+  checkpoint(
+    state: SessionTransferState,
+    openTurn?: { readonly delivery?: DeliverHookPayload },
+  ): Promise<void>;
+}
+
 export interface SessionTurnHost {
+  readonly persistence?: SessionCheckpointSink;
   runTurnStep(input: TurnStepInput): Promise<TurnStepResult>;
   dispatchRuns(
     input: CoordinationDispatchInput,
@@ -251,6 +260,12 @@ export class SessionExecution {
             continue;
           }
           heldByControl = false;
+          await this.input.host.persistence?.checkpoint({
+            admittedDeliveryKeys: this.input.queue.admittedDeliveryKeys,
+            history: cursor.history,
+            serializedContext: cursor.serializedContext,
+            sessionState: cursor.sessionState,
+          });
           const resumed = await this.resume(turn, result, stepAdmission);
           if (resumed === "cancelled") return await this.finishCancelledTurn(turn);
           nextStepInput = resumed;
@@ -259,6 +274,15 @@ export class SessionExecution {
         case "continue":
           heldByControl = false;
           nextStepInput = await this.withSteering(turn, {});
+          await this.input.host.persistence?.checkpoint(
+            {
+              admittedDeliveryKeys: this.input.queue.admittedDeliveryKeys,
+              history: cursor.history,
+              serializedContext: cursor.serializedContext,
+              sessionState: cursor.sessionState,
+            },
+            { delivery: nextStepInput?.delivery },
+          );
           continue;
       }
     }

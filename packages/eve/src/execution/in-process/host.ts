@@ -36,6 +36,11 @@ import {
 } from "./inbox-transport.js";
 import { createMemoryLineStore, type MemoryLineStore } from "./line-store.js";
 import { createInProcessRuns, type InProcessRuns } from "./runs.js";
+import {
+  createSessionPersistence,
+  type DurableSessionStore,
+  type SessionPersistence,
+} from "./session-store.js";
 import { createStepAttempts, type StepFaults } from "./step-attempts.js";
 import { acrossStepBoundary, structuredCloneBoundary, type StepBoundary } from "./step-boundary.js";
 import { createInProcessTimers, type InProcessTimers } from "./timers.js";
@@ -76,6 +81,7 @@ export interface InProcessHostOptions {
   readonly stepFaults?: StepFaults;
   readonly disposeGraceMs?: number;
   readonly deliveries?: DeliveryTiming;
+  readonly store?: DurableSessionStore;
 }
 
 export interface InProcessHost {
@@ -85,6 +91,9 @@ export interface InProcessHost {
   readonly runs: InProcessRuns;
   readonly running: Map<string, Promise<void>>;
   readonly sessionHost: SessionHost;
+  readonly persistence: SessionPersistence | undefined;
+  readonly store: DurableSessionStore | undefined;
+  retryFirstStep(sessionId: string): void;
   stepsRunning(sessionId: string): number;
   working<T>(work: () => Promise<T>): Promise<T>;
   idle(): Promise<void>;
@@ -100,7 +109,15 @@ export function createInProcessHost(
   options: InProcessHostOptions,
   runtimeFor: (config: SessionRuntimeConfig) => Runtime,
 ): InProcessHost {
-  const lines = createMemoryLineStore();
+  const { store } = options;
+  const lineText = new TextDecoder();
+  const lines = createMemoryLineStore(
+    store === undefined
+      ? undefined
+      : (sessionId, index, line) => store.appendLine(sessionId, index, lineText.decode(line)),
+  );
+  const persistence = store === undefined ? undefined : createSessionPersistence(store);
+  const retried = new Set<string>();
   const stepBoundary = options.stepBoundary ?? structuredCloneBoundary;
   const work = createWorkCounter();
   const registry = createMemoryInboxRegistry(stepBoundary, {
@@ -169,6 +186,7 @@ export function createInProcessHost(
   });
   const dispatchRuns = dispatchCoordinationOn(runs.startRun);
   const sessionHost: SessionHost = {
+    ...(persistence !== undefined && { persistence }),
     toolStubs,
     applyRunMessages: (input) => work.count(() => applyRunMessages(input)),
     dispatchRuns: (input) => work.count(() => dispatchRuns(input)),
@@ -191,6 +209,7 @@ export function createInProcessHost(
               steeringSignal,
             }),
             runTurnStep,
+            retried.delete(sessionId) ? 2 : 1,
           );
           return await acrossStepBoundary(stepBoundary, result);
         } finally {
@@ -224,6 +243,9 @@ export function createInProcessHost(
     runs,
     running,
     sessionHost,
+    persistence,
+    store,
+    retryFirstStep: (sessionId) => void retried.add(sessionId),
     stepsRunning: (sessionId) => steps.get(sessionId) ?? 0,
     working: (counted) => work.count(counted),
     idle: () => work.idle(),

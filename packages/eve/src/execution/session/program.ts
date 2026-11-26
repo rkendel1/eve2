@@ -397,6 +397,7 @@ async function runSessionLoop(
   ): Promise<SessionActionResult> => {
     const transfer = await handoff.tryTransfer(next, transferState());
     if (transfer.kind === "transferred") return transfer;
+    await host.persistence?.checkpoint(transferState(), { delivery: next.delivery });
     if (next.delivery.caller !== undefined) progress.caller = next.delivery.caller;
     return { action: await runTurn({ delivery: next.delivery }), kind: "action" };
   };
@@ -470,6 +471,7 @@ async function runSessionLoop(
         return { action: { kind: "park" }, kind: "action" };
       case "turn": {
         const { input } = boot.start;
+        await host.persistence?.checkpoint(transferState(), { delivery: input });
         const action = await runTurn(input === undefined ? undefined : { delivery: input });
         return { action, kind: "action" };
       }
@@ -518,6 +520,7 @@ async function runSessionLoop(
       if (transferred !== undefined) return transferred;
 
       turnControl ??= createTurnControl();
+      await host.persistence?.checkpoint(transferState());
       const next = await nextParkedActivity();
 
       switch (next.kind) {

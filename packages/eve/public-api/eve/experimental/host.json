@@ -5,6 +5,8 @@
   "EveHostConnection",
   "EveHostModels",
   "EveHostOptions",
+  "EveHostRestoration",
+  "EveHostStore",
   "EveModelReference",
   "createEveHost"
 ]

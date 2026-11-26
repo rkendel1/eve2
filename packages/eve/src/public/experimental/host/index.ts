@@ -2,7 +2,12 @@ import type { LanguageModel } from "ai";
 
 import type { Runtime } from "#channel/types.js";
 import { createChannelAddress } from "#channel/channel-address.js";
-import { createInProcessRuntime, type InProcessRuntime } from "#execution/in-process/runtime.js";
+import {
+  createInProcessRuntime,
+  type InProcessRuntime,
+  type SessionRestoration,
+} from "#execution/in-process/runtime.js";
+import type { DurableSessionStore } from "#execution/in-process/session-store.js";
 import { createBundledRuntimeCompiledArtifactsSource } from "#runtime/compiled-artifacts-source.js";
 import type { BundledCompiledArtifacts } from "#runtime/loaders/bundled-artifacts.js";
 import type { RuntimeModelReference } from "#runtime/agent/bootstrap.js";
@@ -25,12 +30,35 @@ export interface EveHostModels {
   resolve(reference: EveModelReference): Promise<LanguageModel> | LanguageModel;
 }
 
+/**
+ * Where a host keeps its sessions so they survive the host: each session's event lines and one record per session.
+ * Every write resolves only once it is durable; a record is opaque text eve reads back exactly as it wrote it.
+ */
+export interface EveHostStore extends DurableSessionStore {
+  /** Appends line `index` (counting from 0) of a session's event stream. */
+  appendLine(sessionId: string, index: number, line: string): Promise<void>;
+  /** Every line of a session's event stream, in order. */
+  readLines(sessionId: string): Promise<readonly string[]>;
+  /** Replaces a session's record. */
+  saveSession(sessionId: string, record: string): Promise<void>;
+  /** Every session record the store holds. */
+  readSessions(): Promise<readonly { readonly sessionId: string; readonly record: string }[]>;
+}
+
+/** What a host restored when it started: sessions back in service, and sessions it refused, with the reason. */
+export type EveHostRestoration = SessionRestoration;
+
 /** What a host supplies to run an organization's agent. */
 export interface EveHostOptions {
   /** The organization's agent, as `eve build` compiled it. One host runs one agent for every connection. */
   readonly agent: EveCompiledAgent;
   /** Model resolution. Without it, eve resolves the agent's own model definitions. */
   readonly models?: EveHostModels;
+  /**
+   * Durable session storage. With it, every session is restored when a host starts on the same store, at the turn
+   * or wait it was in, and continues on the same application conversation. Without it, sessions end with the host.
+   */
+  readonly store?: EveHostStore;
 }
 
 /** Where an application delivers work for one conversation: send messages, answer approvals, and read results. */
@@ -50,6 +78,11 @@ export interface EveHost {
   readonly runtime: Runtime;
   /** The address an application delivers work to. Each delivery names the person or service asking (`auth`). */
   connect(connection: EveHostConnection): EveConversation;
+  /**
+   * Resolves once the host has restored its stored sessions: those it restored and those it refused. A refused
+   * session's record and lines are left as they were.
+   */
+  readonly restoration: Promise<EveHostRestoration>;
   /** Resolves once no session has a step running or a delivery waiting to be handled. */
   idle(): Promise<void>;
   /** Stops every session the host started. */
@@ -60,8 +93,7 @@ export interface EveHost {
  * Runs an organization's agent with eve's complete session runtime: turns, tool calls, approvals, subagents, timeouts
  * and session completion are eve's. The host supplies the compiled agent and its infrastructure.
  *
- * Sessions live in this runtime while it runs: a host that stops loses sessions in flight. Durable, resumable
- * execution is not part of this interface.
+ * Without a `store`, sessions live in this runtime while it runs and end with it. With one, they survive the host.
  */
 export function createEveHost(options: EveHostOptions): EveHost {
   const session = createRuntimeSession("eve-host");
@@ -72,11 +104,14 @@ export function createEveHost(options: EveHostOptions): EveHost {
       const models = options.models;
       session.hostModels = (reference) => models.resolve(reference);
     }
-    runtime = createInProcessRuntime({
-      compiledArtifactsSource: createBundledRuntimeCompiledArtifactsSource(),
-    });
+    runtime = createInProcessRuntime(
+      { compiledArtifactsSource: createBundledRuntimeCompiledArtifactsSource() },
+      options.store === undefined ? {} : { store: options.store },
+    );
   });
-  const within = inSession(session, ready);
+  const restoration = ready.then(() => withRuntimeSession(session, () => runtime.restore()));
+  const restored = restoration.then(() => undefined);
+  const within = inSession(session, restored);
   const hostedRuntime = within(runtime);
   return {
     runtime: hostedRuntime,
@@ -89,6 +124,7 @@ export function createEveHost(options: EveHostOptions): EveHost {
           runtime: hostedRuntime,
         }),
       ),
+    restoration,
     idle: () => withRuntimeSession(session, () => runtime.idle()),
     dispose: () => withRuntimeSession(session, () => runtime.dispose()),
   };
