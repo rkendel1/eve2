@@ -104,23 +104,21 @@ The host's implementation must propagate context through every promise continuat
 
 ## Durability
 
-This interface is a warm instance. Nothing it holds survives the instance.
+Without a `store`, this interface is a warm instance: nothing it holds survives the instance. With
+`createEveHost({ store })`, sessions survive the host (see [resumable session program](./resumable-session-program.md)).
 
-| State                                                            | Where it lives                                            | After the instance ends                            |
-| ---------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------- |
-| The compiled agent                                               | the host's bundle                                         | unchanged; a new instance loads it again           |
-| Session facts (the session line stream)                          | instance memory, readable through `runtime.getLineStream` | lost unless the host copied them out               |
-| Session state, history, pending approvals, subagent runs, timers | instance memory                                           | lost                                               |
-| Effects a tool performed                                         | the application that performed them                       | kept by the application; eve has no record of them |
+| State                                               | Without a store   | With a store                                                                  |
+| --------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------- |
+| The compiled agent                                  | the host's bundle | the host's bundle                                                             |
+| Session facts (the session line stream)             | instance memory   | the store; each line is durable before eve continues                          |
+| Session state, history, pending approvals           | instance memory   | the store, checkpointed at each turn start, step, approval wait and idle wait |
+| Subagent child sessions, workflow-tool runs, timers | instance memory   | instance memory: not restored                                                 |
+| Effects a tool performed                            | the application   | the application; eve records each call's start before it runs                 |
 
-- **Instance terminated mid-turn:** the turn and its session are gone. A tool call in flight may or may not have
-  taken effect in the application; eve cannot tell.
-- **Resumption:** not supported. A new instance starts new sessions. A conversation's next message opens a new
-  session with no history.
-
-A durable host needs what Workflow provides on Node: a durable record of each step's input and result, an inbox
-that survives restarts, durable timers, and idempotent or reconciled effects. The
-[resumable session program](./resumable-session-program.md) proposes how eve would expose that without a host loop.
+- **Host terminated mid-turn, with a store:** a new host on the same store restores the session at its last checkpoint
+  and reruns the interrupted step as a retry. Calls whose outcome was recorded are adopted; a call that started without
+  a recorded outcome is reported to the model as one that may or may not have taken effect, and is not run again.
+- **Resumption:** the same `connect({ application, conversation })` reaches the restored session.
 
 ## The organization's agent and the applications that connect to it
 

@@ -23,6 +23,11 @@ import { runPreparedSession } from "#execution/session/program.js";
 import { createUlid } from "#shared/ulid.js";
 import { runInputOwnerKey } from "#channel/session-owner.js";
 import { readParentLineage } from "#execution/eve-workflow-attributes.js";
+import { createSessionInbox } from "#execution/session-inbox/inbox.js";
+import { migrateSessionCheckpoint } from "#execution/session/checkpoint-migrations.js";
+import { createTurnControl } from "#execution/session/turn-control.js";
+import type { SessionBoot } from "#execution/session/program.js";
+import { decodeStoredSession, type StoredSession } from "./session-store.js";
 
 type SessionOwner = string | null | { readonly root: string };
 const ownersByHost = new WeakMap<InProcessHost, Map<string, SessionOwner>>();
@@ -37,7 +42,13 @@ import type { WorkflowFunction } from "./runs.js";
 
 export type InProcessRuntimeOptions = InProcessHostOptions;
 
+export interface SessionRestoration {
+  readonly restored: readonly string[];
+  readonly refused: readonly { readonly sessionId: string; readonly reason: string }[];
+}
+
 export interface InProcessRuntime extends Runtime {
+  restore(): Promise<SessionRestoration>;
   settled(sessionId: string): Promise<void>;
   holds(token: string): boolean;
   stepsRunning(sessionId: string): number;
@@ -71,14 +82,30 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
   const startEntry = (
     entry: Omit<InitialWorkflowEntryInput, "ownerDeploymentId">,
     continuationToken: string | undefined,
+    owner?: SessionOwner,
   ): Promise<{ readonly sessionId: string; readonly claimedContinuation: boolean }> =>
-    host.working(() => bootEntry(entry, continuationToken));
+    host.working(() => bootEntry(entry, continuationToken, owner));
+  const run = (
+    sessionId: string,
+    boot: SessionBoot,
+    inbox: Parameters<typeof runPreparedSession>[1],
+  ) => {
+    const session = runPreparedSession(boot, inbox, host.sessionHost).then(
+      async () => {
+        await host.persistence?.ended(sessionId).catch(() => {});
+      },
+      () => undefined,
+    );
+    running.set(sessionId, session);
+    void session.finally(() => running.delete(sessionId));
+  };
   const bootEntry = async (
     entry: Omit<InitialWorkflowEntryInput, "ownerDeploymentId">,
     continuationToken: string | undefined,
+    owner: SessionOwner | undefined,
   ): Promise<{ readonly sessionId: string; readonly claimedContinuation: boolean }> => {
     const sessionId = `session_${createUlid()}`;
-    owners.set(sessionId, null);
+    owners.set(sessionId, owner ?? null);
     const sessionWritable = lines.open(sessionId);
     host.onDispose(registerSessionLineStore(sessionId, lines));
     const boot = await bootInitialOwner(
@@ -100,30 +127,79 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       if (holder === undefined) throw new Error("The session's address is held elsewhere.");
       return { claimedContinuation: false, sessionId: holder };
     }
-    const session = runPreparedSession(boot.session, boot.inbox, host.sessionHost).then(
-      () => undefined,
-      () => undefined,
-    );
-    running.set(sessionId, session);
-    void session.finally(() => running.delete(sessionId));
+    if (owner !== undefined && (owner === null || typeof owner === "string")) {
+      await host.persistence?.track({
+        capabilities: boot.session.capabilities,
+        continuationToken:
+          (boot.session.serializedContext["eve.continuationToken"] as string) || "",
+        ownerKey: owner,
+        retention: boot.session.retention,
+        sessionId,
+        sessionTimeoutMs: boot.session.sessionTimeoutMs,
+      });
+    }
+    run(sessionId, boot.session, boot.inbox);
     return { claimedContinuation: true, sessionId };
+  };
+  const restoreEntry = async (stored: StoredSession): Promise<void> => {
+    const migration = migrateSessionCheckpoint(stored.checkpoint);
+    if (migration.kind !== "current") {
+      throw new Error(
+        migration.kind === "pre-v27"
+          ? "its checkpoint predates this eve's host sessions"
+          : migration.detail,
+      );
+    }
+    const { checkpoint } = migration;
+    const { sessionId } = stored;
+    const encoder = new TextEncoder();
+    const restoredLines = (await host.store!.readLines(sessionId)).map((line) =>
+      encoder.encode(line),
+    );
+    owners.set(sessionId, stored.ownerKey);
+    const sessionWritable = lines.open(sessionId, restoredLines);
+    host.onDispose(registerSessionLineStore(sessionId, lines));
+    const inbox = createSessionInbox(inboxes.transportFor(sessionId));
+    await inbox.claimSessionHook(sessionCommandHookToken(sessionId));
+    if (stored.continuationToken !== "") await inbox.claimSessionHook(stored.continuationToken);
+    await host.persistence!.track(stored);
+    if (stored.openTurn !== undefined) host.retryFirstStep(sessionId);
+    run(
+      sessionId,
+      {
+        admittedDeliveryKeys: checkpoint.admittedDeliveryKeys,
+        anchor: { kind: "self" },
+        caller: undefined,
+        capabilities: checkpoint.capabilities,
+        deploymentId: host.deploymentId,
+        history: checkpoint.history,
+        initialTurnControl: createTurnControl(),
+        retention: checkpoint.retention,
+        serializedContext: checkpoint.serializedContext,
+        sessionId,
+        sessionState: checkpoint.sessionState,
+        sessionTimeoutMs: checkpoint.sessionTimeoutMs,
+        sessionWritable,
+        start:
+          stored.openTurn === undefined
+            ? { kind: "parked" }
+            : { input: stored.openTurn.delivery, kind: "turn" },
+      },
+      inbox,
+    );
   };
 
   return {
     async createSession(input: RunInput): Promise<RunHandle> {
       const prepared = await prepareInitialEntry(config, input);
-      const started = await startEntry(prepared.entry, input.continuationToken);
-      if (started.claimedContinuation) {
-        const { rootSessionId, sessionId: parentId } = readParentLineage(
-          prepared.serializedContext,
-        );
-        owners.set(
-          started.sessionId,
-          parentId === undefined
-            ? (runInputOwnerKey(input) ?? null)
-            : { root: rootSessionId ?? parentId },
-        );
-      }
+      const { rootSessionId, sessionId: parentId } = readParentLineage(prepared.serializedContext);
+      const started = await startEntry(
+        prepared.entry,
+        input.continuationToken,
+        parentId === undefined
+          ? (runInputOwnerKey(input) ?? null)
+          : { root: rootSessionId ?? parentId },
+      );
       const delivery = prepared.input.delivery;
       if (!started.claimedContinuation) {
         return {
@@ -144,6 +220,26 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
     },
 
     startEntry: (entry) => startEntry(entry, undefined),
+
+    async restore() {
+      const restored: string[] = [];
+      const refused: { sessionId: string; reason: string }[] = [];
+      if (host.store === undefined) return { refused, restored };
+      for (const { sessionId, record } of await host.store.readSessions()) {
+        try {
+          const stored = decodeStoredSession(record);
+          if (stored.ended === true || stored.checkpoint === undefined) continue;
+          await host.working(() => restoreEntry(stored));
+          restored.push(sessionId);
+        } catch (error) {
+          refused.push({
+            reason: error instanceof Error ? error.message : String(error),
+            sessionId,
+          });
+        }
+      }
+      return { refused, restored };
+    },
 
     async dispatchContinuation<TCommand extends SessionCommand>(
       input: DispatchContinuationInput<TCommand>,
