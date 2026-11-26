@@ -1,4 +1,4 @@
-import { posix } from "node:path";
+import { posix } from "#platform/path.js";
 
 import { normalizeLogicalPath, stripLogicalPathExtension } from "#discover/filesystem.js";
 import { validateProgrammaticLogicalPathInternal } from "#compiler/source-graph-paths.js";

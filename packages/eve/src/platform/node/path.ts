@@ -1,1 +1,1 @@
-export { basename, dirname, extname, sep } from "node:path";
+export { basename, dirname, extname, isAbsolute, posix, sep } from "node:path";

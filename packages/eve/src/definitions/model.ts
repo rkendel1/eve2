@@ -159,6 +159,17 @@ export function agentModel(bundle: CompiledBundle): Definition | undefined {
   };
 }
 
+export function hostModel(bundle: CompiledBundle): Definition {
+  const reference: RuntimeModelReference = bundle.turnAgent.model ?? {
+    id: `${bundle.turnAgent.id}#model`,
+  };
+  return {
+    contribute: () => ({ model: () => ({ reference }) }),
+    id: "eve.model",
+    label: "the host's model",
+  };
+}
+
 export const parentModel: Definition = {
   contribute: ({ container }) => ({
     model: () => {

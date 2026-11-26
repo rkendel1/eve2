@@ -1,0 +1,10 @@
+[
+  "EveCompiledAgent",
+  "EveConversation",
+  "EveHost",
+  "EveHostConnection",
+  "EveHostModels",
+  "EveHostOptions",
+  "EveModelReference",
+  "createEveHost"
+]

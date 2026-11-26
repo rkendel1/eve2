@@ -7,7 +7,7 @@ import { expect } from "vitest";
 const EVE_BIN_PATH = fileURLToPath(new URL("../../bin/eve.js", import.meta.url));
 
 export function isVercelEnvName(name: string): boolean {
-  return /^VERCEL/u.test(name) || name === "AI_GATEWAY_API_KEY";
+  return name.startsWith("VERCEL") || name === "AI_GATEWAY_API_KEY";
 }
 
 export function withoutVercelEnv(
@@ -15,7 +15,7 @@ export function withoutVercelEnv(
 ): NodeJS.ProcessEnv {
   const env: Record<string, string | undefined> = {};
   for (const [name, value] of Object.entries(process.env)) {
-    if (isVercelEnvName(name) || /_API_KEY$/u.test(name) || name.startsWith("EVE_ACCEPTANCE_")) {
+    if (isVercelEnvName(name) || name.endsWith("_API_KEY") || name.startsWith("EVE_ACCEPTANCE_")) {
       continue;
     }
     env[name] = value;

@@ -1,3 +1,5 @@
+import type { LanguageModel } from "ai";
+import type { RuntimeModelReference } from "#runtime/agent/bootstrap.js";
 import { AsyncLocalStorage } from "#platform/async-context.js";
 
 import type { DescribedAgent } from "#channel/agent-description.js";
@@ -15,7 +17,12 @@ export interface RuntimeSession {
     { readonly agent: Promise<DescribedAgent>; readonly version: string }
   >;
   skillFiles: InstalledSkillFiles | null;
+  hostModels: HostModelResolver | null;
 }
+
+export type HostModelResolver = (
+  reference: RuntimeModelReference,
+) => Promise<LanguageModel> | LanguageModel;
 
 export function createRuntimeSession(id: string = "test-session"): RuntimeSession {
   return {
@@ -23,6 +30,7 @@ export function createRuntimeSession(id: string = "test-session"): RuntimeSessio
     bundleCacheKeyBySourceKey: new Map(),
     compiledArtifacts: null,
     describedAgents: new Map(),
+    hostModels: null,
     id,
     skillFiles: null,
   };

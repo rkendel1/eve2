@@ -1,6 +1,4 @@
 import { InvalidToolStubTargetError } from "#tool-stubs/validate-targets.js";
-import { readStubFailure, readMatchedStubRules } from "#execution/tool-stubs/steps.js";
-import { getRun } from "#internal/workflow/runtime.js";
 import { proxyStreamResponse } from "#eve-channel/stream-headers.js";
 import { descendantStreamResponse } from "#eve-channel/descendant-stream.js";
 import { handleExpiredLegacyAuthorization } from "#execution/legacy-session/authorization.js";
@@ -676,6 +674,10 @@ export function eveChannel(input: EveChannelConfig): EveChannel {
         const sessionId = requireSessionId(params);
         if (sessionId instanceof Response) return sessionId;
         try {
+          const [{ getRun }, { readStubFailure, readMatchedStubRules }] = await Promise.all([
+            import("#internal/workflow/runtime.js"),
+            import("#execution/tool-stubs/steps.js"),
+          ]);
           if (!(await getRun(sessionId).exists)) {
             return Response.json({ error: "Session not found.", ok: false }, { status: 404 });
           }

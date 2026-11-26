@@ -1,6 +1,5 @@
 import { HookNotFoundError } from "#compiled/@workflow/errors/index.js";
 
-import { resumeWebhook } from "#internal/workflow/runtime.js";
 import type { RouteContext } from "#public/definitions/channel.js";
 import { walkCauseChain } from "#shared/errors.js";
 
@@ -23,6 +22,7 @@ export async function handleWorkflowWebhookRequest(
       signal: request.signal,
       duplex: "half",
     } as RequestInit & { duplex: "half" });
+    const { resumeWebhook } = await import("#internal/workflow/runtime.js");
     return await resumeWebhook(token, callback);
   } catch (error) {
     for (const candidate of walkCauseChain(error)) {

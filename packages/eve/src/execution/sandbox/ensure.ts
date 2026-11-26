@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 
-import { ensureDevelopmentSandboxesPrepared } from "#execution/sandbox/development-lazy-prewarm.js";
 import { isEveDevEnvironment } from "#internal/application/dev-environment.js";
 import { createLogger } from "#internal/logging.js";
 import { contextStorage } from "#context/container.js";
@@ -254,6 +253,8 @@ export async function ensureSandboxAccess(
       throw new ToolSessionSandboxUnsupportedError(provider.providerName);
     }
     if (isEveDevEnvironment() && input.compiledArtifactsSource.kind === "disk") {
+      const { ensureDevelopmentSandboxesPrepared } =
+        await import("#execution/sandbox/development-lazy-prewarm.js");
       await ensureDevelopmentSandboxesPrepared({
         compiledArtifactsSource: input.compiledArtifactsSource,
         nodeId: ownerNodeId,

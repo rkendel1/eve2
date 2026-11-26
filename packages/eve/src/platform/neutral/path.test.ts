@@ -1,7 +1,7 @@
 import { posix } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { basename, dirname, extname } from "./path.ts";
+import { basename, dirname, extname, isAbsolute, join, normalize } from "./path.ts";
 
 const paths = [
   "",
@@ -30,6 +30,35 @@ describe("neutral path (POSIX)", () => {
     expect(basename(path)).toBe(posix.basename(path));
     expect(dirname(path)).toBe(posix.dirname(path));
     expect(extname(path)).toBe(posix.extname(path));
+    expect(isAbsolute(path)).toBe(posix.isAbsolute(path));
+    expect(normalize(path)).toBe(posix.normalize(path));
+  });
+
+  it.each([
+    "a/./b",
+    "a/../../b",
+    "/../a",
+    "./",
+    "../",
+    "a/b/../../..",
+    "tools/../tools/x.ts",
+    "..a/b",
+    "a/..b/../c",
+    "a/.../b",
+  ])("normalizes %j as node does", (path) => {
+    expect(normalize(path)).toBe(posix.normalize(path));
+  });
+
+  it("joins as node does", () => {
+    for (const parts of [
+      ["a", "b"],
+      ["/a", "../b"],
+      ["", ""],
+      ["a", "", "b/"],
+      ["subagents/x", "extensions", "ns"],
+    ]) {
+      expect(join(...parts)).toBe(posix.join(...parts));
+    }
   });
 
   it("strips a suffix as node does", () => {

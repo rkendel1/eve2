@@ -84,7 +84,7 @@ export async function decideWithTracing<
       rootSessionId: session.parent?.rootSessionId,
       traceSessionId: resolveTraceRootSessionId(ctx, sessionId),
     });
-  const model = resolveDecisionModel(options.model ?? DEFAULT_DECISION_MODEL);
+  const model = await resolveDecisionModel(options.model ?? DEFAULT_DECISION_MODEL);
   const operation = await traceDecision({
     modelId: typeof model === "string" ? model : model.modelId,
     provider: typeof model === "string" ? undefined : model.provider,

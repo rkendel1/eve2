@@ -1,7 +1,6 @@
 import * as aiSdk from "ai";
 import type { DecisionModel, DecisionOptions, DecisionQuestion } from "#ai/decision-types.js";
 import { ensureAiSdkWarningLogger } from "#instrumentation/ai-sdk-warnings.js";
-import { localGatewayDecisionModel } from "#internal/model-auth/transport.js";
 
 export const DEFAULT_DECISION_MODEL = "typesafe-ai/jev";
 
@@ -10,9 +9,14 @@ type AiSdkDecideOptions = Parameters<AiSdkDecide>[0];
 
 export type DecisionInstrumentation = Pick<AiSdkDecideOptions, "telemetry">;
 
-export function resolveDecisionModel(model: DecisionModel): DecisionModel {
+async function localGatewayDecisionModel(id: string) {
+  const { localGatewayDecisionModel: local } = await import("#internal/model-auth/transport.js");
+  return local(id);
+}
+
+export async function resolveDecisionModel(model: DecisionModel): Promise<DecisionModel> {
   if (typeof model !== "string") return model;
-  const local = localGatewayDecisionModel(model);
+  const local = await localGatewayDecisionModel(model);
   if (local !== undefined) return local as DecisionModel;
   const provider =
     Reflect.get(globalThis, "AI_SDK_DEFAULT_PROVIDER") ?? Reflect.get(aiSdk, "gateway");
@@ -62,15 +66,17 @@ export function decideWithMetadata<
       "decide requires a provider decision model implementation, not just its identity.",
     );
   }
-  return decideWithAiSdk({
-    model: (typeof model === "string"
-      ? (localGatewayDecisionModel(model) ?? model)
-      : model) as AiSdkDecideOptions["model"],
-    state,
-    questions,
-    maxRetries,
-    abortSignal: signal,
-    providerOptions,
-    ...instrumentation,
-  });
+  const decideOn = async () =>
+    await decideWithAiSdk({
+      model: (typeof model === "string"
+        ? ((await localGatewayDecisionModel(model)) ?? model)
+        : model) as AiSdkDecideOptions["model"],
+      state,
+      questions,
+      maxRetries,
+      abortSignal: signal,
+      providerOptions,
+      ...instrumentation,
+    });
+  return decideOn();
 }

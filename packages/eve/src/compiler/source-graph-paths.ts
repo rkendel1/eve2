@@ -1,4 +1,4 @@
-import { isAbsolute, posix } from "node:path";
+import { isAbsolute, posix } from "#platform/path.js";
 
 import {
   getSupportedModuleBaseName,
