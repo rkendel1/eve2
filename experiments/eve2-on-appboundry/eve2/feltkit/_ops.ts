@@ -7,9 +7,34 @@
 import { evidence, executions, tasks } from "./app.js";
 
 export type Ctx = any;
-export type Task = { id: string; sourceKey: string; source: { system: string; conversation: string; message: string }; operation?: string; status: string; openQuestion?: string; sourceDigest?: string; intent?: any; plan?: any; planDigest?: string; reference: string; target?: { id: string; kind: string }; attempts: number; steps: number; work?: any; report?: any; createdAt: string; updatedAt: string };
+export type Task = {
+  id: string;
+  sourceKey: string;
+  source: { system: string; conversation: string; message: string };
+  operation?: string;
+  status: string;
+  openQuestion?: string;
+  sourceDigest?: string;
+  intent?: any;
+  plan?: any;
+  planDigest?: string;
+  reference: string;
+  target?: { id: string; kind: string };
+  attempts: number;
+  steps: number;
+  work?: any;
+  report?: any;
+  createdAt: string;
+  updatedAt: string;
+};
 
-export const WAITING = new Set(["needs_clarification", "needs_approval", "blocked", "failed", "verification_failed"]);
+export const WAITING = new Set([
+  "needs_clarification",
+  "needs_approval",
+  "blocked",
+  "failed",
+  "verification_failed",
+]);
 export const TERMINAL = new Set(["completed"]);
 export const MAX_STEPS = 60;
 export const now = () => new Date().toISOString();
@@ -17,7 +42,8 @@ export const now = () => new Date().toISOString();
 /** FNV-1a over canonical JSON, twice with different seeds: a stable 64-bit digest the guest computes without crypto. */
 export function digest(value: unknown): string {
   const text = canonical(value);
-  let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995;
+  let a = 0x811c9dc5,
+    b = 0x01000193 ^ 0x5bd1e995;
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
     a = Math.imul(a ^ c, 0x01000193) >>> 0;
@@ -28,27 +54,68 @@ export function digest(value: unknown): string {
 export function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  return `{${Object.keys(value as object).sort().filter((k) => (value as any)[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canonical((value as any)[k])}`).join(",")}}`;
+  return `{${Object.keys(value as object)
+    .sort()
+    .filter((k) => (value as any)[k] !== undefined)
+    .map((k) => `${JSON.stringify(k)}:${canonical((value as any)[k])}`)
+    .join(",")}}`;
 }
 export const money = (n: number) => n.toFixed(2);
 
 /* ------------------------------------------------------------------ helpers: every effect leaves a record */
 
-export async function invoke(ctx: Ctx, task: Task, capability: string, input: unknown, idempotencyKey: string) {
+export async function invoke(
+  ctx: Ctx,
+  task: Task,
+  capability: string,
+  input: unknown,
+  idempotencyKey: string,
+) {
   const result = await ctx.capabilities.invoke(capability, input, { idempotencyKey });
-  const summary = result.outcome === "succeeded" ? `${capability} succeeded${result.replayed ? " (replayed)" : ""}`
-    : result.outcome === "unknown" ? `${capability}: outcome unknown (${result.reason})`
-    : `${capability} ${result.outcome}: ${result.error.code} ${result.error.message}`;
-  await ctx.db.insert(executions, {
-    taskId: task.id, seq: task.steps, at: now(), from: task.status, to: task.status, kind: "invoke", summary, capability, idempotencyKey, outcome: result.outcome,
-    ...(result.outboundId ? { outboundId: result.outboundId } : {}),
-    ...(result.outcome === "failed" || result.outcome === "refused" ? { detail: result.error } : {}),
-  });
+  const summary =
+    result.outcome === "succeeded"
+      ? `${capability} succeeded${result.replayed ? " (replayed)" : ""}`
+      : result.outcome === "unknown"
+        ? `${capability}: outcome unknown (${result.reason})`
+        : `${capability} ${result.outcome}: ${result.error.code} ${result.error.message}`;
+  const execution: Record<string, unknown> = {
+    taskId: task.id,
+    seq: task.steps,
+    at: now(),
+    from: task.status,
+    to: task.status,
+    kind: "invoke",
+    summary,
+    capability,
+    idempotencyKey,
+    outcome: result.outcome,
+  };
+  if (result.outboundId) execution.outboundId = result.outboundId;
+  if (result.outcome === "failed" || result.outcome === "refused") execution.detail = result.error;
+  await ctx.db.insert(executions, execution);
   return result;
 }
 
-export async function record(ctx: Ctx, task: Task, kind: string, from: string, to: string, summary: string, detail?: unknown) {
-  await ctx.db.insert(executions, { taskId: task.id, seq: task.steps, at: now(), from, to, kind, summary, ...(detail !== undefined ? { detail } : {}) });
+export async function record(
+  ctx: Ctx,
+  task: Task,
+  kind: string,
+  from: string,
+  to: string,
+  summary: string,
+  detail?: unknown,
+) {
+  const execution: Record<string, unknown> = {
+    taskId: task.id,
+    seq: task.steps,
+    at: now(),
+    from,
+    to,
+    kind,
+    summary,
+  };
+  if (detail !== undefined) execution.detail = detail;
+  await ctx.db.insert(executions, execution);
 }
 
 export async function keep(ctx: Ctx, task: Task, kind: string, data: unknown) {
@@ -56,15 +123,32 @@ export async function keep(ctx: Ctx, task: Task, kind: string, data: unknown) {
 }
 
 export async function latest(ctx: Ctx, task: Task, kind: string) {
-  const rows = (await ctx.db.find(evidence, { taskId: task.id, kind })) as Array<{ at: string; data: any }>;
+  const rows = (await ctx.db.find(evidence, { taskId: task.id, kind })) as Array<{
+    at: string;
+    data: any;
+  }>;
   return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0]?.data ?? null;
 }
 
-export async function move(ctx: Ctx, task: Task, to: string, kind: string, summary: string, detail?: unknown) {
+export async function move(
+  ctx: Ctx,
+  task: Task,
+  to: string,
+  kind: string,
+  summary: string,
+  detail?: unknown,
+) {
   await record(ctx, task, kind, task.status, to, summary, detail);
   // Progress clears the count of transient retries.
   if (task.work?.transient) task.work = { ...task.work, transient: 0 };
-  await ctx.db.patch(tasks, task.id, { status: to, steps: task.steps + 1, updatedAt: now(), openQuestion: undefined, ...(task.work ? { work: task.work } : {}) });
+  const moved: Record<string, unknown> = {
+    status: to,
+    steps: task.steps + 1,
+    updatedAt: now(),
+    openQuestion: undefined,
+  };
+  if (task.work) moved.work = task.work;
+  await ctx.db.patch(tasks, task.id, moved);
   ctx.afterCommit.jobs.enqueue("eve.advance", { taskId: task.id }, { maxAttempts: 3 });
   return { taskId: task.id, status: to };
 }
@@ -74,7 +158,14 @@ export async function wait(ctx: Ctx, task: Task, to: string, question: string, d
   await record(ctx, task, "wait", task.status, to, question, detail);
   // A blocked task remembers where it stopped, so an operator's resume continues there.
   if (to === "blocked" && task.work) task.work = { ...task.work, resumeAt: task.status };
-  await ctx.db.patch(tasks, task.id, { status: to, openQuestion: question, steps: task.steps + 1, updatedAt: now(), ...(task.work ? { work: task.work } : {}) });
+  const waiting: Record<string, unknown> = {
+    status: to,
+    openQuestion: question,
+    steps: task.steps + 1,
+    updatedAt: now(),
+  };
+  if (task.work) waiting.work = task.work;
+  await ctx.db.patch(tasks, task.id, waiting);
   await notify(ctx, { ...task, steps: task.steps + 1 }, question, `ask:${task.steps}`);
   return { taskId: task.id, status: to, question };
 }
@@ -83,16 +174,37 @@ export async function wait(ctx: Ctx, task: Task, to: string, question: string, d
 export async function notify(ctx: Ctx, task: Task, text: string, key: string) {
   const { system, conversation, message } = task.source;
   if (system === "operator") return null;
-  if (system === "tracker") return invoke(ctx, task, "tracker.items.comment", { repository: conversation, number: Number(message), operation: `${task.id}:${key}`, body: text }, `${task.id}:${key}`);
-  return invoke(ctx, task, "conversation.messages.reply", { conversation, message, text }, `${task.id}:${key}`);
+  if (system === "tracker")
+    return invoke(
+      ctx,
+      task,
+      "tracker.items.comment",
+      {
+        repository: conversation,
+        number: Number(message),
+        operation: `${task.id}:${key}`,
+        body: text,
+      },
+      `${task.id}:${key}`,
+    );
+  return invoke(
+    ctx,
+    task,
+    "conversation.messages.reply",
+    { conversation, message, text },
+    `${task.id}:${key}`,
+  );
 }
 
 export const halt = (ctx: Ctx, task: Task, to: string, why: string) => wait(ctx, task, to, why);
 
 /** Whether an outcome may clear up by itself: a provider that is down or restarting, an unknown outcome, a concurrent attempt. */
-export const transient = (result: any) => result.outcome === "unknown"
-  || (result.outcome === "failed" && (["UNAVAILABLE", "RATE_LIMITED", "TIMEOUT"].includes(result.error?.code) || /\.UNAVAILABLE$/.test(result.error?.code ?? "")))
-  || (result.outcome === "refused" && result.error?.code === "CONFLICT");
+export const transient = (result: any) =>
+  result.outcome === "unknown" ||
+  (result.outcome === "failed" &&
+    (["UNAVAILABLE", "RATE_LIMITED", "TIMEOUT"].includes(result.error?.code) ||
+      /\.UNAVAILABLE$/.test(result.error?.code ?? ""))) ||
+  (result.outcome === "refused" && result.error?.code === "CONFLICT");
 export const MAX_TRANSIENT = 6;
 
 /**
@@ -101,14 +213,37 @@ export const MAX_TRANSIENT = 6;
  * exactly which capability and why. The task is kept either way.
  */
 export async function unavailable(ctx: Ctx, task: Task, capability: string, result: any) {
-  const why = result.outcome === "unknown" ? `it did not answer (${result.reason})` : `${result.error.code}: ${result.error.message}`;
+  const why =
+    result.outcome === "unknown"
+      ? `it did not answer (${result.reason})`
+      : `${result.error.code}: ${result.error.message}`;
   const tries = (task.work?.transient ?? 0) + 1;
   if (transient(result) && tries <= MAX_TRANSIENT) {
     task.work = { ...(task.work ?? {}), transient: tries };
-    await record(ctx, task, "wait", task.status, task.status, `${capability}: ${why}. Trying this step again (${tries} of ${MAX_TRANSIENT}).`);
-    await ctx.db.patch(tasks, task.id, { steps: task.steps + 1, updatedAt: now(), work: task.work });
-    ctx.afterCommit.jobs.enqueue("eve.advance", { taskId: task.id }, { maxAttempts: 3, runAt: new Date(Date.now() + 5_000 * tries).toISOString() });
+    await record(
+      ctx,
+      task,
+      "wait",
+      task.status,
+      task.status,
+      `${capability}: ${why}. Trying this step again (${tries} of ${MAX_TRANSIENT}).`,
+    );
+    await ctx.db.patch(tasks, task.id, {
+      steps: task.steps + 1,
+      updatedAt: now(),
+      work: task.work,
+    });
+    ctx.afterCommit.jobs.enqueue(
+      "eve.advance",
+      { taskId: task.id },
+      { maxAttempts: 3, runAt: new Date(Date.now() + 5_000 * tries).toISOString() },
+    );
     return { taskId: task.id, status: task.status, retrying: tries };
   }
-  return wait(ctx, task, "blocked", `I couldn't use ${capability}: ${why}. Nothing was entered; I'll continue when it is available.`);
+  return wait(
+    ctx,
+    task,
+    "blocked",
+    `I couldn't use ${capability}: ${why}. Nothing was entered; I'll continue when it is available.`,
+  );
 }

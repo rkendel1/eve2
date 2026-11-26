@@ -65,15 +65,16 @@ describe("scheduled run channel handoff", () => {
       .fn<ChannelSource["send"]>()
       .mockResolvedValue(workerDelivery());
     const end = vi.fn<ChannelSource["end"]>();
-    const source: ChannelSource = {
+    const source = {
       cancel: vi.fn<ChannelSource["cancel"]>(),
       clear: vi.fn<ChannelSource["clear"]>(),
       compact: vi.fn<ChannelSource["compact"]>(),
       create: vi.fn<ChannelSource["create"]>(),
       end,
       respond: vi.fn<ChannelSource["respond"]>(),
+      resume: vi.fn(),
       send,
-    };
+    } as ChannelSource;
     const from = vi.fn<(address: string) => ChannelSource>(() => source);
     const receive = scheduledRunChannel.receive;
     if (!receive) throw new Error("The scheduled-run channel cannot receive.");
