@@ -9,7 +9,8 @@ export default eveChannel({
     localDev(),
     // Safe default: blocks anonymous browser requests in production. Replace
     // with your auth provider (Auth.js, Clerk, ...) so each user gets their own
-    // memory, or use `none()` for a public demo where everyone shares memory.
+    // memory, or use `none()` and `sessionAccess: () => true` for a public demo
+    // where everyone shares memory.
     placeholderAuth(),
   ],
 });

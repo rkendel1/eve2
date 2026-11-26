@@ -9,7 +9,8 @@ import { always } from "#tools/approval/policies.js";
 import { defineTool } from "#tools/definition.js";
 
 import { createChannelAddress } from "#channel/channel-address.js";
-import type { Runtime } from "#channel/types.js";
+import { sessionOwnerKey } from "#channel/session-owner.js";
+import type { Runtime, SessionAuthContext } from "#channel/types.js";
 import type { DeliveryTiming } from "#execution/in-process/inbox-transport.js";
 import type { InProcessRuntime } from "#execution/in-process/runtime.js";
 import { createTestInProcessRuntime } from "#internal/testing/in-process-runtime.js";
@@ -218,6 +219,40 @@ describe("the in-process runtime", () => {
         expect(shape(here.events)).toEqual(shape(deployed.events));
         expect(here.violations).toEqual([]);
         expect(deployed.violations).toEqual([]);
+      } finally {
+        await inProcess.dispose();
+      }
+    });
+  });
+
+  it("binds a session to the caller that started it, as Workflow does", async () => {
+    const test = await createTestRuntime({ agent: { name: "in-process-owner" } });
+    await test.run(async () => {
+      const compiledArtifactsSource = createBundledRuntimeCompiledArtifactsSource();
+      const inProcess = createTestInProcessRuntime({ compiledArtifactsSource });
+      const alice: SessionAuthContext = {
+        attributes: {},
+        authenticator: "meetings",
+        issuer: "org-a",
+        principalId: "alice",
+        principalType: "user",
+      };
+      const owners = async (runtime: Runtime, prefix: string) => {
+        const started = async (token: string, auth: SessionAuthContext | null) =>
+          (await (await address(runtime, `${prefix}-${token}`).send("Hello.", { auth })).result())
+            .sessionId;
+        return {
+          alice: await runtime.readSessionOwnerKey!(await started("alice", alice)),
+          anonymous: await runtime.readSessionOwnerKey!(await started("anonymous", null)),
+          unknown: await runtime.readSessionOwnerKey!("wrun_01M8ZZZZZZZZZZZZZZZZZZZZZZ"),
+        };
+      };
+      try {
+        const expected = { alice: sessionOwnerKey(alice), anonymous: null, unknown: undefined };
+        expect(await owners(inProcess, "in-process")).toEqual(expected);
+        expect(
+          await owners(createWorkflowRuntime({ compiledArtifactsSource }), "workflow"),
+        ).toEqual(expected);
       } finally {
         await inProcess.dispose();
       }

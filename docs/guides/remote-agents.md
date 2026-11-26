@@ -85,7 +85,7 @@ export default defineRemoteAgent({
 
 Each turn runs as its own caller, even in a child session that persists. If Alice starts the child and Bob continues it with its `taskId`, the follow-up runs with Bob as `auth.current`. If the parent turn's auth is `null`, a local child clears `auth.current`, and a remote child runs as the verified calling deployment. Neither runs as Alice. A later turn can use only the OAuth grant of its own `auth.current` user.
 
-Forwarding doesn't make a child session private to one caller: its conversation history, tool outputs, and other state persist. If they must not be visible across users, give each user a separate child session or check ownership in your application.
+Forwarding doesn't make a child session private to one user. The receiver's eve channel binds the child session to the deployment that created it, so every user that deployment forwards can reach it. If its history must not be visible across users, give each user a separate child session.
 
 The receiver must opt in. It names trusted deployments with `eveChannel({ trustedForwarders })` and can limit which users each one may assert (see [Auth & route protection](./auth-and-route-protection#accepting-forwarded-identity-from-another-deployment)). A refused deployment or identity gets a 403. The same trust decision covers the parent session link and, with forwarding on, trace-content limits.
 

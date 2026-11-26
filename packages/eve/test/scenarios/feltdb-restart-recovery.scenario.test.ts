@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,8 +12,11 @@ import { buildApplication } from "../../src/internal/nitro/host.js";
 import { materializeScenarioApp } from "../../src/internal/testing/scenario-app.js";
 import { startPackagedEveStart, withoutVercelEnv } from "./eve-start-harness.js";
 
-const ALICE = { basic: { username: "alice", password: "alice-fixture" } };
-const BOB = { basic: { username: "bob", password: "bob-fixture" } };
+const ALICE = { bearer: "meetings.org-a.alice" };
+const BOB = { bearer: "meetings.org-a.bob" };
+const CAROL = { bearer: "meetings.org-a.carol" };
+const ALICE_IN_ANOTHER_APPLICATION = { bearer: "xeet.org-a.alice" };
+const ALICE_IN_ANOTHER_ORGANIZATION = { bearer: "meetings.org-b.alice" };
 const FELTDB_WORLD_ROOT = fileURLToPath(new URL("../../../eve-world-feltdb", import.meta.url));
 const INTERRUPTED = "may or may not have taken effect";
 
@@ -112,13 +115,36 @@ export default defineTool({
   },
 });`,
         "agent/instructions.md": "Handle payments, transfers and refunds.\n",
-        "agent/channels/eve.ts": `import { httpBasic } from "eve/channels/auth";
+        "agent/channels/eve.ts": `import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { extractBearerToken, none } from "eve/channels/auth";
 import { eveChannel } from "eve/channels/eve";
 export default eveChannel({
   auth: [
-    httpBasic({ username: "alice", password: "alice-fixture" }),
-    httpBasic({ username: "bob", password: "bob-fixture" }),
+    (request) => {
+      const [application, organization, person] =
+        extractBearerToken(request.headers.get("authorization"))?.split(".") ?? [];
+      if (!application || !organization || !person) return null;
+      return {
+        attributes: {},
+        authenticator: application,
+        issuer: organization,
+        principalId: person,
+        principalType: "user",
+      };
+    },
+    none(),
   ],
+  sessionAccess: ({ caller, operation, owner, sessionId }) => {
+    if (owner) return true;
+    const grant = join(
+      process.env.RECOVERY_SCRATCH!,
+      "grants",
+      sessionId,
+      [caller.authenticator, caller.issuer, caller.principalId].join("."),
+    );
+    return existsSync(grant) && readFileSync(grant, "utf8").split(",").includes(operation);
+  },
 });`,
       },
     });
@@ -168,6 +194,11 @@ function committedTurnSteps(scratch: string): number {
     .map((entry) => readFileSync(join(entry.parentPath, entry.name), "utf8"))
     .filter((text) => text.includes('"eventType":"step_completed"') && text.includes("//turnStep"))
     .length;
+}
+
+async function grant(scratch: string, sessionId: string, delegate: string, operations: string) {
+  await mkdir(join(scratch, "grants", sessionId), { recursive: true });
+  await writeFile(join(scratch, "grants", sessionId, delegate), operations);
 }
 
 async function responseOutcome(url: string, sessionId: string) {
@@ -277,12 +308,20 @@ describe("eve on the FeltDB World, across the death of its host process", () => 
       await new Promise((resolve) => setTimeout(resolve, 3_000));
       expect(s.count("refunds"), "nothing runs during recovery").toBe(0);
 
-      await new Client({ baseUrl: server.url, auth: BOB }).sessions
+      await expect(
+        new Client({ baseUrl: server.url, auth: BOB }).sessions
+          .attach(sessionId)
+          .respond([{ interactionId, optionId: "approve" }]),
+        "someone without access to Alice's session cannot reach its approval",
+      ).rejects.toThrow();
+
+      await grant(s.scratch, sessionId, "meetings.org-a.carol", "respond");
+      await new Client({ baseUrl: server.url, auth: CAROL }).sessions
         .attach(sessionId)
         .respond([{ interactionId, optionId: "approve" }]);
       expect(
         await responseOutcome(server.url, sessionId),
-        "another person cannot answer Alice's approval",
+        "access to a session does not make Carol an approver of Alice's call",
       ).toBe("refused");
       expect(s.count("refunds")).toBe(0);
 
@@ -412,6 +451,124 @@ describe("eve on the FeltDB World, across the death of its host process", () => 
       }
     } finally {
       await owner.stop();
+    }
+  }, 300_000);
+});
+
+const UNKNOWN_SESSION = "wrun_01M8ZZZZZZZZZZZZZZZZZZZZZZ";
+
+async function attempt(
+  url: string,
+  token: string | undefined,
+  sessionId: string,
+  operation: "read" | "message" | "respond" | "control",
+) {
+  const path = new URL(`/eve/v1/session/${sessionId}`, url).href;
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (token !== undefined) headers.authorization = `Bearer ${token}`;
+  const response =
+    operation === "read"
+      ? await fetch(`${path}/stream?startIndex=0&follow=false`, { headers })
+      : await fetch(operation === "control" ? `${path}/cancel` : path, {
+          body: JSON.stringify(
+            operation === "message"
+              ? { message: "Someone else writes into this session." }
+              : operation === "respond"
+                ? { answers: [{ interactionId: "req_A", optionId: "approve" }] }
+                : {},
+          ),
+          headers,
+          method: "POST",
+        });
+  return { body: await response.text(), status: response.status };
+}
+
+async function expectIndistinguishableFromUnknown(
+  url: string,
+  token: string | undefined,
+  sessionId: string,
+) {
+  for (const operation of ["read", "message", "respond", "control"] as const) {
+    expect(
+      await attempt(url, token, sessionId, operation),
+      `${token ?? "anonymous"} ${operation}`,
+    ).toEqual(await attempt(url, token, UNKNOWN_SESSION, operation));
+  }
+}
+
+const OUTSIDERS = [
+  BOB.bearer,
+  ALICE_IN_ANOTHER_APPLICATION.bearer,
+  ALICE_IN_ANOTHER_ORGANIZATION.bearer,
+  undefined,
+];
+
+describe("who may act on a session, before and after its host dies", () => {
+  it("gives a session to the caller that created it and to explicit, revocable grants only", async () => {
+    const s = await scenarioDirectory("session-access");
+    let server = await s.start();
+    let sessionId: string;
+    let anonymousSessionId: string;
+    try {
+      const { session } = await new Client({ baseUrl: server.url, auth: ALICE }).sessions.create();
+      sessionId = session.id;
+      expect((await (await session.send("Alice says one.")).result()).reply).toBe(
+        "Heard: Alice says one.",
+      );
+      const own = await attempt(server.url, ALICE.bearer, sessionId, "read");
+      expect(own.status, own.body).toBe(200);
+      expect(own.body).toContain("Alice says one.");
+
+      for (const outsider of OUTSIDERS) {
+        await expectIndistinguishableFromUnknown(server.url, outsider, sessionId);
+      }
+
+      await grant(s.scratch, sessionId, "meetings.org-a.carol", "read");
+      const delegated = await attempt(server.url, CAROL.bearer, sessionId, "read");
+      expect(delegated.status).toBe(200);
+      expect(delegated.body).toContain("Alice says one.");
+      expect(await attempt(server.url, CAROL.bearer, sessionId, "message")).toEqual(
+        await attempt(server.url, CAROL.bearer, UNKNOWN_SESSION, "message"),
+      );
+      await rm(join(s.scratch, "grants", sessionId), { recursive: true });
+      expect(await attempt(server.url, CAROL.bearer, sessionId, "read")).toEqual(
+        await attempt(server.url, CAROL.bearer, UNKNOWN_SESSION, "read"),
+      );
+
+      const anonymous = await fetch(new URL("/eve/v1/session", server.url), {
+        body: JSON.stringify({ message: "Someone without an identity says hello." }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      expect(anonymous.status).toBe(202);
+      anonymousSessionId = ((await anonymous.json()) as { sessionId: string }).sessionId;
+      await expectIndistinguishableFromUnknown(server.url, undefined, anonymousSessionId);
+    } finally {
+      await server.crash();
+    }
+
+    server = await s.start();
+    try {
+      for (const outsider of OUTSIDERS) {
+        await expectIndistinguishableFromUnknown(server.url, outsider, sessionId);
+      }
+      await expectIndistinguishableFromUnknown(server.url, undefined, anonymousSessionId);
+
+      const alice = new Client({ baseUrl: server.url, auth: ALICE }).sessions.attach(sessionId);
+      expect((await (await alice.send("Alice says two.")).result()).reply).toBe(
+        "Heard: Alice says one. | Alice says two.",
+      );
+
+      await grant(s.scratch, sessionId, "meetings.org-a.carol", "read");
+      expect((await attempt(server.url, CAROL.bearer, sessionId, "read")).body).toContain(
+        "Alice says two.",
+      );
+      await rm(join(s.scratch, "grants", sessionId), { recursive: true });
+      expect(await attempt(server.url, CAROL.bearer, sessionId, "read")).toEqual(
+        await attempt(server.url, CAROL.bearer, UNKNOWN_SESSION, "read"),
+      );
+    } finally {
+      await server.stop();
     }
   }, 300_000);
 });

@@ -3,6 +3,7 @@ import { Client } from "#client/client.js";
 import { StreamExpiredError } from "#compiled/@workflow/errors/index.js";
 import type { SessionStreamEvent } from "#protocol/session-event.js";
 import type { InternalSession } from "#channel/session.js";
+import { sessionOwnerKey } from "#channel/session-owner.js";
 import type { RouteHandlerArgs } from "#channel/routes.js";
 import { eveChannel } from "#eve-channel/index.js";
 import { mockAgentRouteArgs } from "#internal/testing/mocks/mock-route-args.js";
@@ -96,6 +97,13 @@ function deployment(origin: string, token: string) {
         id: sessionId,
         getChildBinding: async (childId) => bindings.get(JSON.stringify([sessionId, childId])),
         getStreamTailIndex: async () => stored().length - 1,
+        readOwnerKey: async () =>
+          sessionOwnerKey({
+            attributes: {},
+            authenticator: "test",
+            principalId: "alice",
+            principalType: "user",
+          }),
         getLineStream: async (options) => {
           lineReads.push({ sessionId, startIndex: options?.startIndex ?? 0 });
           return new ReadableStream({
