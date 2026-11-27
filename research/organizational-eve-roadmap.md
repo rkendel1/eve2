@@ -15,6 +15,20 @@ last_updated: "2026-11-27"
 - Sessions survive host restarts.
 - Nothing runs per application while Eve is idle.
 
+**Storage principle.** AppBoundry uses FeltDB as its default durable state layer. It is not an integration an
+application selects.
+
+- Platform-owned state lives in host-reserved FeltDB collections that application-facing data operations cannot
+  reach. That covers agent sessions and event streams, lifecycle and deployment metadata, platform-managed
+  configuration, durable execution and recovery records, and the state of future capabilities.
+- Each capability defines its own reserved namespace, access boundary, transaction semantics and lifecycle. It
+  may expose narrowly scoped access to that state; sharing a database never grants an application access to it.
+- Applications reach their own data only through their application-facing interfaces.
+- Platform state lives wherever the organization's AppBoundry FeltDB lives. AppBoundry adds no second database
+  or external persistence service for agent state.
+- Eve stays storage-independent through `EveHostStore`. It takes no direct FeltDB dependency: AppBoundry's
+  FeltDB-backed `sessions@1` is the default production store, and other hosts may supply others.
+
 This document is the working plan:
 
 - Update the **status table** (§5) as slices land.
@@ -171,7 +185,7 @@ Each slice is one PR in its owning repository unless stated otherwise. "Blocks" 
   - SIGKILL restart tests in separate processes (`test/sessions-restart.test.ts`), including a kill mid-stream.
   - eve's restart scenarios on the production capability, on Node and Boa (`experiments/eve-host-boa`, `EVE_STORE=appboundry`).
   - It found an eve fix: the host's `idle()` and `dispose()` did not wait for store writes, so with a store whose writes take time, `idle()` resolved before a restored session's checkpoint was written.
-- **Not verified:** a remote FeltDB backend; durability past process death (power loss is the backend's promise); backup and retention of session contents (S10).
+- **Not verified:** a remote FeltDB backend (a required test before S7, not an assumed result); durability past process death (power loss is the backend's promise); backup and retention of session contents (S10).
 
 **S3: `model@1`, host-resolved models.** AppBoundry. Blocks.
 
