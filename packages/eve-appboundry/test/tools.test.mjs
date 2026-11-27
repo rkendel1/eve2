@@ -20,6 +20,8 @@ import {
   listen,
   provider,
   scriptedModel,
+  organization,
+  answerArgs,
 } from "./support/production.mjs";
 
 const reexport = (name) => `export { default } from "eve/tools/${name}";\n`;
@@ -120,18 +122,23 @@ describe(
   { skip: needsAppBoundry, timeout: 900_000 },
   () => {
     let host;
+    let org;
     before(async () => {
       const model = scriptedModel();
       const repo = await provider();
+      org = await organization({ meetings: ["repo.changes.get"] });
       host = hostProcess({
         artifact: (await artifactOf("framework-tools-agent")).path,
         state: join(scratch("eve-state-"), "state"),
         ...bindings({ modelUrl: await listen(model.server), providerUrl: repo.url }),
+        authority: org.binding,
       });
       await host.ready;
+      await org.connect(host.operator, "meetings");
     });
     after(async () => {
       await host?.close();
+      await org?.close();
       await closeServers();
       cleanup();
     });
@@ -150,12 +157,10 @@ describe(
         interaction.request.options.map((o) => o.id),
         ["North", "South"],
       );
-      const answered = await host.call("eve:answer", {
-        session: "meetings.rooms",
-        application: "meetings",
-        conversation: "rooms",
-        answers: [{ interactionId: interaction.interactionId, optionId: "North" }],
-      });
+      const answered = await host.call(
+        "eve:answer",
+        answerArgs("rooms", [{ interactionId: interaction.interactionId, optionId: "North" }]),
+      );
       assert.equal(answered.ok, true, JSON.stringify(answered.error));
       assert.equal(answered.value.status, "completed");
       assert.match(answered.value.reply, /North/);

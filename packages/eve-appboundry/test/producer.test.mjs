@@ -114,7 +114,15 @@ describe("producing the organization's agent", { skip: needsEngine, timeout: 600
     assert.deepEqual(manifest.application, readDeclaration(fixture("minimal-agent")).application);
     assert.deepEqual(manifest.runtime, {
       abi: "appboundry-guest/1",
-      interfaces: { actions: 1, agents: 1, identity: 1, model: 1, sessions: 1, capabilities: 1 },
+      interfaces: {
+        actions: 1,
+        agents: 1,
+        connections: 1,
+        identity: 1,
+        model: 1,
+        sessions: 1,
+        capabilities: 1,
+      },
     });
     assert.deepEqual(
       manifest.requires.map((r) => r.name),

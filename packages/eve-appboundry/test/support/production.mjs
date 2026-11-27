@@ -1,11 +1,18 @@
 import { spawn } from "node:child_process";
+import { generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CHECKOUT, hostDependency } from "../support.mjs";
 
 export const TOKEN = "provider-issued-consumer-token";
-export const alice = { id: "alice", type: "user", roles: ["member"] };
+export const appPrincipal = (application) => ({
+  id: `app.${application}`,
+  type: "service",
+  roles: ["member"],
+});
 export const servers = [];
 
 export const listen = async (server) => {
@@ -120,7 +127,12 @@ export async function provider({ hang = new Set() } = {}) {
         authorization: [],
         idempotency: "supported",
         handler: async (input, context) => {
-          received.push({ capability: "repo.changes.get", key: context.idempotencyKey, input });
+          received.push({
+            capability: "repo.changes.get",
+            key: context.idempotencyKey,
+            input,
+            claimed: context.invocation?.claimed,
+          });
           if (hang.has(input.number)) await new Promise(() => {});
           return { number: input.number, merged: true };
         },
@@ -133,7 +145,12 @@ export async function provider({ hang = new Set() } = {}) {
         authorization: [],
         idempotency: "supported",
         handler: async (input, context) => (
-          received.push({ capability: "repo.changes.publish", key: context.idempotencyKey, input }),
+          received.push({
+            capability: "repo.changes.publish",
+            key: context.idempotencyKey,
+            input,
+            claimed: context.invocation?.claimed,
+          }),
           { ok: true }
         ),
       }),
@@ -175,18 +192,91 @@ export const bindings = ({ modelUrl, providerUrl, capabilityTimeoutMs = 1_000 })
   })),
 });
 
-export const deliverArgs = (conversation, message) => ({
-  session: `meetings.${conversation}`,
-  application: "meetings",
+export const inProcessOperator = (host) => {
+  const actor = { kind: "local", name: "test" };
+  return (action, input = {}) =>
+    action === "user"
+      ? host.admin((a) => a.addUser(actor, input))
+      : action === "connect"
+        ? host.connectApplication(actor, input)
+        : action === "list"
+          ? host.listConnections()
+          : host.changeConnection(actor, action, input.application);
+};
+
+export const deliverArgs = (
   conversation,
   message,
+  { application = "meetings", assertion } = {},
+) => ({
+  session: `${application}.${conversation}`,
+  conversation,
+  message,
+  ...(assertion ? { assertion } : {}),
 });
-export const answerArgs = (conversation, answers) => ({
-  session: `meetings.${conversation}`,
-  application: "meetings",
+export const answerArgs = (
   conversation,
   answers,
+  { application = "meetings", assertion } = {},
+) => ({
+  session: `${application}.${conversation}`,
+  conversation,
+  answers,
+  ...(assertion ? { assertion } : {}),
 });
+
+export async function organization(applications) {
+  const { startLocalAuthority } = await import("@authboundry/local");
+  const capabilities = [...new Set(Object.values(applications).flat())];
+  const authority = await startLocalAuthority({
+    dataDir: mkdtempSync(join(tmpdir(), "eve-authority-")),
+    application: { id: "org-eve", name: "Organization eve", capabilities },
+    executor: { id: "agent:org-eve", name: "Organization eve" },
+    adminSecret: randomBytes(24).toString("hex"),
+  });
+  const keys = Object.fromEntries(
+    Object.keys(applications).map((application) => [
+      application,
+      generateKeyPairSync("ec", { namedCurve: "prime256v1" }),
+    ]),
+  );
+  return {
+    authority,
+    binding: {
+      url: authority.url,
+      applicationId: "org-eve",
+      agent: "agent:org-eve",
+      checkCredential: authority.checkCredential,
+      agentCredential: authority.agentCredential,
+    },
+    assertion(application, person, claims = {}) {
+      const now = Math.floor(Date.now() / 1000);
+      const encode = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
+      const head = `${encode({ alg: "ES256", typ: "JWT" })}.${encode({ iss: `feltkit:${application}`, aud: "org-eve", sub: person, kind: "person", iat: now, exp: now + 120, jti: randomUUID(), ...claims })}`;
+      return `${head}.${sign("sha256", Buffer.from(head), { key: keys[application].privateKey, dsaEncoding: "ieee-p1363" }).toString("base64url")}`;
+    },
+    async connect(operator, application) {
+      await operator("user", { id: `app.${application}`, roles: ["member"], type: "service" });
+      return operator("connect", {
+        application,
+        principal: `app.${application}`,
+        capabilities: applications[application],
+        assertion: {
+          issuer: `feltkit:${application}`,
+          publicKeys: [
+            keys[application].publicKey.export({ type: "spki", format: "pem" }).toString(),
+          ],
+        },
+      });
+    },
+    async grant(person, granted) {
+      await authority.ensurePrincipal(person);
+      return authority.grant({ delegator: person, capabilities: granted });
+    },
+    revoke: (id) => authority.revoke(id),
+    close: () => authority.close(),
+  };
+}
 
 export function hostProcess({ artifact, state, agentIdleMs = 60_000, ...rest }) {
   const child = spawn(
@@ -229,8 +319,15 @@ export function hostProcess({ artifact, state, agentIdleMs = 60_000, ...rest }) 
     ready,
     exited,
     messages,
-    call: async (fn, args, principal = alice) =>
+    call: async (fn, args, principal = appPrincipal(args.session?.split(".")[0] ?? "meetings")) =>
       (await send({ op: "call", fn, args, principal })).result,
+    operator: async (action, input = {}) => {
+      const answer = await send({ op: "operator", action, input });
+      if (answer.error)
+        throw Object.assign(new Error(answer.error.message), { code: answer.error.code });
+      return answer.value;
+    },
+    outbound: async () => (await send({ op: "outbound" })).value,
     status: async () => (await send({ op: "status" })).status,
     close: async () => (await send({ op: "close" }), exited),
     kill: () => (child.kill("SIGKILL"), exited),

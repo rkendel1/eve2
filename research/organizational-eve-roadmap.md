@@ -145,10 +145,11 @@ These need an owner's decision; each blocks the slice named.
 - **D3 (blocks S3): model access.** Decided in S3.
   - Taken: one provider-neutral generation contract (FeltKit's `ctx.model.generate` request and result) and one implementation of the provider protocols (AppPort Services `streamGeneration`), run by whoever owns the model: FeltKit for a standalone application, the AppBoundry host (`model@1`) for a guest. The guest never sees a key.
   - Deferred: Resolver-held credentials for `model@1` (the binding reads the key from an environment variable today).
-- **D4 (blocks S8, S9): the connection contract for applications.**
-  - Proposed: one generic contract, `agent-connections@1`, with operations `deliver`, `answer`, `result`, `stream`. The caller is the AppBoundry application principal, the application name is derived from it, and the person's identity is carried as a signed assertion per delivery.
-  - The alternative is bespoke capabilities per app, the current Meetings pattern. They don't scale and duplicate the contract.
-  - Session access on this path is decided by the calling application's own records, as `feltkitSessionAccess()` does today.
+- **D4 (blocks S8, S9): the connection contract for applications.** Decided in S8.
+  - Taken: AppBoundry `connections@1`, operator-managed durable connection records on the organizational Eve's host. A record names the application, the host principal it calls as, the capabilities it contributes and the public keys that sign its person assertions; it is `active`, `disconnected` or `revoked` (final). The application is derived from the caller, never an argument; the lane must be the application's; the person comes from a per-delivery ES256 assertion the host verifies (issuer, audience, lifetime, single-use `jti`) and removes before the guest runs.
+  - Taken: acting authority is decided by AuthBoundry at the host, per capability call (`authorize/check`, `on_behalf_of` the verified person, with the agent's own credential). Delegation scope, expiry and revocation stay AuthBoundry's; nothing is cached. A connection grants no authority.
+  - Not taken: bespoke capabilities per app; trusting a person named in arguments; prompt-level separation.
+  - Open: session access by the calling application's own records (`feltkitSessionAccess()`) is not on this path; S9.
 - **D5 (later; does not block the first production version): restoring subagent child sessions, workflow-tool runs and timers.**
 - **D6 (blocks S5): cold-start strategy.** Decided in S5.
   - Taken: bundle reduction in the guest build. Code eve loads only on demand (`import()`) was 65% of the bundle and parsed at every cold start; it is now a stub that throws, naming the module, unless the guest uses it (a measured keep list).
@@ -351,18 +352,16 @@ One contract, three ownership paths; none requires the others:
   - each new session lane pays the cold start;
   - `sessions@1` on a remote FeltDB server is still verified by contract test only.
 
-**S8: application connections and acting identity.** AppBoundry. Blocks.
+**S8: application connections and acting identity.** AppBoundry, eve2. Done, in review.
 
-- **Code areas:** `agent-connections@1` (decision D4) on the participation contracts; `actingAs` (contract 02).
-- **Acceptance:**
-  - two applications reach one Eve with separate conversations;
-  - a revoked grant stops a connection;
-  - a person's assertion is verified per delivery.
+- **Implemented:** `connections@1` in `appboundry-host` (records, assertion verification, replay store, lane rule, per-call AuthBoundry decision, ledger evidence, admin channel and CLI, `--authority`); the eve guest takes the application from the connection and the person from the verified actor.
+- **Verified** in a real host process with the real AuthBoundry (`@authboundry/local`) and two applications: the 15 acceptance requirements in `packages/eve-appboundry/README.md`, including disconnect and reconnect, idle release, `SIGKILL` and restart, revocation, and uncertain outcomes.
+- **Not verified:** a deployed AuthBoundry; assertions signed by a real FeltKit application (S9); key rotation (keys are operator-set PEMs, no JWKS).
 
 **S9: FeltKit organizational Eve client.** FeltKit. Blocks.
 
 - Replace the per-app `EveHost` path, for an app that names an organizational Eve, with a client of `agent-connections@1`.
-- Per-app keys (a JWKS by `kid`) instead of one env key.
+- Per-app keys (a JWKS by `kid`) instead of one env key; sign the person assertion `connections@1` verifies (`iss feltkit:<app>`, `aud` the agent, short-lived, unique `jti`).
 - Context comes from the existing delivery fields.
 - Check "issuer still holds the grant" on every `/invoke` (gap 1.3).
 - Tests for `feltkitSessionAccess()`.
@@ -391,7 +390,7 @@ One contract, three ownership paths; none requires the others:
 | S5 Cold start                                | appboundry / eve2                     | Done in the harness; host execution in S7    | appboundry #115                                           |
 | S6 `.app` producer                           | eve2                                  | Done                                         | eve2 #44                                                  |
 | S7 Eve `.app` on `appboundry-host`           | eve2, appboundry                      | Done, in review                              | eve2 #45, appboundry #116                                 |
-| S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)                             |                                                           |
+| S8 Application connections, `actingAs`       | appboundry, eve2                      | Done, in review                              | appboundry, eve2 (this branch)                            |
 | S9 FeltKit organizational client             | feltkit                               | Not started                                  |                                                           |
 | S10 Operations                               | appboundry, feltkit                   | Not started                                  |                                                           |
 | S11 Real applications                        | meetings, feltkit-eve, feltkit        | Not started                                  |                                                           |
@@ -422,7 +421,7 @@ These steps run against the real artifact. **A** means automatable in `appboundr
 
 - **Provisioning and administration:** the organization deploys one Eve `.app` through the deploy contract.
 - **Configuration and secrets:** models and secrets come through bindings (S3, S10), never in the artifact.
-- **Connecting applications:** applications connect by grant (S8).
+- **Connecting applications:** an operator connects each application (`appboundry admin connections`); its people act only under AuthBoundry delegations, checked per call (S8).
 - **Context and capabilities:** applications declare capabilities through AppPort requirements and offers. Context travels per delivery (S9).
 - **Authority:** revocation is through AppBoundry grants and FeltKit grants, checked per call.
 - **Backup:** `sessions@1` contents are backed up with the host's FeltDB (S10).

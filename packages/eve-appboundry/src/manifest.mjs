@@ -9,15 +9,22 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const delivery = (extra, required) => ({
   type: "object",
   additionalProperties: false,
-  required: ["session", "application", "conversation", ...required],
+  required: ["session", "conversation", ...required],
   properties: {
     session: {
       type: "string",
       description:
-        "<application>.<conversation>: the session this delivery belongs to (agents@1 serializes per session)",
+        "<application>.<conversation>: the session this delivery belongs to (agents@1 serializes per session; connections@1 keeps it to the calling application's own)",
     },
-    application: { type: "string", description: "The application whose conversation this is" },
-    conversation: { type: "string", description: "The conversation within that application" },
+    conversation: {
+      type: "string",
+      description: "The conversation within the calling application",
+    },
+    assertion: {
+      type: "string",
+      description:
+        "The calling application's signed assertion of the person asking (ES256 JWT); the host verifies and removes it",
+    },
     ...extra,
   },
 });
@@ -31,7 +38,7 @@ export const FUNCTIONS = [
       "Delivers a message to the agent in one application's conversation and returns the turn's result.",
     args: delivery({ message: { type: "string" } }, ["message"]),
     timeoutMs: 600_000,
-    agent: { session: "session" },
+    agent: { session: "session", actor: "assertion" },
   },
   {
     name: "eve:answer",
@@ -41,13 +48,14 @@ export const FUNCTIONS = [
       "Answers the agent's pending approvals or questions in one application's conversation.",
     args: delivery({ answers: { type: "array", items: { type: "object" } } }, ["answers"]),
     timeoutMs: 600_000,
-    agent: { session: "session" },
+    agent: { session: "session", actor: "assertion" },
   },
 ];
 
 export const interfacesFor = (requires) => ({
   actions: 1,
   agents: 1,
+  connections: 1,
   identity: 1,
   model: 1,
   sessions: 1,
