@@ -95,7 +95,22 @@ function shape(events: readonly SessionStreamEvent[]) {
       );
     return value;
   };
-  return events.map((event) => rename({ data: event.data, type: event.type }));
+  return events.map((event) =>
+    rename({
+      data: event.type === "model.composed" ? composedShape(event.data) : event.data,
+      type: event.type,
+    }),
+  );
+}
+
+function composedShape(data: unknown) {
+  const {
+    prefixHash: _prefix,
+    requestHash: _request,
+    tokens: _tokens,
+    ...rest
+  } = data as Record<string, unknown>;
+  return rest;
 }
 
 const model = markMockModel(
