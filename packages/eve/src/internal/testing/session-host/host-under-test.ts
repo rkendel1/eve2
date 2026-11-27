@@ -12,7 +12,10 @@ import type { StoredWait } from "#internal/testing/local-world-database.js";
 import { currentTestWorld } from "#internal/testing/workflow-test-world.js";
 import { cancelRun } from "#internal/workflow/runtime.js";
 import { createBundledRuntimeCompiledArtifactsSource } from "#runtime/compiled-artifacts-source.js";
-import type { DurableSessionStore } from "#execution/in-process/session-store.js";
+import {
+  decodeStoredSession,
+  type DurableSessionStore,
+} from "#execution/in-process/session-store.js";
 import type { WorkflowBody } from "#tools/workflow-body.js";
 
 export type HostName = "workflow" | "in-process" | "in-process-durable";
@@ -56,6 +59,8 @@ export interface HostUnderTest {
   runStatus?(runId: string): Promise<string>;
   runSpecVersion?(runId: string): Promise<number | undefined>;
   rewriteRunAttributes?(runId: string, patch: Record<string, string | undefined>): Promise<void>;
+  storedSessions?(): Promise<{ readonly sessionId: string; readonly ownerKey: unknown }[]>;
+  forgetSession?(sessionId: string): void;
   dispose(): Promise<void>;
 }
 
@@ -95,6 +100,7 @@ export const inProcessHost: SessionHostKind = {
 const IN_PROCESS_DURABLE_CAPABILITIES: HostCapabilities = {
   ...IN_PROCESS_CAPABILITIES,
   durable: true,
+  durableChildren: true,
 };
 
 export const inProcessDurableHost: SessionHostKind = {
@@ -163,7 +169,15 @@ function memoryStore() {
       },
     };
   };
-  return { die: () => void generation++, open };
+  return {
+    die: () => void generation++,
+    forget(sessionId: string) {
+      records.delete(sessionId);
+      lines.delete(sessionId);
+    },
+    open,
+    records,
+  };
 }
 
 async function makeInProcessDurableHost(setup: HostSetup = {}): Promise<HostUnderTest> {
@@ -209,6 +223,13 @@ async function makeInProcessDurableHost(setup: HostSetup = {}): Promise<HostUnde
       current = open();
       await current.restore();
     },
+    async storedSessions() {
+      return [...store.records].map(([sessionId, record]) => ({
+        ownerKey: decodeStoredSession(record).ownerKey,
+        sessionId,
+      }));
+    },
+    forgetSession: (sessionId) => store.forget(sessionId),
     dispose: () => current.dispose(),
   };
 }

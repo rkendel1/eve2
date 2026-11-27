@@ -18,6 +18,8 @@ import type { WorkflowToolRunInput } from "#execution/tools/workflow/types.js";
 import { createLogger, logError } from "#internal/logging.js";
 import { createUlid } from "#shared/ulid.js";
 import type { Keep, MemoryInboxRegistry } from "./inbox-transport.js";
+import { reattachAgentTask, type OpenAgentTask, type ReattachHost } from "./reattach.js";
+import type { WorkflowToolRunControlMessage } from "#execution/tools/workflow/messages.js";
 import { acrossStepBoundary, type StepBoundary } from "./step-boundary.js";
 import type { InProcessTimers } from "./timers.js";
 
@@ -34,6 +36,7 @@ export interface InProcessRunsHost {
 
 export interface InProcessRuns {
   readonly startRun: StartWorkflowToolRun;
+  reattach(task: OpenAgentTask, host: ReattachHost): void;
   runEnded(runId: string): boolean | undefined;
   cancelRun(runId: string, reason: string): boolean | undefined;
   registerWorkflow(workflowId: string, body: WorkflowFunction): void;
@@ -122,6 +125,25 @@ export function createInProcessRuns(host: InProcessRunsHost): InProcessRuns {
           for (const release of reservations) release();
         });
       return { hookToken, runId };
+    },
+    reattach(task, reattachHost) {
+      if (runs.has(task.run.runId)) return;
+      const run: Run = { ended: false, hookToken: task.run.hookToken, runId: task.run.runId };
+      runs.set(run.runId, run);
+      const hook = host.inboxes.openHook<WorkflowToolRunControlMessage>(run.runId, run.hookToken, {
+        keep: KEEP_NOTHING,
+      });
+      run.finished = reattachAgentTask(task, hook, reattachHost)
+        .catch((error: unknown) => {
+          logError(log, "re-attached agent task failed", error, {
+            runId: run.runId,
+            taskId: task.taskId,
+          });
+        })
+        .finally(async () => {
+          run.ended = true;
+          await hook.dispose().catch(() => {});
+        });
     },
     runEnded: (runId) => runs.get(runId)?.ended,
     cancelRun(runId, reason) {
