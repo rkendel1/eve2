@@ -20,6 +20,7 @@ export type HostName = "workflow" | "in-process" | "in-process-durable";
 export interface HostCapabilities {
   readonly retries: boolean;
   readonly durable: boolean;
+  readonly durableChildren: boolean;
   readonly durableTimers: boolean;
   readonly moves: boolean;
   readonly externalCancel: boolean;
@@ -69,6 +70,7 @@ const IN_PROCESS_CALLBACK_BASE_URL = "http://session-host.in-process";
 const IN_PROCESS_CAPABILITIES: HostCapabilities = {
   externalCancel: false,
   durable: false,
+  durableChildren: false,
   durableTimers: false,
   moves: false,
   retries: true,
@@ -78,6 +80,7 @@ const IN_PROCESS_CAPABILITIES: HostCapabilities = {
 const WORKFLOW_CAPABILITIES: HostCapabilities = {
   externalCancel: true,
   durable: true,
+  durableChildren: true,
   durableTimers: true,
   moves: true,
   retries: true,
