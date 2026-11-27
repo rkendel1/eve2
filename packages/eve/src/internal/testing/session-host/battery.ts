@@ -435,6 +435,65 @@ export function describeSessionHost(name: string, kind: SessionHostKind): void {
         );
       }
 
+      needs(
+        "durableChildren",
+        "hears an agent tool's child reply after the process dies while the child works",
+        async () => {
+          let childStarted!: () => void;
+          const childWorking = new Promise<void>((resolve) => (childStarted = resolve));
+          let restarted = false;
+          const firstMessage = (prompt: string) =>
+            JSON.stringify(
+              (JSON.parse(prompt) as { role: string; content: unknown }[]).find(
+                (message) => message.role === "user",
+              )?.content ?? "",
+            );
+          await withHost(
+            {
+              name: `${name}-durable-child`,
+              respond: async (prompt) => {
+                if (firstMessage(prompt).includes("Summarize Bob's notes.")) {
+                  if (!restarted) {
+                    childStarted();
+                    return await new Promise<never>(() => {});
+                  }
+                  return textStreamResult("Bob's notes say ship on Friday.");
+                }
+                return prompt.includes('"role":"tool"')
+                  ? textStreamResult("Alice, the helper is on it.")
+                  : toolCallsStreamResult([
+                      {
+                        input: JSON.stringify({ message: "Summarize Bob's notes." }),
+                        toolCallId: "call-agent",
+                        toolName: "agent",
+                      },
+                    ]);
+              },
+            },
+            async ({ restart, runtime, settled }) => {
+              const sent = await alice(runtime, `${name}:durable-child`).send("Ask a helper.", {
+                auth: null,
+              });
+              await childWorking;
+              restarted = true;
+              await restart!();
+              await vi.waitFor(
+                async () => {
+                  const calls = ofType(await recorded(runtime, sent.sessionId), "call.settled");
+                  expect(calls).toHaveLength(1);
+                },
+                { interval: 50, timeout: 20_000 },
+              );
+              await settled();
+              const calls = ofType(await recorded(runtime, sent.sessionId), "call.settled");
+              expect(calls[0]).toMatchObject({ data: { outcome: "completed" } });
+              expect(JSON.stringify(calls[0])).toContain("Bob's notes say ship on Friday.");
+              expect(await violations(runtime, sent.sessionId)).toEqual([]);
+            },
+          );
+        },
+      );
+
       const napper = (ms: number): CaseOptions => ({
         name: `${name}-nap-${ms}`,
         respond: (prompt) =>
