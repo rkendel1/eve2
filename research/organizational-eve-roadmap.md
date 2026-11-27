@@ -390,7 +390,7 @@ One contract, three ownership paths; none requires the others:
 | S4 Agent lifecycle, timers, capability fetch | appboundry                            | Done                                         | appboundry #114                                           |
 | S5 Cold start                                | appboundry / eve2                     | Done in the harness; host execution in S7    | appboundry #115                                           |
 | S6 `.app` producer                           | eve2                                  | Done                                         | eve2 #44                                                  |
-| S7 Eve `.app` on `appboundry-host`           | eve2, appboundry                      | Done, in review                              | eve2 (this PR), appboundry #116                           |
+| S7 Eve `.app` on `appboundry-host`           | eve2, appboundry                      | Done, in review                              | eve2 #45, appboundry #116                                 |
 | S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)                             |                                                           |
 | S9 FeltKit organizational client             | feltkit                               | Not started                                  |                                                           |
 | S10 Operations                               | appboundry, feltkit                   | Not started                                  |                                                           |
