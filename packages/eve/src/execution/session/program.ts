@@ -60,6 +60,7 @@ export type SessionStart =
       readonly input: DeliverHookPayload | undefined;
       readonly step?: TurnStepPayload;
       readonly waiting?: OpenTurn["waiting"];
+      readonly dispatched?: OpenTurn["dispatched"];
     }
   | { readonly kind: "first-message" }
   | { readonly kind: "parked" };
@@ -368,7 +369,7 @@ async function runSessionLoop(
   let compactionHandoffDue = false;
   const runTurn = async (
     payload: TurnStepPayload | undefined,
-    waiting?: OpenTurn["waiting"],
+    resume: Pick<OpenTurn, "waiting" | "dispatched"> = {},
   ): Promise<TurnOutcome> => {
     const caller = progress.caller;
     const control = turnControl;
@@ -378,7 +379,7 @@ async function runSessionLoop(
       payload?.control === undefined
         ? turnCoordinates(storedProjection(cursor.sessionState.snapshot.session.state)).turnId
         : undefined;
-    const outcome = await execution.runTurn(payload, { caller, control, waiting });
+    const outcome = await execution.runTurn(payload, { caller, control, ...resume });
     if (control !== undefined) turnControl ??= nextTurnControl(control);
     progress.turnId = undefined;
     sessionTimeout?.recordActivity();
@@ -479,11 +480,13 @@ async function runSessionLoop(
       case "parked":
         return { action: { kind: "park" }, kind: "action" };
       case "turn": {
-        const { input, step, waiting } = boot.start;
-        await host.persistence?.checkpoint(transferState(), { delivery: input, step, waiting });
+        const { dispatched, input, step, waiting } = boot.start;
+        if (waiting === undefined) {
+          await host.persistence?.checkpoint(transferState(), { delivery: input, step });
+        }
         const action = await runTurn(
           step ?? (input === undefined ? undefined : { delivery: input }),
-          waiting,
+          { dispatched, waiting },
         );
         return { action, kind: "action" };
       }

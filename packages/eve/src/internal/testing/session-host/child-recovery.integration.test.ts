@@ -25,6 +25,7 @@ interface Script {
   child: Respond;
   parentAfterTool: Respond;
   readonly childCalls: string[];
+  parentCalls: number;
 }
 
 function script(): Script {
@@ -32,7 +33,29 @@ function script(): Script {
     child: () => textStreamResult("Bob's notes say ship on Friday."),
     childCalls: [],
     parentAfterTool: () => textStreamResult("Alice, the helper is on it."),
+    parentCalls: 0,
   };
+}
+
+function gate(): { readonly open: () => void; readonly wait: Respond } {
+  let open!: () => void;
+  const opened = new Promise<void>((resolve) => (open = resolve));
+  return {
+    open,
+    wait: async () => {
+      await opened;
+      return textStreamResult("Alice, the helper is on it.");
+    },
+  };
+}
+
+async function childSettled(host: HostUnderTest, childId: string): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      expect(ofType(await recorded(host.runtime, childId), "turn.settled")).toHaveLength(1);
+    },
+    { interval: 20, timeout: 10_000 },
+  );
 }
 
 async function withParentAndChild(
@@ -47,6 +70,7 @@ async function withParentAndChild(
         current.childCalls.push(prompt);
         return await current.child();
       }
+      current.parentCalls += 1;
       if (prompt.includes('"role":"tool"')) return await current.parentAfterTool();
       return toolCallsStreamResult([
         { input: JSON.stringify({ message: TASK }), toolCallId: "call-agent", toolName: "agent" },
@@ -128,24 +152,46 @@ describe("durable child sessions on the in-process host with a durable store", (
     });
   });
 
+  it("holds a child's reply until the parent's running step ends, without a restart", async () => {
+    const current = script();
+    const parentStep = gate();
+    current.parentAfterTool = parentStep.wait;
+    await withParentAndChild("reply-at-boundary", current, async (host, parentId) => {
+      const childId = await childOf(host, parentId);
+      await childSettled(host, childId);
+      expect(ofType(await recorded(host.runtime, parentId), "call.settled")).toHaveLength(0);
+      parentStep.open();
+      const [settled] = await agentCallSettlements(host, parentId);
+      expect(settled).toMatchObject({ data: { callId: "call-agent", outcome: "completed" } });
+    });
+  });
+
   it("settles a reply the child finished before the parent applied it, after the process dies", async () => {
     const current = script();
-    current.parentAfterTool = HANG;
+    const parentStep = gate();
+    current.parentAfterTool = parentStep.wait;
     await withParentAndChild("reattach-finished", current, async (host, parentId) => {
       const childId = await childOf(host, parentId);
-      await vi.waitFor(
-        async () => {
-          expect(ofType(await recorded(host.runtime, childId), "turn.settled")).toHaveLength(1);
-        },
-        { interval: 20, timeout: 10_000 },
-      );
+      await childSettled(host, childId);
       expect(ofType(await recorded(host.runtime, parentId), "call.settled")).toHaveLength(0);
       await host.restart!();
+      await vi.waitFor(() => expect(current.parentCalls).toBeGreaterThanOrEqual(3));
+      expect(ofType(await recorded(host.runtime, parentId), "call.settled")).toHaveLength(0);
+      parentStep.open();
       const [settled] = await agentCallSettlements(host, parentId);
       expect(settled).toMatchObject({ data: { callId: "call-agent", outcome: "completed" } });
       expect(JSON.stringify(settled)).toContain("Bob's notes say ship on Friday.");
+      await vi.waitFor(
+        async () => {
+          expect(ofType(await recorded(host.runtime, parentId), "turn.settled")).toMatchObject([
+            { data: { outcome: "completed" } },
+          ]);
+        },
+        { interval: 50, timeout: 20_000 },
+      );
       expect(current.childCalls).toHaveLength(1);
       expect(await admittedTo(host, childId)).toBe(1);
+      expect(await violations(host.runtime, parentId)).toEqual([]);
     });
   });
 

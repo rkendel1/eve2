@@ -67,6 +67,8 @@ export interface HostUnderTest {
   storedSessions?(): Promise<{ readonly sessionId: string; readonly ownerKey: unknown }[]>;
   forgetSession?(sessionId: string): void;
   rewriteSession?(sessionId: string, edit: (session: StoredSession) => StoredSession): void;
+  crashAt?(point: CrashPoint): Promise<void>;
+  linesOf?(sessionId: string): readonly Record<string, unknown>[];
   dispose(): Promise<void>;
 }
 
@@ -147,10 +149,45 @@ async function makeInProcessHost(setup: HostSetup = {}): Promise<HostUnderTest> 
   };
 }
 
+export type StoreWrite =
+  | {
+      readonly kind: "line";
+      readonly sessionId: string;
+      readonly child: boolean;
+      readonly line: Record<string, unknown>;
+    }
+  | {
+      readonly kind: "session";
+      readonly sessionId: string;
+      readonly child: boolean;
+      readonly record: Record<string, unknown>;
+    };
+
+export interface CrashPoint {
+  readonly at: (write: StoreWrite) => boolean;
+  readonly landed: boolean;
+}
+
 function memoryStore() {
   const lines = new Map<string, string[]>();
   const records = new Map<string, string>();
   let generation = 0;
+  let armed: { point: CrashPoint; crashed: () => void } | undefined;
+  const isChild = (sessionId: string, record?: string) => {
+    const stored = record ?? records.get(sessionId);
+    if (stored === undefined) return false;
+    const owner = (JSON.parse(stored) as { ownerKey?: unknown }).ownerKey;
+    return typeof owner === "object" && owner !== null;
+  };
+  const crashing = (write: StoreWrite, land: () => void) => {
+    if (armed === undefined || !armed.point.at(write)) return land();
+    const { crashed, point } = armed;
+    armed = undefined;
+    if (point.landed) land();
+    generation++;
+    crashed();
+    throw new Error("This process is gone.");
+  };
   const open = (): DurableSessionStore => {
     const mine = ++generation;
     const alive = () => {
@@ -161,7 +198,15 @@ function memoryStore() {
         alive();
         const stream = lines.get(sessionId) ?? [];
         if (index !== stream.length) throw new Error(`Line ${index} is not the next line.`);
-        lines.set(sessionId, [...stream, line]);
+        crashing(
+          {
+            child: isChild(sessionId),
+            kind: "line",
+            line: JSON.parse(line) as Record<string, unknown>,
+            sessionId,
+          },
+          () => lines.set(sessionId, [...stream, line]),
+        );
       },
       async readLines(sessionId) {
         return [...(lines.get(sessionId) ?? [])];
@@ -171,16 +216,29 @@ function memoryStore() {
       },
       async saveSession(sessionId, record) {
         alive();
-        records.set(sessionId, record);
+        crashing(
+          {
+            child: isChild(sessionId, record),
+            kind: "session",
+            record: JSON.parse(record) as Record<string, unknown>,
+            sessionId,
+          },
+          () => records.set(sessionId, record),
+        );
       },
     };
   };
   return {
+    crashAt: (point: CrashPoint) =>
+      new Promise<void>((crashed) => {
+        armed = { crashed, point };
+      }),
     die: () => void generation++,
     forget(sessionId: string) {
       records.delete(sessionId);
       lines.delete(sessionId);
     },
+    lines,
     open,
     records,
   };
@@ -236,6 +294,9 @@ async function makeInProcessDurableHost(setup: HostSetup = {}): Promise<HostUnde
       }));
     },
     forgetSession: (sessionId) => store.forget(sessionId),
+    crashAt: (point) => store.crashAt(point),
+    linesOf: (sessionId) =>
+      (store.lines.get(sessionId) ?? []).map((line) => JSON.parse(line) as Record<string, unknown>),
     rewriteSession(sessionId, edit) {
       const record = store.records.get(sessionId);
       if (record === undefined) throw new Error(`No stored session ${sessionId}.`);

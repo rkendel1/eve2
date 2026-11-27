@@ -18,8 +18,14 @@ import type { WorkflowToolRunInput } from "#execution/tools/workflow/types.js";
 import { createLogger, logError } from "#internal/logging.js";
 import { createUlid } from "#shared/ulid.js";
 import type { Keep, MemoryInboxRegistry } from "./inbox-transport.js";
-import { reattachAgentTask, type OpenAgentTask, type ReattachHost } from "./reattach.js";
+import {
+  endUnknownTask,
+  reattachAgentTask,
+  type OpenAgentTask,
+  type ReattachHost,
+} from "./reattach.js";
 import type { WorkflowToolRunControlMessage } from "#execution/tools/workflow/messages.js";
+import type { StoredLaunch } from "./session-store.js";
 import { acrossStepBoundary, type StepBoundary } from "./step-boundary.js";
 import type { InProcessTimers } from "./timers.js";
 
@@ -32,10 +38,13 @@ export interface InProcessRunsHost {
   readonly toolStubs: ToolStubHost;
   runtimeFor(config: SessionRuntimeConfig): Runtime;
   readonly dispatchSession: Runtime["dispatchSession"];
+  deferLaunch?(sessionId: string, launch: StoredLaunch, start: () => void): boolean;
 }
 
 export interface InProcessRuns {
   readonly startRun: StartWorkflowToolRun;
+  relaunch(launch: StoredLaunch): void;
+  endUnknown(task: OpenAgentTask): void;
   reattach(task: OpenAgentTask, host: ReattachHost): void;
   runEnded(runId: string): boolean | undefined;
   cancelRun(runId: string, reason: string): boolean | undefined;
@@ -54,6 +63,7 @@ interface Run {
   readonly hookToken: string;
   ended: boolean;
   finished?: Promise<void>;
+  abandon?: () => void;
 }
 
 const runHookPrefix = (runId: string) => `eve:in-process:${runId}:`;
@@ -102,6 +112,30 @@ export function createInProcessRuns(host: InProcessRunsHost): InProcessRuns {
     };
   };
 
+  const launch = (runId: string, input: WorkflowToolRunInput): (() => void) => {
+    const run: Run = { ended: false, hookToken: input.hookToken, runId };
+    runs.set(runId, run);
+    const reservations = [
+      host.inboxes.reserve(runId, { token: input.hookToken }, { keep: KEEP_NOTHING }),
+      host.inboxes.reserve(runId, { prefix: runHookPrefix(runId) }, { keep: KEEP_NOTHING }),
+    ];
+    let decide!: (begins: boolean) => void;
+    const decided = new Promise<boolean>((resolve) => (decide = resolve));
+    run.abandon = () => decide(false);
+    run.finished = decided
+      .then(async (begins) => {
+        if (begins) await runWorkflowToolRun(input, runHost(runId));
+      })
+      .catch((error: unknown) => {
+        logError(log, "workflow tool run failed", error, { runId });
+      })
+      .finally(() => {
+        run.ended = true;
+        for (const release of reservations) release();
+      });
+    return () => decide(true);
+  };
+
   return {
     async startRun(input) {
       const hookToken = workflowToolRunHookToken(input);
@@ -110,21 +144,29 @@ export function createInProcessRuns(host: InProcessRunsHost): InProcessRuns {
         ...input,
         hookToken,
       });
-      const run: Run = { ended: false, hookToken, runId };
-      runs.set(runId, run);
-      const reservations = [
-        host.inboxes.reserve(runId, { token: hookToken }, { keep: KEEP_NOTHING }),
-        host.inboxes.reserve(runId, { prefix: runHookPrefix(runId) }, { keep: KEEP_NOTHING }),
-      ];
-      run.finished = runWorkflowToolRun(crossed, runHost(runId))
+      const start = launch(runId, crossed);
+      const taskId = "taskId" in input.entry ? input.entry.taskId : undefined;
+      const deferred =
+        taskId !== undefined &&
+        host.deferLaunch?.(input.session.id, { input: crossed, runId, taskId }, start) === true;
+      if (!deferred) start();
+      return { hookToken, runId };
+    },
+    relaunch({ input, runId }) {
+      if (runs.has(runId)) return;
+      launch(runId, input)();
+    },
+    endUnknown(task) {
+      if (runs.has(task.run.runId)) return;
+      const run: Run = { ended: false, hookToken: task.run.hookToken, runId: task.run.runId };
+      runs.set(run.runId, run);
+      run.finished = endUnknownTask(task)
         .catch((error: unknown) => {
-          logError(log, "workflow tool run failed", error, { runId });
+          logError(log, "could not end a task whose run was lost", error, { taskId: task.taskId });
         })
         .finally(() => {
           run.ended = true;
-          for (const release of reservations) release();
         });
-      return { hookToken, runId };
     },
     reattach(task, reattachHost) {
       if (runs.has(task.run.runId)) return;
@@ -158,7 +200,10 @@ export function createInProcessRuns(host: InProcessRunsHost): InProcessRuns {
     },
     async stopAll(reason) {
       const live = [...runs.values()].filter((run) => !run.ended);
-      for (const run of live) void host.inboxes.deliver(run.hookToken, { kind: "end", reason });
+      for (const run of live) {
+        run.abandon?.();
+        void host.inboxes.deliver(run.hookToken, { kind: "end", reason });
+      }
       await Promise.all(live.map((run) => run.finished));
     },
   };
