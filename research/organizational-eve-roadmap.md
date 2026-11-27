@@ -136,10 +136,9 @@ Topic by topic:
 
 These need an owner's decision; each blocks the slice named.
 
-- **D1 (blocks S4): the agent guest execution model in `appboundry-host`.**
-  - Proposed: instantiate on a delivery, `restore` from the store, run to idle, then release the instance. Keep it warm for a bounded idle window.
-  - The alternative is a resident instance per organization.
-  - Approval waits become idle waits, which restore already supports.
+- **D1 (blocks S4): the agent guest execution model in `appboundry-host`.** Decided in S4.
+  - Taken: on demand. A delivery runs in its session's lane (one delivery at a time per session, on an instance serving that session only), the instance stays warm for a bounded, configurable window (default 60 s), then is released; the next delivery starts a new instance and the guest restores the session. One organizational Eve; different sessions run in parallel within the host's limits.
+  - Not taken: a resident instance per organization, and one serialized lane per application.
 - **D2 (blocks S2): where Eve's store lives.** Decided in S2.
   - Taken: a host-owned, guest-private store behind a new `sessions@1` interface. Its operations are the `EveHostStore` strings.
   - The alternative is collections declared in the manifest through `db.*`. That is writable only from mutations and exposes session internals to app code, so it is not recommended.
@@ -151,7 +150,9 @@ These need an owner's decision; each blocks the slice named.
   - The alternative is bespoke capabilities per app, the current Meetings pattern. They don't scale and duplicate the contract.
   - Session access on this path is decided by the calling application's own records, as `feltkitSessionAccess()` does today.
 - **D5 (later; does not block the first production version): restoring subagent child sessions, workflow-tool runs and timers.**
-- **D6 (blocks S5): cold-start strategy.** Engine snapshot after load, bundle reduction, or a raised memory limit for agent guests.
+- **D6 (blocks S5): cold-start strategy.** Decided in S5.
+  - Taken: bundle reduction in the guest build. Code eve loads only on demand (`import()`) was 65% of the bundle and parsed at every cold start; it is now a stub that throws, naming the module, unless the guest uses it (a measured keep list).
+  - Not taken: a post-load engine snapshot (load is within budget after the reduction; a snapshot does not reduce memory and needs invalidation and per-instance reseeding) and a raised memory limit (not needed).
 
 ## 4. Ordered implementation slices
 
@@ -246,11 +247,21 @@ One contract, three ownership paths; none requires the others:
   - a SIGKILLed host restores on restart;
   - approval waits survive release.
 - **Tests:** a port of `experiments/eve-host-boa/test/restart.test.mjs` onto `appboundry-host`.
+- **Done** (appboundry #114, merged as `d3bd22a`):
+  - production host (`agents@1`, a deterministic agent fixture, not Eve): release and restore, an approval across a release, serialized deliveries to one session, parallel sessions, eviction when full, `timer.sleep` bounds, `capability.invoke` through the authorization path and refusal of an undeclared capability, `model@1` through the lifecycle (`test/agents.test.ts`, 9 cases); SIGKILL restarts for a pending approval, an in-flight capability call (reported uncertain, not repeated) and a pending timer (lost, as documented) (`test/agents-restart.test.ts`, 3 cases);
+  - real Eve in the experiment harness, against the production capabilities: capability calls through `capability.invoke` keyed by `${session}:${callId}`, with an unknown outcome reported as uncertain (`experiments/eve-host-boa/test/capability.test.mjs`, Node and Boa, 4/4 after a harness fix in S5); the 12-case restart matrix 12/12;
+  - fixture measurements only (not Eve): instance start 16-26 ms, cold delivery 23-41 ms, warm 2-3 ms.
+- **Explicit S7 dependency:** eve's `restore()` restores every stored session. With one instance per session, eve must restore only the session being delivered before Eve runs in the production host.
 
 **S5: cold start within limits.** AppBoundry, with eve where the bundle is reduced. Blocks production.
 
 - **Prerequisite:** decision D6.
 - **Acceptance:** a cold start under a stated budget, and memory within an agent-guest limit, both measured.
+- **Budgets:** cold load under 15 s on the reference machine (the host allows 30 s, `maxInitMs`), linear memory within the host's default 256 MiB (`maxMemoryBytes`), unchanged.
+- **Done in the experiment harness** (real Eve guest, FeltKit's Boa engine bounded by the host's own `boundModule`; Node v26.13.1, 4 vCPU Xeon @ 2.10 GHz):
+  - bundle 12.78 MB to 4.85 MB; cold load 43-45 s to 7.8-8.6 s; memory 541 MB (traps under the 256 MiB bound) to 209 MB; restore and deliveries unchanged (restore 10 / 112 / 386 ms for 0 / 80 / 400 stored lines);
+  - the whole eve-host-boa suite passes on the reduced guest (37/37: Boa and Node turns, `model@1`, `capability.invoke`, the restart matrix, `test/cold-start.test.mjs`).
+- **Not yet verified:** the guest inside the production host's worker (maxInitMs, maxStepMs) as an artifact: that is S6 and S7. The keep list is this agent's; an agent that declares eve's bash, file or web tools needs them kept, which the producer should derive from the compiled agent (S6).
 
 **S6: Eve `.app` producer.** eve2 (a command or script) or AppBoundry tooling, decided in the PR.
 
@@ -261,7 +272,7 @@ One contract, three ownership paths; none requires the others:
 
 **S7: Eve `.app` runs on `appboundry-host` as the organization's application.** AppBoundry experiments to tests.
 
-- **Prerequisites:** S6, S5.
+- **Prerequisites:** S6, S5; eve restoring only the delivered session (from S4).
 - **Acceptance:** the final scenario's steps 1-3 and 11-14, against the real artifact.
 
 **S8: application connections and acting identity.** AppBoundry. Blocks.
@@ -295,19 +306,19 @@ One contract, three ownership paths; none requires the others:
 
 ## 5. Status
 
-| Slice                                        | Repository                            | Status                | PR                                                        |
-| -------------------------------------------- | ------------------------------------- | --------------------- | --------------------------------------------------------- |
-| S1 Durable host sessions                     | eve2                                  | Done                  | #39                                                       |
-| S2 `sessions@1`                              | appboundry                            | Done (in review)      | eve #41                                                   |
-| S3 Model access (`model@1`)                  | appport-services, feltkit, appboundry | Done; release pending | appport-services #56, appboundry #112, #113, feltkit #175 |
-| S4 Agent lifecycle, timers, capability fetch | appboundry                            | Not started (D1)      |                                                           |
-| S5 Cold start                                | appboundry / eve2                     | Not started (D6)      |                                                           |
-| S6 `.app` producer                           | eve2 or appboundry                    | Not started           |                                                           |
-| S7 Eve `.app` on `appboundry-host`           | appboundry                            | Not started           |                                                           |
-| S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)      |                                                           |
-| S9 FeltKit organizational client             | feltkit                               | Not started           |                                                           |
-| S10 Operations                               | appboundry, feltkit                   | Not started           |                                                           |
-| S11 Real applications                        | meetings, feltkit-eve, feltkit        | Not started           |                                                           |
+| Slice                                        | Repository                            | Status                                       | PR                                                        |
+| -------------------------------------------- | ------------------------------------- | -------------------------------------------- | --------------------------------------------------------- |
+| S1 Durable host sessions                     | eve2                                  | Done                                         | #39                                                       |
+| S2 `sessions@1`                              | appboundry                            | Done                                         | appboundry #111, eve #41                                  |
+| S3 Model access (`model@1`)                  | appport-services, feltkit, appboundry | Done; `@appport/services` 0.23.0 unpublished | appport-services #56, appboundry #112, #113, feltkit #175 |
+| S4 Agent lifecycle, timers, capability fetch | appboundry                            | Done                                         | appboundry #114                                           |
+| S5 Cold start                                | appboundry / eve2                     | Done in the harness; host execution in S7    | appboundry #115                                           |
+| S6 `.app` producer                           | eve2 or appboundry                    | Not started                                  |                                                           |
+| S7 Eve `.app` on `appboundry-host`           | appboundry                            | Not started                                  |                                                           |
+| S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)                             |                                                           |
+| S9 FeltKit organizational client             | feltkit                               | Not started                                  |                                                           |
+| S10 Operations                               | appboundry, feltkit                   | Not started                                  |                                                           |
+| S11 Real applications                        | meetings, feltkit-eve, feltkit        | Not started                                  |                                                           |
 
 ## 6. Final acceptance scenario
 
