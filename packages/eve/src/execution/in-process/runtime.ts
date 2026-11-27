@@ -314,6 +314,7 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       for (const { record, sessionId } of records) {
         try {
           const stored = decodeStoredSession(record);
+          decoded.set(sessionId, stored);
           const migration =
             stored.checkpoint === undefined
               ? undefined
@@ -325,7 +326,6 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
                 : migration.detail,
             );
           }
-          decoded.set(sessionId, stored);
         } catch (error) {
           refusals.set(sessionId, error instanceof Error ? error.message : String(error));
         }
