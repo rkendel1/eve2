@@ -41,8 +41,11 @@ describe(
         const parsed = parseManifest(JSON.parse(JSON.stringify(manifest)));
         assert.equal(parsed.application.id, "org-eve");
         assert.deepEqual(
-          parsed.functions.map((f) => f.agent),
-          [{ session: "session" }, { session: "session" }],
+          parsed.functions.map((f) => ({ ...f.agent })),
+          [
+            { session: "session", actor: "assertion" },
+            { session: "session", actor: "assertion" },
+          ],
         );
       }
     });
@@ -74,7 +77,7 @@ describe(
       );
       assert.match(
         result.stdout,
-        /Interfaces\s+actions@1, agents@1, identity@1, model@1, sessions@1, capabilities@1/,
+        /Interfaces\s+actions@1, agents@1, connections@1, identity@1, model@1, sessions@1, capabilities@1/,
       );
       assert.match(
         result.stdout,
@@ -93,7 +96,11 @@ describe(
       const noAgents = await appboundry(
         "artifact",
         "verify",
-        await altered("minimal-agent", (m) => delete m.runtime.interfaces.agents),
+        await altered("minimal-agent", (m) => {
+          delete m.runtime.interfaces.agents;
+          delete m.runtime.interfaces.connections;
+          for (const fn of m.functions) delete fn.agent.actor;
+        }),
       );
       assert.notEqual(noAgents.code, 0);
       assert.match(

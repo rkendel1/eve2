@@ -15,6 +15,7 @@ const host = await ArtifactHost.open({
   agentIdleMs: config.agentIdleMs,
   modelBinding: config.modelBinding,
   capabilityBindings: config.capabilityBindings,
+  ...(config.authority ? { authority: config.authority } : {}),
   logger: {
     info() {},
     warn: (message) => say({ warn: message }),
@@ -31,6 +32,23 @@ for await (const line of createInterface({ input: process.stdin })) {
         via: "eve-appboundry lifecycle",
       })
       .then((result) => say({ id: command.id, result }));
+  } else if (command.op === "operator") {
+    const operator = { kind: "local", name: "lifecycle" };
+    try {
+      const value =
+        command.action === "user"
+          ? await host.admin((a) => a.addUser(operator, command.input))
+          : command.action === "connect"
+            ? await host.connectApplication(operator, command.input)
+            : command.action === "list"
+              ? await host.listConnections()
+              : await host.changeConnection(operator, command.action, command.input.application);
+      say({ id: command.id, value });
+    } catch (error) {
+      say({ id: command.id, error: { code: error.code, message: error.message } });
+    }
+  } else if (command.op === "outbound") {
+    say({ id: command.id, value: await host.outbound() });
   } else if (command.op === "status") {
     say({ id: command.id, status: (await host.status()).runtime.guests });
   } else if (command.op === "close") {

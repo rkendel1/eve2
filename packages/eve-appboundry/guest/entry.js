@@ -207,34 +207,51 @@ async function restore(request) {
   return { restoration, modelReferences: references.splice(0) };
 }
 
-const authOf = (principal) =>
-  principal
+const authOf = (invocation, application) => {
+  const actor = invocation.actor;
+  if (actor) {
+    return {
+      attributes: { application, ...(actor.roles ? { roles: [...actor.roles] } : {}) },
+      authenticator: `appboundry-connection:${application}`,
+      issuer: actor.issuer,
+      principalId: actor.id,
+      principalType: actor.type,
+      subject: actor.id,
+    };
+  }
+  const principal = invocation.principal;
+  return principal
     ? {
-        attributes: { roles: [...(principal.roles ?? [])] },
+        attributes: { application, roles: [...(principal.roles ?? [])] },
         authenticator: `appboundry:${__EVE_APPLICATION__.id}`,
         issuer: "appboundry",
         principalId: principal.id,
-        principalType: principal.type ?? "user",
+        principalType: principal.type ?? "service",
       }
     : null;
+};
 
 function delivery(args, invocation) {
-  for (const field of ["session", "application", "conversation"]) {
+  const application = invocation.connection?.application;
+  if (typeof application !== "string" || !application) {
+    throw Object.assign(new Error("this delivery comes from no connected application"), {
+      code: "FORBIDDEN",
+    });
+  }
+  for (const field of ["session", "conversation"]) {
     if (typeof args[field] !== "string" || !args[field])
       throw Object.assign(new Error(`${field} is required`), { code: "INVALID_ARGUMENT" });
   }
-  if (args.session !== `${args.application}.${args.conversation}`) {
+  if (args.session !== `${application}.${args.conversation}`) {
     throw Object.assign(
-      new Error(
-        `session must be "${args.application}.${args.conversation}" (the application's conversation)`,
-      ),
+      new Error(`session must be "${application}.${args.conversation}" (your conversation)`),
       { code: "INVALID_ARGUMENT" },
     );
   }
   return {
-    application: args.application,
+    application,
     conversation: args.conversation,
-    auth: authOf(invocation.principal),
+    auth: authOf(invocation, application),
     durable: true,
     models: "generate",
     scoped: true,

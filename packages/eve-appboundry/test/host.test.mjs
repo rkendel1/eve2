@@ -10,9 +10,10 @@ import {
   needsAppBoundry,
   scratch,
 } from "./support.mjs";
+import { answerArgs, deliverArgs, inProcessOperator, organization } from "./support/production.mjs";
 
 const TOKEN = "provider-issued-consumer-token";
-const alice = { id: "alice", type: "user", roles: ["member"] };
+const meetingsApp = { id: "app.meetings", type: "service", roles: ["member"] };
 const keepalive = setInterval(() => {}, 1 << 30);
 const servers = [];
 after(async () => {
@@ -160,8 +161,10 @@ describe(
     let modelUrl;
     let state;
     let host;
+    let org;
     const open = async () =>
       ArtifactHost.open({
+        authority: org.binding,
         artifact,
         stateDir: state,
         jobIntervalMs: 0,
@@ -182,15 +185,14 @@ describe(
           timeoutMs: 1_000,
         })),
       });
-    const call = async (fn, args, principal = alice) =>
+    const call = async (fn, args, principal = meetingsApp) =>
       host.call(fn, args, { principal, via: "eve-appboundry test" });
+    const alice = () => org.assertion("meetings", "user:alice");
     const deliver = async (conversation, message) => {
-      const result = await call("eve:deliver", {
-        session: `meetings.${conversation}`,
-        application: "meetings",
-        conversation,
-        message,
-      });
+      const result = await call(
+        "eve:deliver",
+        deliverArgs(conversation, message, { assertion: alice() }),
+      );
       assert.ok(result.ok, JSON.stringify(result.error));
       return result.value;
     };
@@ -203,11 +205,17 @@ describe(
       modelUrl = await listen(model.server);
       repo = await provider();
       state = join(scratch(), "state");
+      org = await organization({ meetings: ["repo.changes.get", "repo.changes.publish"] });
+      await org.grant("user:alice", ["repo.changes.get", "repo.changes.publish"]);
     });
-    after(async () => host?.close());
+    after(async () => {
+      await host?.close();
+      await org?.close();
+    });
 
     it("answers a delivery with the host's bound model and keeps the conversation in its session", async () => {
       host = await open();
+      await org.connect(inProcessOperator(host), "meetings");
       const one = await deliver("weekly-sync", "Alice says hello.");
       assert.equal(one.status, "completed");
       assert.equal(one.reply, "Heard: Alice says hello.");
@@ -240,12 +248,14 @@ describe(
       assert.equal(asked.status, "awaiting-input");
       assert.equal(asked.interactions.length, 1);
       assert.equal(repo.received.length, before, "nothing runs before a person answers");
-      const answered = await call("eve:answer", {
-        session: "meetings.release",
-        application: "meetings",
-        conversation: "release",
-        answers: [{ interactionId: asked.interactions[0].interactionId, optionId: "approve" }],
-      });
+      const answered = await call(
+        "eve:answer",
+        answerArgs(
+          "release",
+          [{ interactionId: asked.interactions[0].interactionId, optionId: "approve" }],
+          { assertion: alice() },
+        ),
+      );
       assert.ok(answered.ok, JSON.stringify(answered.error));
       assert.equal(answered.value.status, "completed");
       assert.deepEqual(
@@ -274,22 +284,16 @@ describe(
     it("refuses a delivery whose session is not its application's conversation, and a caller without permission", async () => {
       const mismatched = await call("eve:deliver", {
         session: "meetings.other",
-        application: "meetings",
         conversation: "weekly-sync",
         message: "x",
       });
       assert.equal(mismatched.ok, false);
       assert.equal(mismatched.error.code, "INVALID_ARGUMENT");
-      const stranger = await call(
-        "eve:deliver",
-        {
-          session: "meetings.weekly-sync",
-          application: "meetings",
-          conversation: "weekly-sync",
-          message: "x",
-        },
-        { id: "mallory", type: "user", roles: [] },
-      );
+      const stranger = await call("eve:deliver", deliverArgs("weekly-sync", "x"), {
+        id: "mallory",
+        type: "user",
+        roles: [],
+      });
       assert.equal(stranger.ok, false);
       assert.equal(stranger.error.code, "FORBIDDEN");
     });

@@ -2227,6 +2227,9 @@ importers:
 
   packages/eve-appboundry:
     devDependencies:
+      '@authboundry/local':
+        specifier: 0.1.1
+        version: 0.1.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)
       acorn:
         specifier: 8.19.0
         version: 8.19.0

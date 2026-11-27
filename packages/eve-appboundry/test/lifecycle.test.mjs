@@ -6,12 +6,13 @@ import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { APPBOUNDRY_CLI, artifactOf, cleanup, needsAppBoundry, scratch } from "./support.mjs";
 import {
-  answerArgs,
+  answerArgs as baseAnswerArgs,
   bindings,
   closeServers,
-  deliverArgs,
+  deliverArgs as baseDeliverArgs,
   gate,
   hostProcess,
+  organization,
   listen,
   provider,
   scriptedModel,
@@ -20,7 +21,21 @@ import {
 } from "./support/production.mjs";
 
 const run = promisify(execFile);
-after(cleanup);
+let org;
+before(async () => {
+  if (needsAppBoundry) return;
+  org = await organization({ meetings: ["repo.changes.get", "repo.changes.publish"] });
+  await org.grant("user:alice", ["repo.changes.get", "repo.changes.publish"]);
+});
+after(async () => {
+  await org?.close();
+  cleanup();
+});
+const alice = () => org.assertion("meetings", "user:alice");
+const deliverArgs = (conversation, message) =>
+  baseDeliverArgs(conversation, message, { assertion: alice() });
+const answerArgs = (conversation, answers) =>
+  baseAnswerArgs(conversation, answers, { assertion: alice() });
 const INTERRUPTED = "may or may not have taken effect";
 const ok = (result) => {
   assert.equal(result.ok, true, JSON.stringify(result.error));
@@ -60,6 +75,7 @@ describe(
         artifact,
         state: join(scratch("eve-state-"), "state"),
         ...bindings({ modelUrl: await listen(model.server), providerUrl: repo.url }),
+        authority: org.binding,
       };
     });
     after(closeServers);
@@ -80,6 +96,7 @@ describe(
     it("opens the host with its interfaces, delivers to a new session and continues it", async () => {
       first = hostProcess({ ...config, agentIdleMs: 2_000 });
       await first.ready;
+      await org.connect(first.operator, "meetings");
       assert.equal((await first.status()).agents.started, 0);
       meeting = ok(
         await first.call("eve:deliver", deliverArgs("weekly-sync", "Alice says hello.")),
@@ -222,9 +239,11 @@ describe(
         artifact: await deployment(),
         state: join(scratch("eve-state-"), "state"),
         ...bindings({ modelUrl: await listen(model.server), providerUrl: repo.url }),
+        authority: org.binding,
       };
       host = hostProcess(config);
       await host.ready;
+      await org.connect(host.operator, "meetings");
     });
     after(closeServers);
 

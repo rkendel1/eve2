@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { artifactOf, CHECKOUT, cleanup, scratch } from "./support.mjs";
 import {
-  alice,
+  appPrincipal,
+  inProcessOperator,
+  organization,
   bindings,
   closeServers,
   deliverArgs,
@@ -22,6 +24,7 @@ const { path } = await artifactOf("minimal-agent");
 const model = scriptedModel();
 const repo = await provider();
 const AGENT_IDLE_MS = 3_000;
+const org = await organization({ meetings: ["repo.changes.get", "repo.changes.publish"] });
 
 let t = performance.now();
 const artifact = await loadArtifact(path);
@@ -34,13 +37,15 @@ const host = await ArtifactHost.open({
   agentIdleMs: AGENT_IDLE_MS,
   ...bindings({ modelUrl: await listen(model.server), providerUrl: repo.url }),
   logger: { info() {}, warn() {}, error() {} },
+  authority: org.binding,
 });
+await org.connect(inProcessOperator(host), "meetings");
 const openMs = performance.now() - t;
 const agents = async () => (await host.status()).runtime.guests;
 const deliver = async (conversation, message) => {
   const started = performance.now();
   const result = await host.call("eve:deliver", deliverArgs(conversation, message), {
-    principal: alice,
+    principal: appPrincipal("meetings"),
     via: "measure",
   });
   if (!result.ok) throw new Error(JSON.stringify(result.error));
@@ -122,6 +127,7 @@ out.limits = {
 };
 
 await host.close();
+await org.close();
 await closeServers();
 cleanup();
 clearInterval(keepalive);

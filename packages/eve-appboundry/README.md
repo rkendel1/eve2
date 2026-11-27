@@ -53,19 +53,21 @@ names no build-machine path: the app root becomes `/appboundry/agent`.
 
 ## The manifest
 
-| Field                | Value                                                                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `application`        | from `appboundry.json`                                                                                                                      |
-| `producer`           | `eve-appboundry` and the eve version                                                                                                        |
-| `functions`          | `eve:deliver { session, application, conversation, message }` and `eve:answer { …, answers }`: actions with `agent: { session: "session" }` |
-| `runtime.interfaces` | `actions@1`, `agents@1`, `identity@1`, `model@1`, `sessions@1`; `capabilities@1` when `requires` is not empty                               |
-| `requires`           | from `appboundry.json`                                                                                                                      |
-| `identity.roles`     | `member: ["eve.deliver"]`; both functions need `eve.deliver`                                                                                |
-| `permissions`        | no collections, services, network or filesystem                                                                                             |
-| `omitted`            | what the agent configures that the artifact does not carry: the model (a reference; the deployment binds it), the sandbox, eve's channels   |
+| Field                | Value                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `application`        | from `appboundry.json`                                                                                                                                         |
+| `producer`           | `eve-appboundry` and the eve version                                                                                                                           |
+| `functions`          | `eve:deliver { session, conversation, message, assertion? }` and `eve:answer { …, answers }`: actions with `agent: { session: "session", actor: "assertion" }` |
+| `runtime.interfaces` | `actions@1`, `agents@1`, `connections@1`, `identity@1`, `model@1`, `sessions@1`; `capabilities@1` when `requires` is not empty                                 |
+| `requires`           | from `appboundry.json`                                                                                                                                         |
+| `identity.roles`     | `member: ["eve.deliver"]`; both functions need `eve.deliver`                                                                                                   |
+| `permissions`        | no collections, services, network or filesystem                                                                                                                |
+| `omitted`            | what the agent configures that the artifact does not carry: the model (a reference; the deployment binds it), the sandbox, eve's channels                      |
 
-A delivery's `session` must be `<application>.<conversation>`, so agents@1 serializes each conversation on its own
-lane. The guest refuses any other value. eve's `auth` is the principal the host authenticated, never an argument.
+A delivery's `session` must be `<application>.<conversation>`, where `<application>` is the connection the host
+matched to the caller (connections@1), so agents@1 serializes each conversation on its own lane. The guest refuses any
+other value, and no argument names the application. eve's `auth` is the person the host verified from `assertion`, or
+else the principal the host authenticated, never an argument.
 
 How the guest uses each interface:
 
@@ -158,6 +160,8 @@ EVE_APPBOUNDRY_ENGINE=<engine.wasm> APPBOUNDRY_CHECKOUT=<appboundry> pnpm --filt
 - `test/host.test.mjs` (the engine and the checkout): deliveries, a capability call, an approval, an uncertain outcome,
   restore by a new host, refusal of a mismatched session and of an unpermitted caller.
 - `test/lifecycle.test.mjs` (the engine and the checkout): the production lifecycle below, in real host processes.
+- `test/connections.test.mjs` (the engine and the checkout): two applications connected to one eve, in a real host
+  process with the real AuthBoundry (`@authboundry/local`); see [Applications and acting identity](#applications-and-acting-identity).
 
 Without those variables the suites that need them are skipped, naming the variable. eve's CI does not set them yet.
 `test/measure-host.mjs` measures the production host path.
@@ -232,11 +236,51 @@ On the same machine, `experiments/eve-host-boa/host/measure-cold.mjs` loads the 
 program in 7.4-8.0 s (209.6 MB). That is within S5's 15 s budget and the host's 30 s `maxInitMs`. On Node v22 both
 take about 14 s.
 
-## What remains for S8
+## Applications and acting identity
 
-- **Applications and acting identity.** One organization's eve serving several applications, with each application's
-  identity and authorization (`agent-connections@1`, `actingAs`).
-- **A published AppBoundry** serving `agents@1`, `sessions@1`, `model@1` and `capabilities@1`, so eve's CI can
+Several applications connect to the one organizational eve through AppBoundry's connections@1. An application
+contributes conversations and capabilities; it does not own eve, its identity, its sessions or its authority.
+
+- **A connection** is a durable host record an operator creates: the application, the host principal it calls as,
+  the capabilities it contributes, and the keys that sign its person assertions (`appboundry admin connections add`).
+  It is `active`, `disconnected` or `revoked`; revoked is final. Connecting grants no authority by itself.
+- **Each delivery** is checked by the host before the guest runs: the caller must match an active connection, the
+  lane must be that application's, and `assertion` (an ES256 JWT, `iss` the application's issuer, `aud` the agent,
+  short-lived, each `jti` used once) must verify. The guest sees the connection and the verified person, never the
+  assertion.
+- **Each capability call** must be one the caller's connection contributes, and AuthBoundry must allow it for that
+  person (`POST /_authboundry/authorize/check`, `on_behalf_of`), at the time of the call. A refusal reaches the model
+  as the call's error; nothing reaches the provider. The ledger records the connection, the person, and
+  AuthBoundry's `decisionId` and `delegationId`; the provider receives the person and the delegation as AppPort's
+  invocation context.
+- **The deployment binds AuthBoundry**: `appboundry run --authority authority.json`, with the credentials read from
+  environment variables. Without a binding every person-acting call is refused.
+
+`test/connections.test.mjs` runs `meetings` (contributing `repo.changes.get`) and `review` (`repo.changes.publish`)
+against one host process and one AuthBoundry, and checks:
+
+| #    | Requirement                                                       | Evidence                                                                                                                       |
+| ---- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1-4  | two applications, one eve, distinct applications and callers      | both connections active; the ledger shows `org-eve` acting for alice (meetings) and bob (review)                               |
+| 5    | one application cannot act as another                             | another lane: `SESSION_OUTSIDE_CONNECTION`; another's signature: `UNAUTHORIZED`; an `application` argument: `INVALID_ARGUMENT` |
+| 6-7  | disconnect one, the other works; reconnect keeps eve and sessions | `CONNECTION_DISCONNECTED`, review continues, meetings returns to the same session                                              |
+| 8    | context isolation                                                 | the same conversation name under each application is two sessions; no text crosses                                             |
+| 9-11 | authority from AuthBoundry, unauthorized and revoked refused      | `DELEGATION_DENIED` (`delegation_missing`, `delegation_revoked`); another application's capability: `CAPABILITY_NOT_CONNECTED` |
+| 12   | evidence                                                          | connection, person, issuer and decision on every record; no assertion or credential                                            |
+| 13   | idle release and restore                                          | the restored instance keeps the connection rules                                                                               |
+| 14   | `SIGKILL` and restart                                             | connection states, the revocation and the sessions survive                                                                     |
+| 15   | uncertain outcomes                                                | reported as "may or may not have taken effect", sent to the provider once                                                      |
+
+Not covered: eve's HTTP channels (`sessionAccess`) are not on this path; the applications' own signing (S9) is
+simulated by the test with the same key format; AuthBoundry is a local instance, not a deployed one.
+
+## What remains after S8
+
+- **The FeltKit organizational client (S9)**: applications signing person assertions with their own keys (a JWKS by
+  `kid`) and delivering through `eve:deliver`.
+- **Key rotation and discovery**: connection keys are PEM public keys set by the operator; there is no JWKS fetch.
+- **Per-connection model policy**: one model binding serves every connection.
+- **A published AppBoundry** serving `agents@1`, `sessions@1`, `model@1`, `capabilities@1` and `connections@1`, so eve's CI can
   verify and run the artifact.
 - **A supported compile entry in eve.** The producer imports `dist/src/compiler/compile-agent.js`, which `eve` does not
   export.
