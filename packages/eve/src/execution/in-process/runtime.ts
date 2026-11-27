@@ -28,6 +28,11 @@ import { migrateSessionCheckpoint } from "#execution/session/checkpoint-migratio
 import { createTurnControl } from "#execution/session/turn-control.js";
 import type { SessionBoot } from "#execution/session/program.js";
 import { foldPublishedTail } from "#execution/publish-session-events.js";
+import { readDurableSession } from "#execution/durable-session-read.js";
+import type { DurableSessionState } from "#execution/durable-session-store.js";
+import type { DispatchedCalls, OpenTurn } from "#execution/session/turn.js";
+import { createRuntimeToolResultFromValue } from "#harness/action-result-helpers.js";
+import { storedProjection } from "#harness/session-machine/view.js";
 import { CHANNEL_CONTEXT_KEY_NAME } from "#context/key-names.js";
 import { isSubagentAdapterState } from "#subagents/adapter-state.js";
 import { decodeStoredSession, type StoredLaunch, type StoredSession } from "./session-store.js";
@@ -246,7 +251,11 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
                 kind: "turn",
                 step: stored.openTurn.step,
                 waiting,
-                dispatched: stored.openTurn.dispatched,
+                dispatched: withLostCalls(
+                  waiting,
+                  stored.openTurn.dispatched,
+                  checkpoint.sessionState,
+                ),
               },
       },
       inbox,
@@ -469,4 +478,35 @@ function parentOf(stored: StoredSession): string | undefined {
     | { readonly state?: unknown }
     | undefined;
   return isSubagentAdapterState(adapter?.state) ? adapter.state.parentSessionId : undefined;
+}
+
+function withLostCalls(
+  waiting: OpenTurn["waiting"],
+  dispatched: DispatchedCalls | undefined,
+  sessionState: DurableSessionState,
+): DispatchedCalls | undefined {
+  if (waiting?.on !== "calls" || waiting.dispatch) return dispatched;
+  const { calls } = storedProjection(readDurableSession(sessionState).state).view;
+  const results = dispatched?.results ?? [];
+  const lost = waiting.callIds
+    .filter((callId) => calls[callId]?.status === "running" && calls[callId].taskId === undefined)
+    .filter((callId) => !results.some((result) => result.callId === callId))
+    .map((callId) =>
+      createRuntimeToolResultFromValue({
+        callId,
+        isError: true,
+        output: {
+          code: "TOOL_OUTCOME_UNKNOWN",
+          message:
+            "eve restarted while this call ran, so its outcome is unknown. It was not run again; check its effects before you call it again.",
+          tool: { result: "unknown" },
+        },
+        toolName: calls[callId]?.capability.name ?? "unknown",
+      }),
+    );
+  if (lost.length === 0) return dispatched;
+  return {
+    pending: dispatched?.pending ?? { executing: [], refused: [], started: [] },
+    results: [...results, ...lost],
+  };
 }

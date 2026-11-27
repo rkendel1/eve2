@@ -13,7 +13,6 @@ import type {
 import type { WithSessionStateDelta } from "#execution/session/state-delta.js";
 import type { SessionInputQueue } from "#execution/session/input-queue.js";
 import { taskToolResult, type TaskToolCall } from "#execution/tasks/calls.js";
-import { createRuntimeToolResultFromValue } from "#harness/action-result-helpers.js";
 import { TASK_WAIT_TOOL_NAME } from "#protocol/task-tools.js";
 import { resolveTurnPrincipal } from "#execution/session/principal.js";
 import { isBetweenTurns, storedProjection } from "#harness/session-machine/view.js";
@@ -431,11 +430,7 @@ export class SessionExecution {
         ? await this.dispatchRuns(paused)
         : (recorded ?? { pending: NOTHING_PENDING, results: [] });
     await this.publishDispatched(dispatched.pending);
-    const results =
-      restored === undefined
-        ? dispatched.results
-        : [...dispatched.results, ...this.unknownOutcomes(paused.callIds, dispatched.results)];
-    const wait = new CallWait(this.input, paused.callIds, results);
+    const wait = new CallWait(this.input, paused.callIds, dispatched.results);
     await wait.answerTaskToolCalls(paused.taskToolCalls);
     return wait;
   }
@@ -455,29 +450,6 @@ export class SessionExecution {
     const recorded = { pending: dispatched.pending, results: dispatched.results };
     await this.checkpoint({ dispatched: recorded, waiting: { ...paused, dispatch: false } });
     return recorded;
-  }
-
-  private unknownOutcomes(
-    callIds: readonly string[],
-    results: readonly RuntimeActionResult[],
-  ): RuntimeActionResult[] {
-    const { calls } = storedProjection(this.input.cursor.sessionState.snapshot.session.state).view;
-    return callIds
-      .filter((callId) => calls[callId]?.status === "running" && calls[callId].taskId === undefined)
-      .filter((callId) => !results.some((result) => result.callId === callId))
-      .map((callId) =>
-        createRuntimeToolResultFromValue({
-          callId,
-          isError: true,
-          output: {
-            code: "TOOL_OUTCOME_UNKNOWN",
-            message:
-              "eve restarted while this call ran, so its outcome is unknown. It was not run again; check its effects before you call it again.",
-            tool: { result: "unknown" },
-          },
-          toolName: calls[callId]?.capability.name ?? "unknown",
-        }),
-      );
   }
 
   private async publishDispatched(pending: PendingDispatch): Promise<void> {
