@@ -119,7 +119,7 @@ Topic by topic:
 2. **`.app` packaging and manifest.** The format is verified. Eve is not packaged (S6), and the manifest cannot yet declare the interfaces Eve needs (S2-S4).
 3. **Wasm guest execution.** The production host is verified. The interfaces Eve needs are missing (S2-S4), and cold start is over the memory limit (S5).
 4. **Host interface.** Verified.
-5. **Checkpoints and stream restore.** Verified in eve (#39). Production host storage is verified as `sessions@1` (S2, in review): Eve's restart scenarios pass on it, on Node and Boa, with the store in a real `ArtifactHost`. Eve itself does not yet run in the production host (S3, S4, S7).
+5. **Checkpoints and stream restore.** Verified in eve (#39). Production host storage is verified as `sessions@1` (S2): Eve's restart scenarios pass on it, on Node and Boa, with the store in a real `ArtifactHost`. Production model access is `model@1` (S3, in review). Eve itself does not yet run in the production host (S4, S7).
 6. **Conversation identity and isolation.** Verified in eve, by application channel and conversation token. It must be preserved end to end in the connection contract (S8, S9).
 7. **Per-delivery authentication and authorization.**
    - eve carries `auth` on each delivery.
@@ -143,9 +143,9 @@ These need an owner's decision; each blocks the slice named.
 - **D2 (blocks S2): where Eve's store lives.** Decided in S2.
   - Taken: a host-owned, guest-private store behind a new `sessions@1` interface. Its operations are the `EveHostStore` strings.
   - The alternative is collections declared in the manifest through `db.*`. That is writable only from mutations and exposes session internals to app code, so it is not recommended.
-- **D3 (blocks S3): model access.**
-  - Proposed: `model@1`. The host resolves the organization's configured models; a Resolver binding holds the credential; the guest never sees a key.
-  - `docs/architecture/agent-execution-host-capabilities.md` already proposes `model@1`.
+- **D3 (blocks S3): model access.** Decided in S3.
+  - Taken: one provider-neutral generation contract (FeltKit's `ctx.model.generate` request and result) and one implementation of the provider protocols (AppPort Services `streamGeneration`), run by whoever owns the model: FeltKit for a standalone application, the AppBoundry host (`model@1`) for a guest. The guest never sees a key.
+  - Deferred: Resolver-held credentials for `model@1` (the binding reads the key from an environment variable today).
 - **D4 (blocks S8, S9): the connection contract for applications.**
   - Proposed: one generic contract, `agent-connections@1`, with operations `deliver`, `answer`, `result`, `stream`. The caller is the AppBoundry application principal, the application name is derived from it, and the person's identity is carried as a signed assertion per delivery.
   - The alternative is bespoke capabilities per app, the current Meetings pattern. They don't scale and duplicate the contract.
@@ -179,20 +179,56 @@ Each slice is one PR in its owning repository unless stated otherwise. "Blocks" 
   - per-application isolation of store contents;
   - the operations are refused unless declared.
 - **Tests:** `appboundry-host/test/sessions-interface.test.ts`, using a probe guest. Restart persistence is checked by reopening the store in a new host process.
-- **Verified (S2, in review):**
-  - `sessions@1` in `appboundry-host` (`src/sessions.ts`), available in actions only; documented in `docs/artifact-runtime.md`.
-  - Contract, isolation (two applications on one FeltDB) and failure tests (`test/sessions.test.ts`): conflict, invalid input, corrupt data as `DATA_LOSS`, uncommitted writes as `UNAVAILABLE`.
-  - SIGKILL restart tests in separate processes (`test/sessions-restart.test.ts`), including a kill mid-stream.
-  - eve's restart scenarios on the production capability, on Node and Boa (`experiments/eve-host-boa`, `EVE_STORE=appboundry`).
-  - It found an eve fix: the host's `idle()` and `dispose()` did not wait for store writes, so with a store whose writes take time, `idle()` resolved before a restored session's checkpoint was written.
-- **Not verified:** a remote FeltDB backend (a required test before S7, not an assumed result); durability past process death (power loss is the backend's promise); backup and retention of session contents (S10).
+- **S2 status (AppBoundry PR in review; eve fix merged in #41).**
+- **Implemented and verified:**
+  - `sessions@1` in `appboundry-host` (`src/sessions.ts`), actions only, in the host's own FeltDB state: `_appboundry_agent_sessions` and `_appboundry_agent_session_lines`. Documented in `docs/artifact-runtime.md`.
+  - Contract and failure tests (`test/sessions.test.ts`):
+    - ordering;
+    - `CONFLICT` for a repeated, out-of-order or concurrent append;
+    - invalid input;
+    - corrupt data as `DATA_LOSS`, never an empty restore;
+    - uncommitted writes as `UNAVAILABLE`;
+    - refusal when not declared or outside an action.
+  - Isolation: two applications on one FeltDB, guest-supplied scope ignored, and `db.*` refused on both collections.
+  - Process death (`test/sessions-restart.test.ts`): a SIGKILLed host, then a fresh host process reads every acknowledged line and record back in order, including after a kill mid-stream.
+  - eve through `EveHostStore` (`experiments/eve-host-boa`): 12/12 SIGKILL scenarios on Node and Boa, each on the file store and on `sessions@1` in a real `ArtifactHost`:
+    - history and conversation isolation;
+    - approvals run once;
+    - completed effects not repeated;
+    - interrupted effects reported as uncertain and not retried.
+  - eve's `idle()` and `dispose()` wait for store writes (#41). eve takes no FeltDB dependency.
+- **Implemented, not verified against a remote FeltDB:**
+  - the managed contract declares both collections, so the managed authority accepts them and managed backups include them (contract test only);
+  - running `sessions@1` against a `feltdb-server` (`managed-acceptance.test.ts` with `FELTDB_REPO`) is a required test before S7.
+- **Remaining limitations:**
+  - durability beyond process death (for example power loss) is whatever the configured FeltDB promises;
+  - the 10,000-session cap is enforced when sessions are read back with `sessions.readSessions`, not when they are written;
+  - no session deletion or retention.
+- **Later slices:**
+  - eve does not yet run in the production host (S3 model access, S4 lifecycle and timers, S7);
+  - backup, retention and operations of session state (S10).
 
-**S3: `model@1`, host-resolved models.** AppBoundry. Blocks.
+**S3: model access across standalone FeltKit and AppBoundry.** feltkit, appport-services, appboundry. Done (in review).
 
-- **Code areas:** `manifest.ts`; `host.ts` (`model.stream`, wire format from `experiments/eve-guest-spike/guest/wire.js`); a Resolver binding through the capability bindings file.
-- **Prerequisite:** decision D3.
-- **Acceptance:** a guest streams a model response; the credential never enters guest memory (as in the eve-host-boa credential probe); calls are recorded in the outbound ledger.
-- **Tests:** a scripted provider in unit tests; a real-provider test that skips without credentials.
+One contract, three ownership paths; none requires the others:
+
+| Pattern                | Configuration owner                                                                                                                        | Model execution                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| Standalone FeltKit app | the application's deployment (`feltkit model set`, Studio → Models, or a Resolver reference)                                               | FeltKit's runtime (`ctx.model.generate` in an action) |
+| AppBoundry app         | the AppBoundry deployment (`--model <model.json>`: provider, model, endpoint, credential by environment variable, allowed inference hosts) | the host (`model@1`)                                  |
+| Organizational Eve     | the organization's deployment (the same host binding, through `EveHostModels.resolve`)                                                     | the host that runs Eve                                |
+
+- **Implemented and verified:**
+  - `streamGeneration` in `@appport/services` 0.23.0 (moved from FeltKit; `tests/generation.test.ts`, 8 cases): OpenAI, OpenAI-compatible and Anthropic streaming, tool calls as data, cancellation, timeout, errors without the credential.
+  - FeltKit uses it unchanged for standalone apps (its generation and decision suites pass). In an artifact, `ctx.model` maps to `model@1` and the build declares it; the artifact carries no provider, model or credential (`test/model-appboundry.test.ts`). The client-bundle secret scan now refuses model API keys.
+  - `model@1` in `appboundry-host` (`src/model.ts`, `test/model.test.ts`, 11 cases): host-bound model and credential, guest cannot override them, an endpoint outside `allowedHosts` refused at startup, records without content or credential in `_appboundry_model_calls` (unreachable by `db.*`, in the managed contract), provider failures reported to the guest by problem only.
+  - eve through `model@1` (`experiments/eve-host-boa/test/model.test.mjs`): real eve turns on Node and in Boa, with a tool call round-tripping, against a scripted OpenAI-compatible provider. eve core is unchanged; the AI SDK translation is in the host-side adapter.
+- **Not verified:** any real provider (no credentials in CI; the real-provider FeltKit test skips without a key); a remote FeltDB for the call records; Resolver-held credentials for `model@1`.
+- **Gaps (not claimed):**
+  - no data-classification check before model context is assembled: neither FeltKit nor AppBoundry nor eve has a classification mechanism, so what an action or Eve sends to the model is the application's choice;
+  - `allowedHosts` is a destination allowlist chosen by the deployment, not a residency guarantee about the provider's own processing;
+  - in an artifact, `ctx.model.generate` does not stream deltas (the guest ABI answers once), and FeltKit's agent tasks (`ctx.agent`), which standalone generations are recorded on, are not available;
+  - one model per AppBoundry host; per-application or per-connection model policy for Organizational Eve is S8/S9.
 
 **S4: agent guest lifecycle, timers and capability fetch.** AppBoundry. Blocks.
 
@@ -256,19 +292,19 @@ Each slice is one PR in its owning repository unless stated otherwise. "Blocks" 
 
 ## 5. Status
 
-| Slice                                        | Repository                     | Status           | PR  |
-| -------------------------------------------- | ------------------------------ | ---------------- | --- |
-| S1 Durable host sessions                     | eve2                           | Done             | #39 |
-| S2 `sessions@1`                              | appboundry                     | Done (in review) |     |
-| S3 `model@1`                                 | appboundry                     | Not started (D3) |     |
-| S4 Agent lifecycle, timers, capability fetch | appboundry                     | Not started (D1) |     |
-| S5 Cold start                                | appboundry / eve2              | Not started (D6) |     |
-| S6 `.app` producer                           | eve2 or appboundry             | Not started      |     |
-| S7 Eve `.app` on `appboundry-host`           | appboundry                     | Not started      |     |
-| S8 Application connections, `actingAs`       | appboundry                     | Not started (D4) |     |
-| S9 FeltKit organizational client             | feltkit                        | Not started      |     |
-| S10 Operations                               | appboundry, feltkit            | Not started      |     |
-| S11 Real applications                        | meetings, feltkit-eve, feltkit | Not started      |     |
+| Slice                                        | Repository                            | Status           | PR      |
+| -------------------------------------------- | ------------------------------------- | ---------------- | ------- |
+| S1 Durable host sessions                     | eve2                                  | Done             | #39     |
+| S2 `sessions@1`                              | appboundry                            | Done (in review) | eve #41 |
+| S3 Model access (`model@1`)                  | appport-services, feltkit, appboundry | Done (in review) |         |
+| S4 Agent lifecycle, timers, capability fetch | appboundry                            | Not started (D1) |         |
+| S5 Cold start                                | appboundry / eve2                     | Not started (D6) |         |
+| S6 `.app` producer                           | eve2 or appboundry                    | Not started      |         |
+| S7 Eve `.app` on `appboundry-host`           | appboundry                            | Not started      |         |
+| S8 Application connections, `actingAs`       | appboundry                            | Not started (D4) |         |
+| S9 FeltKit organizational client             | feltkit                               | Not started      |         |
+| S10 Operations                               | appboundry, feltkit                   | Not started      |         |
+| S11 Real applications                        | meetings, feltkit-eve, feltkit        | Not started      |         |
 
 ## 6. Final acceptance scenario
 
