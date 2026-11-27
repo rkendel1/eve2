@@ -1,8 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { textStreamResult, toolCallsStreamResult } from "#internal/testing/approval-resume.js";
+import {
+  textStreamResult,
+  toolCallStreamResult,
+  toolCallsStreamResult,
+} from "#internal/testing/approval-resume.js";
+import {
+  waitingForCleanupBody,
+  waitingForCleanupWorkflow,
+} from "#internal/testing/workflow-tool-fixtures.js";
 import type { SessionStreamEvent } from "#protocol/session-event.js";
-import { inProcessDurableHost, type HostUnderTest } from "./host-under-test.js";
+import {
+  inProcessDurableHost,
+  type CrashPoint,
+  type HostUnderTest,
+  type StoreWrite,
+} from "./host-under-test.js";
 import { alice, ofType, probe, recorded, violations } from "./probe.js";
 
 vi.setConfig({ testTimeout: 60_000 });
@@ -61,6 +74,7 @@ async function withParent(
   name: string,
   current: Scenario,
   body: (host: HostUnderTest, parentId: string) => Promise<void>,
+  arm?: (host: HostUnderTest) => void,
 ): Promise<void> {
   const agent = await probe({
     name,
@@ -90,6 +104,7 @@ async function withParent(
   await agent.test.run(async () => {
     const host = await inProcessDurableHost.make();
     try {
+      arm?.(host);
       const sent = await alice(host.runtime, `${name}:alice`).send("Ask the helpers.", {
         auth: null,
       });
@@ -137,13 +152,19 @@ async function children(host: HostUnderTest, parentId: string): Promise<string[]
 async function expectNoDuplicateWork(host: HostUnderTest, parentId: string, current: Scenario) {
   const events = await recorded(host.runtime, parentId);
   expect(ofType(events, "turn.started")).toHaveLength(1);
-  expect(ofType(events, "task.started")).toHaveLength(current.helpers.length);
-  for (const { callId } of current.helpers) {
-    expect(ofType(events, "call.requested").filter((e) => e.data.callId === callId)).toHaveLength(
-      1,
-    );
-    expect(ofType(events, "call.started").filter((e) => e.data.callId === callId)).toHaveLength(1);
-    expect(ofType(events, "call.settled").filter((e) => e.data.callId === callId)).toHaveLength(1);
+  const count = (type: "call.requested" | "call.started" | "call.settled", callId: string) =>
+    ofType(events, type).filter((e) => e.data.callId === callId).length;
+  for (const requested of ofType(events, "call.requested")) {
+    const { callId } = requested.data;
+    expect(count("call.requested", callId)).toBe(1);
+    expect(count("call.started", callId)).toBeLessThanOrEqual(1);
+    expect(count("call.settled", callId)).toBe(1);
+  }
+  const started = ofType(events, "task.started");
+  expect(started).toHaveLength(current.helpers.length);
+  const settledOutputs = ofType(events, "call.settled").map((e) => JSON.stringify(e.data));
+  for (const h of current.helpers) {
+    expect(settledOutputs.filter((data) => data.includes(h.answer)).length).toBeLessThanOrEqual(1);
   }
   const kids = await children(host, parentId);
   expect(kids).toHaveLength(current.helpers.length);
@@ -341,36 +362,225 @@ describe("an interrupted parent turn on the in-process host with a durable store
     });
   });
 
-  it("refuses to restore a parent whose stored continuation is unreadable, and runs none of its work", async () => {
+  it("refuses a parent whose stored continuation is unreadable, and leaves its child stored and unrun", async () => {
     const current = scenario();
     const [child] = current.helpers;
     child!.reply = HANG;
     current.holdWorking = 1;
     await withParent("parent-corrupt-continuation", current, async (host, parentId) => {
       await parentStep(current, "working");
+      const [kid] = await children(host, parentId);
       const calls = current.parentCalls.length;
-      const restoration = await host.restart!({
-        beforeStart: async () =>
-          host.rewriteSession!(parentId, (session) => ({
-            ...session,
-            openTurn: {
-              ...session.openTurn,
-              step: { runtimeResults: { results: "lost" } } as never,
+      const rewrite = async () =>
+        host.rewriteSession!(parentId, (session) => ({
+          ...session,
+          openTurn: { ...session.openTurn, step: { runtimeResults: { results: "lost" } } as never },
+        }));
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const restoration = await host.restart!({
+          beforeStart: attempt === 0 ? rewrite : undefined,
+        });
+        expect(restoration?.restored).toEqual([]);
+        expect(restoration?.refused).toEqual(
+          expect.arrayContaining([
+            {
+              reason: expect.stringContaining("its stored continuation is not one eve can read"),
+              sessionId: parentId,
             },
-          })),
-      });
-      expect(restoration).toMatchObject({
-        refused: [
-          {
-            reason: expect.stringContaining("its stored continuation is not one eve can read"),
-            sessionId: parentId,
-          },
-        ],
-      });
-      expect(restoration?.restored).not.toContain(parentId);
-      await vi.waitFor(() => expect(child!.calls).toHaveLength(2));
+            {
+              reason: expect.stringContaining(
+                `its parent session ${parentId} could not be restored`,
+              ),
+              sessionId: kid,
+            },
+          ]),
+        );
+        await host.settled();
+      }
       expect(current.parentCalls).toHaveLength(calls);
-      expect(await children(host, parentId)).toHaveLength(1);
+      expect(child!.calls).toHaveLength(1);
+      expect(await children(host, parentId)).toEqual([kid]);
+    });
+  });
+});
+
+type StoredRecord = Record<string, unknown> & {
+  readonly openTurn?: {
+    readonly waiting?: { readonly on?: string; readonly dispatch?: boolean };
+    readonly dispatched?: unknown;
+  };
+  readonly launches?: readonly { readonly child?: string }[];
+  readonly checkpoint?: unknown;
+};
+
+const parentRecord =
+  (match: (record: StoredRecord) => boolean) =>
+  (write: StoreWrite): boolean =>
+    write.kind === "session" && !write.child && match(write.record as StoredRecord);
+
+const childRecord =
+  (match: (record: StoredRecord) => boolean) =>
+  (write: StoreWrite): boolean =>
+    write.kind === "session" && write.child && match(write.record as StoredRecord);
+
+const factLine =
+  (child: boolean, type: string) =>
+  (write: StoreWrite): boolean =>
+    write.kind === "line" &&
+    write.child === child &&
+    Array.isArray(write.line.facts) &&
+    (write.line.facts as { type?: unknown }[]).some((fact) => fact.type === type);
+
+const intent = (record: StoredRecord) =>
+  record.openTurn?.waiting?.on === "calls" && record.openTurn.waiting.dispatch === true;
+
+interface Boundary {
+  readonly name: string;
+  readonly point: CrashPoint;
+  readonly crashes?: number;
+  readonly helpers?: () => Helper[];
+}
+
+const BOUNDARIES: readonly Boundary[] = [
+  {
+    name: "before the dispatch intent is durable",
+    point: { at: parentRecord(intent), landed: false },
+  },
+  {
+    name: "after the dispatch intent, before any child exists",
+    point: { at: parentRecord(intent), landed: true },
+    crashes: 2,
+  },
+  {
+    name: "after the dispatch results and launches are durable, before the run starts",
+    point: {
+      at: parentRecord((record) => record.openTurn?.dispatched !== undefined),
+      landed: true,
+    },
+  },
+  {
+    name: "after the child exists, before the parent acknowledges it",
+    point: { at: childRecord((record) => record.checkpoint !== undefined), landed: true },
+  },
+  {
+    name: "after the child admitted its delivery, before the acknowledgement lands",
+    point: {
+      at: parentRecord((record) => record.launches?.some((launch) => launch.child) === true),
+      landed: false,
+    },
+  },
+  {
+    name: "after the child was told, before the parent records child.sent",
+    point: { at: factLine(false, "child.sent"), landed: false },
+  },
+  {
+    name: "while the child's model call runs",
+    point: { at: factLine(true, "model.requested"), landed: true },
+    crashes: 2,
+  },
+  {
+    name: "after the child completed, before the parent settles the call",
+    point: { at: factLine(false, "call.settled"), landed: false },
+    crashes: 2,
+  },
+  {
+    name: "after the parent settled the call, before its continuation is durable",
+    point: { at: factLine(false, "call.settled"), landed: true },
+  },
+  {
+    name: "between starting two children",
+    point: { at: childRecord((record) => record.checkpoint !== undefined), landed: true },
+    helpers: () => [bob(), carol()],
+  },
+];
+
+describe("process death at each durable boundary of a parent's child dispatch", () => {
+  for (const boundary of BOUNDARIES) {
+    it(`recovers exactly once when the process dies ${boundary.name}`, async () => {
+      const current = scenario(...(boundary.helpers?.() ?? []));
+      let crashed: Promise<void> | undefined;
+      await withParent(
+        `crash-${boundary.name.replace(/[^a-z]+/g, "-")}`,
+        current,
+        async (host, parentId) => {
+          for (let crash = 1; crash <= (boundary.crashes ?? 1); crash++) {
+            await crashed;
+            crashed = crash < (boundary.crashes ?? 1) ? host.crashAt!(boundary.point) : undefined;
+            await host.restart!();
+          }
+          await expectCompleted(host, parentId, current);
+          for (const h of current.helpers) expect(current.parentCalls.at(-1)).toContain(h.answer);
+          let abandoned = 0;
+          const kids = await children(host, parentId);
+          for (const kid of kids) {
+            const events = await recorded(host.runtime, kid);
+            expect(ofType(events, "turn.settled")).toMatchObject([
+              { data: { outcome: "completed" } },
+            ]);
+            expect(
+              ofType(events, "content.completed").filter((e) => e.data.phase === "reply"),
+            ).toHaveLength(1);
+            abandoned += ofType(events, "model.settled").filter(
+              (e) => e.data.outcome === "abandoned",
+            ).length;
+          }
+          const childModelCalls = current.helpers.reduce((sum, h) => sum + h.calls.length, 0);
+          expect(childModelCalls).toBeGreaterThanOrEqual(kids.length);
+          expect(childModelCalls).toBeLessThanOrEqual(kids.length + abandoned);
+          const settled = current.parentCalls.length;
+          await host.restart!();
+          await host.settled();
+          expect(current.parentCalls).toHaveLength(settled);
+          await expectNoDuplicateWork(host, parentId, current);
+        },
+        (host) => {
+          crashed = host.crashAt!(boundary.point);
+        },
+      );
+    });
+  }
+});
+
+describe("a task whose authored run dies with the process", () => {
+  it("ends with an explicit unknown outcome, is not run again, and the turn finishes", async () => {
+    const agent = await probe({
+      name: "parent-lost-workflow-task",
+      respond: (prompt) => {
+        if (prompt.includes("outcome is unknown")) return textStreamResult(FINAL);
+        if (prompt.includes('"role":"tool"')) return textStreamResult(WORKING);
+        return toolCallStreamResult({
+          input: JSON.stringify({ service: "api" }),
+          toolCallId: "call-cleanup",
+          toolName: "cleanup",
+        });
+      },
+      tools: [{ name: "cleanup", task: true, workflow: waitingForCleanupWorkflow }],
+    });
+    await agent.test.run(async () => {
+      const host = await inProcessDurableHost.make({ workflows: [waitingForCleanupBody()] });
+      try {
+        const crashed = host.crashAt!({ at: factLine(false, "call.started"), landed: true });
+        const sent = await alice(host.runtime, "lost-task:alice").send("Clean up the api.", {
+          auth: null,
+        });
+        await crashed;
+        expect(await host.workflowRunsStarted()).toBeLessThanOrEqual(1);
+        const started = await host.workflowRunsStarted();
+        await host.restart!();
+        const events = await settledTurn(host, sent.sessionId);
+        expect(ofType(events, "turn.settled")).toMatchObject([{ data: { outcome: "completed" } }]);
+        expect(finalReply(events)).toBe(FINAL);
+        const settled = ofType(events, "call.settled").filter(
+          (e) => e.data.callId === "call-cleanup",
+        );
+        expect(settled).toHaveLength(1);
+        expect(settled[0]).toMatchObject({ data: { outcome: "failed" } });
+        expect(JSON.stringify(settled[0])).toContain("outcome is unknown");
+        expect(await host.workflowRunsStarted()).toBe(started);
+        expect(await violations(host.runtime, sent.sessionId)).toEqual([]);
+      } finally {
+        await host.dispose();
+      }
     });
   });
 });

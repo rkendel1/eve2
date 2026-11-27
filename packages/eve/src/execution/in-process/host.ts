@@ -146,6 +146,9 @@ export function createInProcessHost(
     await deliverCommand(sessionCommandHookToken(sessionId), command);
 
   const runs = createInProcessRuns({
+    ...(persistence !== undefined && {
+      deferLaunch: (sessionId, launch, start) => persistence.deferLaunch(sessionId, launch, start),
+    }),
     dispatchSession,
     inboxes,
     runtimeFor,

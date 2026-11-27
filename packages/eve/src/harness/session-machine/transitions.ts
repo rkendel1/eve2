@@ -354,12 +354,18 @@ export interface PendingDispatch {
 
 export function startDispatchedCalls(view: SessionView, pending: PendingDispatch): Transition {
   const introducedTasks = new Set(Object.keys(view.projection.view.tasks));
+  const requested = ({ callId }: { readonly callId: string }) =>
+    (view.projection.view.calls[callId]?.status ?? "requested") === "requested";
   return unchanged(view, [
-    ...pending.executing.map(({ callId, clearedBy }) => callStarted(callId, { clearedBy })),
-    ...pending.started.flatMap((task) => startTask(view, task, introducedTasks).events),
-    ...pending.refused.map(({ policy, result }) =>
-      callSettledFrom(result, { cause: { policy }, rejected: true }),
-    ),
+    ...pending.executing
+      .filter(requested)
+      .map(({ callId, clearedBy }) => callStarted(callId, { clearedBy })),
+    ...pending.started
+      .filter(requested)
+      .flatMap((task) => startTask(view, task, introducedTasks).events),
+    ...pending.refused
+      .filter(({ result }) => requested(result))
+      .map(({ policy, result }) => callSettledFrom(result, { cause: { policy }, rejected: true })),
   ]);
 }
 

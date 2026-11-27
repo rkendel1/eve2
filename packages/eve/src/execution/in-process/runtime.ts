@@ -27,14 +27,23 @@ import { createSessionInbox } from "#execution/session-inbox/inbox.js";
 import { migrateSessionCheckpoint } from "#execution/session/checkpoint-migrations.js";
 import { createTurnControl } from "#execution/session/turn-control.js";
 import type { SessionBoot } from "#execution/session/program.js";
-import { decodeStoredSession, type StoredSession } from "./session-store.js";
+import { foldPublishedTail } from "#execution/publish-session-events.js";
+import { readDurableSession } from "#execution/durable-session-read.js";
+import type { DurableSessionState } from "#execution/durable-session-store.js";
+import type { DispatchedCalls, OpenTurn } from "#execution/session/turn.js";
+import { createRuntimeToolResultFromValue } from "#harness/action-result-helpers.js";
+import { storedProjection } from "#harness/session-machine/view.js";
+import { CHANNEL_CONTEXT_KEY_NAME } from "#context/key-names.js";
+import { isSubagentAdapterState } from "#subagents/adapter-state.js";
+import { decodeStoredSession, type StoredLaunch, type StoredSession } from "./session-store.js";
 import {
   adoptAgentTasks,
-  linkFromChild,
+  recoverAgentTasks,
   settledByFacts,
-  openAgentTasks,
+  type AgentTaskRecovery,
   type OpenAgentTask,
   type ReattachHost,
+  type StoredChild,
 } from "./reattach.js";
 
 type SessionOwner = string | null | { readonly root: string };
@@ -140,20 +149,45 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       return { claimedContinuation: false, sessionId: holder };
     }
     if (owner !== undefined) {
-      await host.persistence?.track({
-        capabilities: boot.session.capabilities,
-        continuationToken:
-          (boot.session.serializedContext["eve.continuationToken"] as string) || "",
-        ownerKey: owner,
-        retention: boot.session.retention,
-        sessionId,
-        sessionTimeoutMs: boot.session.sessionTimeoutMs,
-      });
+      const { start } = boot.session;
+      await host.persistence?.track(
+        {
+          capabilities: boot.session.capabilities,
+          continuationToken:
+            (boot.session.serializedContext["eve.continuationToken"] as string) || "",
+          ownerKey: owner,
+          retention: boot.session.retention,
+          sessionId,
+          sessionTimeoutMs: boot.session.sessionTimeoutMs,
+        },
+        {
+          openTurn: start.kind === "turn" ? { delivery: start.input } : undefined,
+          state: {
+            admittedDeliveryKeys: boot.session.admittedDeliveryKeys,
+            history: boot.session.history,
+            serializedContext: boot.session.serializedContext,
+            sessionState: boot.session.sessionState,
+          },
+        },
+      );
+      const adapter = boot.session.serializedContext[CHANNEL_CONTEXT_KEY_NAME] as
+        | { readonly state?: unknown }
+        | undefined;
+      if (isSubagentAdapterState(adapter?.state)) {
+        await host.persistence?.acknowledgeChild(
+          adapter.state.parentSessionId,
+          adapter.state.callId,
+          sessionId,
+        );
+      }
     }
     run(sessionId, boot.session, boot.inbox);
     return { claimedContinuation: true, sessionId };
   };
-  const restoreEntry = async (stored: StoredSession): Promise<OpenAgentTask[]> => {
+  const restoreEntry = async (
+    stored: StoredSession,
+    children: readonly StoredChild[],
+  ): Promise<AgentTaskRecovery> => {
     const migration = migrateSessionCheckpoint(stored.checkpoint);
     if (migration.kind !== "current") {
       throw new Error(
@@ -165,16 +199,21 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
     const { sessionId } = stored;
     const encoder = new TextEncoder();
     const storedLines = await host.store!.readLines(sessionId);
-    const tasks = openAgentTasks({
+    const waiting = stored.openTurn?.waiting;
+    const recovery = recoverAgentTasks({
+      children,
+      launches: stored.launches ?? [],
       lines: storedLines,
       sessionId,
       sessionState: migration.checkpoint.sessionState,
+      undispatched: new Set(waiting?.on === "calls" && waiting.dispatch ? waiting.callIds : []),
     });
+    const settled = settledByFacts(migration.checkpoint.sessionState, storedLines);
     const checkpoint = {
       ...migration.checkpoint,
       sessionState: adoptAgentTasks(
-        settledByFacts(migration.checkpoint.sessionState, storedLines),
-        tasks,
+        waiting === undefined ? settled : foldPublishedTail(settled, storedLines),
+        [...recovery.reattach, ...recovery.unknown],
       ),
     };
     const restoredLines = storedLines.map((line) => encoder.encode(line));
@@ -211,12 +250,17 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
                 input: stored.openTurn.delivery,
                 kind: "turn",
                 step: stored.openTurn.step,
-                waiting: stored.openTurn.waiting,
+                waiting,
+                dispatched: withLostCalls(
+                  waiting,
+                  stored.openTurn.dispatched,
+                  checkpoint.sessionState,
+                ),
               },
       },
       inbox,
     );
-    return tasks;
+    return recovery;
   };
   const reattachHost: ReattachHost = {
     readEvents: async (sessionId) => readSessionEventStream(sessionId),
@@ -265,15 +309,62 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       const refused: { sessionId: string; reason: string }[] = [];
       if (host.store === undefined) return { refused, restored };
       const records = await host.store.readSessions();
+      const decoded = new Map<string, StoredSession>();
+      const refusals = new Map<string, string>();
+      for (const { record, sessionId } of records) {
+        try {
+          const stored = decodeStoredSession(record);
+          decoded.set(sessionId, stored);
+          const migration =
+            stored.checkpoint === undefined
+              ? undefined
+              : migrateSessionCheckpoint(stored.checkpoint);
+          if (migration !== undefined && migration.kind !== "current") {
+            throw new Error(
+              migration.kind === "pre-v27"
+                ? "its checkpoint predates this eve's host sessions"
+                : migration.detail,
+            );
+          }
+        } catch (error) {
+          refusals.set(sessionId, error instanceof Error ? error.message : String(error));
+        }
+      }
+      refuseDescendants(decoded, refusals);
+      const children = [...decoded.values()].flatMap((stored) =>
+        stored.checkpoint === undefined || refusals.has(stored.sessionId)
+          ? []
+          : [
+              {
+                serializedContext: stored.checkpoint.serializedContext,
+                sessionId: stored.sessionId,
+              },
+            ],
+      );
       const reattaching: OpenAgentTask[] = [];
+      const relaunching: StoredLaunch[] = [];
+      const unknown: OpenAgentTask[] = [];
       const restoreRecords = async (pick: (stored: StoredSession) => boolean) => {
-        for (const { sessionId, record } of records) {
-          if (restored.includes(sessionId)) continue;
+        for (const { sessionId } of records) {
+          if (
+            restored.includes(sessionId) ||
+            refused.some((entry) => entry.sessionId === sessionId)
+          )
+            continue;
+          const stored = decoded.get(sessionId);
+          const refusal = refusals.get(sessionId);
+          if (stored !== undefined && !pick(stored)) continue;
+          if (refusal !== undefined) {
+            refused.push({ reason: refusal, sessionId });
+            continue;
+          }
+          if (stored === undefined || stored.ended === true || stored.checkpoint === undefined)
+            continue;
           try {
-            const stored = decodeStoredSession(record);
-            if (!pick(stored)) continue;
-            if (stored.ended === true || stored.checkpoint === undefined) continue;
-            reattaching.push(...(await host.working(() => restoreEntry(stored))));
+            const recovery = await host.working(() => restoreEntry(stored, children));
+            reattaching.push(...recovery.reattach);
+            relaunching.push(...recovery.relaunch);
+            unknown.push(...recovery.unknown);
             restored.push(sessionId);
           } catch (error) {
             refused.push({
@@ -292,24 +383,9 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
           return owner !== null && typeof owner === "object" && restored.includes(owner.root);
         });
       }
-      const children = records.flatMap(({ record, sessionId }) => {
-        try {
-          const stored = decodeStoredSession(record);
-          return stored.checkpoint === undefined
-            ? []
-            : [{ serializedContext: stored.checkpoint.serializedContext, sessionId }];
-        } catch {
-          return [];
-        }
-      });
-      for (const task of reattaching) {
-        const child =
-          task.child ??
-          children
-            .map((candidate) => linkFromChild(task, candidate))
-            .find((link) => link !== undefined);
-        host.runs.reattach({ ...task, child }, reattachHost);
-      }
+      for (const task of reattaching) host.runs.reattach(task, reattachHost);
+      for (const launch of relaunching) host.runs.relaunch(launch);
+      for (const task of unknown) host.runs.endUnknown(task);
       return { refused, restored };
     },
 
@@ -367,5 +443,70 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       host.runs.registerWorkflow(workflowId, workflowBody),
 
     dispose: () => host.dispose(),
+  };
+}
+
+function refuseDescendants(
+  decoded: ReadonlyMap<string, StoredSession>,
+  refusals: Map<string, string>,
+): void {
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const [sessionId, stored] of decoded) {
+      if (refusals.has(sessionId)) continue;
+      const blocked = [parentOf(stored), rootOf(stored)].find(
+        (owner) => owner !== undefined && refusals.has(owner),
+      );
+      if (blocked === undefined) continue;
+      refusals.set(
+        sessionId,
+        `its parent session ${blocked} could not be restored, so eve left this session stored and did not run it: ${refusals.get(blocked)}`,
+      );
+      grew = true;
+    }
+  }
+}
+
+function rootOf(stored: StoredSession): string | undefined {
+  const owner = stored.ownerKey;
+  return owner !== null && typeof owner === "object" ? owner.root : undefined;
+}
+
+function parentOf(stored: StoredSession): string | undefined {
+  const adapter = stored.checkpoint?.serializedContext[CHANNEL_CONTEXT_KEY_NAME] as
+    | { readonly state?: unknown }
+    | undefined;
+  return isSubagentAdapterState(adapter?.state) ? adapter.state.parentSessionId : undefined;
+}
+
+function withLostCalls(
+  waiting: OpenTurn["waiting"],
+  dispatched: DispatchedCalls | undefined,
+  sessionState: DurableSessionState,
+): DispatchedCalls | undefined {
+  if (waiting?.on !== "calls" || waiting.dispatch) return dispatched;
+  const { calls } = storedProjection(readDurableSession(sessionState).state).view;
+  const results = dispatched?.results ?? [];
+  const lost = waiting.callIds
+    .filter((callId) => calls[callId]?.status === "running" && calls[callId].taskId === undefined)
+    .filter((callId) => !results.some((result) => result.callId === callId))
+    .map((callId) =>
+      createRuntimeToolResultFromValue({
+        callId,
+        isError: true,
+        output: {
+          code: "TOOL_OUTCOME_UNKNOWN",
+          message:
+            "eve restarted while this call ran, so its outcome is unknown. It was not run again; check its effects before you call it again.",
+          tool: { result: "unknown" },
+        },
+        toolName: calls[callId]?.capability.name ?? "unknown",
+      }),
+    );
+  if (lost.length === 0) return dispatched;
+  return {
+    pending: dispatched?.pending ?? { executing: [], refused: [], started: [] },
+    results: [...results, ...lost],
   };
 }

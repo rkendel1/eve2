@@ -5,6 +5,7 @@ import { controlDeliveryOf } from "#execution/session/control-delivery.js";
 import type { DeliverHookPayload, SessionCapabilities, TurnCaller } from "#channel/types.js";
 import type { SessionTransferState } from "#execution/session/checkpoint.js";
 import { publishDispatchedCallsStep } from "#execution/coordination-dispatch-step.js";
+import type { PendingDispatch } from "#execution/coordination-dispatch-shared.js";
 import type {
   CoordinationDispatchInput,
   CoordinationDispatchResult,
@@ -85,7 +86,15 @@ const NO_INPUT_CAPABILITY_ERROR_MESSAGE =
 export interface OpenTurn {
   readonly delivery?: DeliverHookPayload;
   readonly step?: TurnStepPayload;
-  readonly waiting?: Extract<TurnPause, { readonly on: "tasks" }>;
+  readonly waiting?: Extract<TurnPause, { readonly on: "tasks" | "calls" }>;
+  readonly dispatched?: DispatchedCalls;
+}
+
+const NOTHING_PENDING: PendingDispatch = { executing: [], refused: [], started: [] };
+
+export interface DispatchedCalls {
+  readonly results: readonly RuntimeActionResult[];
+  readonly pending: PendingDispatch;
 }
 
 export interface SessionCheckpointSink {
@@ -129,6 +138,7 @@ export class SessionExecution {
       readonly caller?: TurnCaller;
       readonly control?: TurnControl;
       readonly waiting?: OpenTurn["waiting"];
+      readonly dispatched?: DispatchedCalls;
     } = {},
   ): Promise<TurnOutcome> {
     const { cursor } = this.input;
@@ -143,7 +153,7 @@ export class SessionExecution {
       options.control,
     );
     try {
-      const outcome = await this.runTurnSteps(turn, delivery, options.waiting);
+      const outcome = await this.runTurnSteps(turn, delivery, options.waiting, options.dispatched);
       await this.handleBoundaryMessages(turn.takeBoundaryMessages(), outcome.kind === "done");
       if (outcome.kind === "park" && outcome.settled !== undefined) {
         await cancelWorkingTasks(this.input.cursor, "turn-ended");
@@ -191,12 +201,15 @@ export class SessionExecution {
     turn: ActiveTurn,
     delivery: TurnStepPayload | undefined,
     waiting: OpenTurn["waiting"],
+    dispatched: DispatchedCalls | undefined,
   ): Promise<TurnOutcome> {
     let nextStepInput: TurnStepPayload | undefined = delivery;
     let bindCaller = turn.caller;
     let heldByControl = false;
     if (waiting !== undefined) {
-      const resumed = await this.continueAfter(turn, waiting, this.input.queue.nextAdmission);
+      const resumed = await this.continueAfter(turn, waiting, this.input.queue.nextAdmission, {
+        dispatched,
+      });
       if (resumed === "cancelled") return await this.finishCancelledTurn(turn);
       nextStepInput = resumed;
     }
@@ -288,9 +301,13 @@ export class SessionExecution {
     turn: ActiveTurn,
     paused: TurnPause,
     heldSince: number,
+    restored?: { readonly dispatched?: DispatchedCalls },
   ): Promise<TurnStepPayload | undefined | "cancelled"> {
-    await this.checkpoint(paused.on === "tasks" ? { waiting: paused } : undefined);
-    const resumed = await this.resume(turn, paused, heldSince);
+    const dispatched = restored?.dispatched;
+    await this.checkpoint(
+      paused.on === "tasks" || paused.on === "calls" ? { dispatched, waiting: paused } : undefined,
+    );
+    const resumed = await this.resume(turn, paused, heldSince, restored);
     if (resumed !== "cancelled" && paused.on !== "interaction") {
       await this.checkpoint({ delivery: resumed?.delivery, step: resumed });
     }
@@ -340,6 +357,7 @@ export class SessionExecution {
     turn: ActiveTurn,
     paused: TurnPause,
     heldSince: number,
+    restored?: { readonly dispatched?: DispatchedCalls },
   ): Promise<TurnStepPayload | undefined | "cancelled"> {
     const earlierCaller = earlierRemoteCaller(this.input.cursor.serializedContext);
     if (paused.on === "interaction" && earlierCaller !== undefined) {
@@ -357,7 +375,7 @@ export class SessionExecution {
       paused.on === "interaction"
         ? { attemptIds: new Set(paused.attemptIds), requestIds: new Set(paused.requestIds) }
         : undefined;
-    const calls = paused.on === "calls" ? await this.startCallWait(paused) : undefined;
+    const calls = paused.on === "calls" ? await this.startCallWait(paused, restored) : undefined;
     let interrupted = false;
     while (true) {
       if (pendingInteraction !== undefined) {
@@ -404,16 +422,23 @@ export class SessionExecution {
 
   private async startCallWait(
     paused: Extract<TurnPause, { readonly on: "calls" }>,
+    restored: { readonly dispatched?: DispatchedCalls } | undefined,
   ): Promise<CallWait> {
-    const dispatched = paused.dispatch ? await this.dispatchRuns() : [];
-    const wait = new CallWait(this.input, paused.callIds, dispatched);
+    const recorded = restored?.dispatched;
+    const dispatched =
+      recorded === undefined && paused.dispatch
+        ? await this.dispatchRuns(paused)
+        : (recorded ?? { pending: NOTHING_PENDING, results: [] });
+    await this.publishDispatched(dispatched.pending);
+    const wait = new CallWait(this.input, paused.callIds, dispatched.results);
     await wait.answerTaskToolCalls(paused.taskToolCalls);
     return wait;
   }
 
-  private async dispatchRuns(): Promise<readonly RuntimeActionResult[]> {
-    const { cursor } = this.input;
-    const dispatched = await cursor.advance(({ serializedContext, sessionState }) =>
+  private async dispatchRuns(
+    paused: Extract<TurnPause, { readonly on: "calls" }>,
+  ): Promise<DispatchedCalls> {
+    const dispatched = await this.input.cursor.advance(({ serializedContext, sessionState }) =>
       this.input.host.dispatchRuns({
         serializedContext,
         sessionState,
@@ -422,13 +447,16 @@ export class SessionExecution {
         },
       }),
     );
-    const { executing, refused, started } = dispatched.pending;
+    const recorded = { pending: dispatched.pending, results: dispatched.results };
+    await this.checkpoint({ dispatched: recorded, waiting: { ...paused, dispatch: false } });
+    return recorded;
+  }
+
+  private async publishDispatched(pending: PendingDispatch): Promise<void> {
+    const { executing, refused, started } = pending;
     if (executing.length > 0 || started.length > 0 || refused.length > 0) {
-      await cursor.advance((state) =>
-        publishDispatchedCallsStep({ ...state, pending: dispatched.pending }),
-      );
+      await this.input.cursor.advance((state) => publishDispatchedCallsStep({ ...state, pending }));
     }
-    return dispatched.results;
   }
 
   async handleWorkflowMessage(

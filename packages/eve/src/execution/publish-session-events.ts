@@ -361,6 +361,29 @@ export function followInterruptedAttempt(
   });
 }
 
+export function foldPublishedTail(
+  state: DurableSessionState,
+  lines: readonly string[],
+): DurableSessionState {
+  const session = readDurableSession(state);
+  const projection = storedProjection(session.state);
+  const first = projection.view.position;
+  if (lines.length <= first) return state;
+  const tail = lines
+    .slice(first)
+    .map((line, index) => ({ line: JSON.parse(line) as StoredLine, position: first + index }));
+  return replaceDurableSessionSnapshot({
+    session: {
+      ...session,
+      state: {
+        ...session.state,
+        [SESSION_PROJECTION_STATE_KEY]: foldOrphanedLines(projection, tail),
+      },
+    },
+    state,
+  });
+}
+
 async function readLinesFrom(sessionId: string, first: number): Promise<OrphanedLine[]> {
   const tail = await readSessionStreamTailIndex(sessionId);
   if (tail + 1 < first) throw new Error("Session checkpoint is ahead of its stream.");

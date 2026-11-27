@@ -14,8 +14,10 @@ import {
   recordTaskRun,
   writeTaskTable,
   type TaskCall,
+  type TaskResult,
   type TaskRunAddress,
 } from "#execution/tasks/table.js";
+import type { JsonValue } from "#shared/json.js";
 import { taskRunHookToken } from "#execution/tools/workflow/start.js";
 import { CHANNEL_CONTEXT_KEY_NAME } from "#context/key-names.js";
 import { isSubagentAdapterState } from "#subagents/adapter-state.js";
@@ -30,6 +32,7 @@ import { toWorkflowOutput } from "#execution/tools/workflow/body.js";
 import { normalizeSerializableError } from "#execution/workflow-errors.js";
 import type { RunHook } from "#execution/run-host.js";
 import type { SessionStreamEvent } from "#protocol/session-event.js";
+import type { StoredLaunch } from "./session-store.js";
 
 export interface ChildLink {
   readonly sessionId: string;
@@ -51,32 +54,66 @@ export interface ReattachHost {
   cancelChildTurn(sessionId: string): Promise<void>;
 }
 
-export function openAgentTasks(input: {
+export interface StoredChild {
+  readonly sessionId: string;
+  readonly serializedContext: Record<string, unknown>;
+}
+
+export interface AgentTaskRecovery {
+  readonly reattach: readonly OpenAgentTask[];
+  readonly relaunch: readonly StoredLaunch[];
+  readonly unknown: readonly OpenAgentTask[];
+}
+
+export function recoverAgentTasks(input: {
   readonly sessionId: string;
   readonly sessionState: DurableSessionState;
   readonly lines: readonly string[];
-}): OpenAgentTask[] {
+  readonly children: readonly StoredChild[];
+  readonly launches: readonly StoredLaunch[];
+  readonly undispatched: ReadonlySet<string>;
+}): AgentTaskRecovery {
   const table = readTaskTable(readDurableSession(input.sessionState).state);
   const facts = recordedFacts(input.lines);
-  const open = table.tasks.flatMap((record) => {
-    if (record.kind !== "agent" || record.cancelled === true) return [];
-    if (facts.endedTasks.has(record.id)) return [];
+  const reattach: OpenAgentTask[] = [];
+  const relaunch: StoredLaunch[] = [];
+  const unknown: OpenAgentTask[] = [];
+  for (const record of table.tasks) {
+    if (record.cancelled === true || (record.kind !== "agent" && record.run === undefined))
+      continue;
+    if (facts.endedTasks.has(record.id)) continue;
     const calls = record.calls.filter((call) => !facts.settledCalls.has(call.callId));
-    return calls.length === 0 ? [] : [{ ...record, calls }];
-  });
-  if (open.length === 0) return [];
-  const links = facts.links;
-  return open.map((record) => ({
-    calls: record.calls,
-    child: record.calls
-      .map((call) => links.get(call.callId))
-      .filter((link) => link !== undefined)
-      .at(-1),
-    parentSessionId: input.sessionId,
-    run: { hookToken: taskRunHookToken(input.sessionId, record.id), runId: recoveryRunId() },
-    taskId: record.id,
-    toolName: record.name,
-  }));
+    if (calls.length === 0) continue;
+    if (calls.some((call) => input.undispatched.has(call.callId))) continue;
+    const task: OpenAgentTask = {
+      calls,
+      child: undefined,
+      parentSessionId: input.sessionId,
+      run: { hookToken: taskRunHookToken(input.sessionId, record.id), runId: recoveryRunId() },
+      taskId: record.id,
+      toolName: record.name,
+    };
+    if (record.kind !== "agent") {
+      unknown.push(task);
+      continue;
+    }
+    const child =
+      calls
+        .map((call) => facts.links.get(call.callId))
+        .filter((link) => link !== undefined)
+        .at(-1) ??
+      input.children
+        .map((stored) => linkFromChild(task, stored))
+        .find((link) => link !== undefined);
+    const launch = input.launches.find(
+      ({ runId, taskId }) => taskId === record.id && runId === record.run?.runId,
+    );
+    const evidenced =
+      launch?.child !== undefined || calls.some((call) => facts.childCalls.has(call.callId));
+    if (child === undefined && launch !== undefined && !evidenced) relaunch.push(launch);
+    else reattach.push({ ...task, child });
+  }
+  return { reattach, relaunch, unknown };
 }
 
 export function adoptAgentTasks(
@@ -93,10 +130,7 @@ export function adoptAgentTasks(
   });
 }
 
-export function linkFromChild(
-  task: OpenAgentTask,
-  child: { readonly sessionId: string; readonly serializedContext: Record<string, unknown> },
-): ChildLink | undefined {
+export function linkFromChild(task: OpenAgentTask, child: StoredChild): ChildLink | undefined {
   const adapter = child.serializedContext[CHANNEL_CONTEXT_KEY_NAME] as
     | { readonly state?: unknown }
     | undefined;
@@ -120,12 +154,13 @@ export function settledByFacts(
   const table = readTaskTable(session.state);
   let changed = false;
   const tasks = table.tasks.map((record) => {
+    const settled = record.calls.filter((call) => facts.settledCalls.has(call.callId));
     const calls = facts.endedTasks.has(record.id)
       ? []
       : record.calls.filter((call) => !facts.settledCalls.has(call.callId));
     if (calls.length === record.calls.length) return record;
     changed = true;
-    return { ...record, calls };
+    return { ...record, calls, results: [...record.results, ...resultsOf(settled, facts)] };
   });
   if (!changed) return sessionState;
   return replaceDurableSessionSnapshot({
@@ -134,16 +169,58 @@ export function settledByFacts(
   });
 }
 
-function recordedFacts(lines: readonly string[]) {
-  const settledCalls = new Set<string>();
-  const endedTasks = new Set<string>();
-  for (const fact of factsOf(lines)) {
-    const data = fact.data as { callId?: unknown; taskId?: unknown };
-    if (fact.type === "call.settled" && typeof data.callId === "string")
-      settledCalls.add(data.callId);
-    if (fact.type === "task.ended" && typeof data.taskId === "string") endedTasks.add(data.taskId);
+function resultsOf(
+  calls: readonly TaskCall[],
+  facts: ReturnType<typeof recordedFacts>,
+): TaskResult[] {
+  const results: TaskResult[] = [];
+  for (const call of calls) {
+    const fact = facts.settledCalls.get(call.callId)!;
+    const source = fact.outputOf === undefined ? fact : facts.settledCalls.get(fact.outputOf);
+    if (fact.outcome === "completed") {
+      results.push({ calls: [call], output: source?.output ?? null, status: "completed" });
+    } else if (fact.outcome === "failed") {
+      results.push({ calls: [call], error: fact.error ?? "The task failed.", status: "failed" });
+    }
   }
-  return { endedTasks, links: childLinks(lines), settledCalls };
+  return results;
+}
+
+interface SettledCall {
+  readonly outcome?: string;
+  readonly output?: JsonValue;
+  readonly outputOf?: string;
+  readonly error?: string;
+}
+
+function recordedFacts(lines: readonly string[]) {
+  const settledCalls = new Map<string, SettledCall>();
+  const endedTasks = new Set<string>();
+  const childCalls = new Set<string>();
+  for (const fact of factsOf(lines)) {
+    const data = fact.data as {
+      callId?: unknown;
+      taskId?: unknown;
+      owner?: { callId?: unknown };
+      outcome?: unknown;
+      output?: JsonValue;
+      outputOf?: { callId?: unknown };
+      error?: { message?: unknown };
+    };
+    if (fact.type === "call.settled" && typeof data.callId === "string") {
+      settledCalls.set(data.callId, {
+        error: typeof data.error?.message === "string" ? data.error.message : undefined,
+        outcome: typeof data.outcome === "string" ? data.outcome : undefined,
+        output: data.output,
+        outputOf: typeof data.outputOf?.callId === "string" ? data.outputOf.callId : undefined,
+      });
+    }
+    if (fact.type === "task.ended" && typeof data.taskId === "string") endedTasks.add(data.taskId);
+    if (fact.type === "child.opened" && typeof data.owner?.callId === "string")
+      childCalls.add(data.owner.callId);
+    if (fact.type === "child.sent" && typeof data.callId === "string") childCalls.add(data.callId);
+  }
+  return { childCalls, endedTasks, links: childLinks(lines), settledCalls };
 }
 
 function factsOf(lines: readonly string[]): { readonly type?: unknown; readonly data?: unknown }[] {
@@ -181,6 +258,25 @@ function childLinks(lines: readonly string[]): Map<string, ChildLink> {
     }
   }
   return links;
+}
+
+export async function endUnknownTask(task: OpenAgentTask): Promise<void> {
+  const send = (message: WorkflowToolRunMessage) =>
+    resumeRoutedHook(sessionInboxHookToken(sessionCommandHookToken(task.parentSessionId)), message);
+  const from = runRef(task);
+  await send({ from, kind: "started" });
+  await send({
+    from,
+    kind: "outcome",
+    result: {
+      error: normalizeSerializableError(
+        new Error(
+          `eve restarted while the ${task.toolName} task ran, so its outcome is unknown. eve did not run it again; check its effects before you call ${task.toolName} again.`,
+        ),
+      ),
+      status: "failed",
+    },
+  });
 }
 
 export async function reattachAgentTask(

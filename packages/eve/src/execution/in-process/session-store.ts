@@ -5,7 +5,10 @@ import {
   type SessionCheckpoint,
   type SessionTransferState,
 } from "#execution/session/checkpoint.js";
+import { readDurableSession } from "#execution/durable-session-read.js";
 import type { OpenTurn, SessionCheckpointSink } from "#execution/session/turn.js";
+import { findTask, readTaskTable } from "#execution/tasks/table.js";
+import type { WorkflowToolRunInput } from "#execution/tools/workflow/types.js";
 import type { AgentWorkflowRetentionDefinition } from "#shared/agent-definition.js";
 
 export interface DurableSessionStore {
@@ -27,7 +30,15 @@ export interface StoredSession {
   readonly sessionTimeoutMs: number | false;
   readonly checkpoint?: SessionCheckpoint;
   readonly openTurn?: OpenTurn;
+  readonly launches?: readonly StoredLaunch[];
   readonly ended?: true;
+}
+
+export interface StoredLaunch {
+  readonly runId: string;
+  readonly taskId: string;
+  readonly input: WorkflowToolRunInput;
+  readonly child?: string;
 }
 
 export type TrackedSession = Pick<
@@ -117,23 +128,16 @@ export function decodeStoredSession(record: string): StoredSession {
 }
 
 function assertContinuation(session: StoredSession): void {
-  const { step, waiting } = (session.openTurn ?? {}) as { step?: unknown; waiting?: unknown };
-  const results = isObject(step) ? step.runtimeResults : undefined;
+  const { dispatched, step, waiting } = (session.openTurn ?? {}) as Record<string, unknown>;
   const valid =
-    (waiting === undefined ||
-      (isObject(waiting) &&
-        waiting.on === "tasks" &&
-        Array.isArray(waiting.taskIds) &&
-        waiting.taskIds.every((id: unknown) => typeof id === "string"))) &&
-    (step === undefined || isObject(step)) &&
-    (results === undefined ||
-      (isObject(results) &&
-        Array.isArray(results.results) &&
-        results.results.every(
-          (result: unknown) =>
-            isObject(result) &&
-            typeof result.callId === "string" &&
-            typeof result.kind === "string",
+    (waiting === undefined || isWaiting(waiting)) &&
+    (step === undefined || (isObject(step) && isResults(step.runtimeResults, true))) &&
+    (dispatched === undefined ||
+      (isObject(dispatched) &&
+        isResults(dispatched, false) &&
+        isObject(dispatched.pending) &&
+        ["executing", "refused", "started"].every((key) =>
+          Array.isArray((dispatched.pending as Record<string, unknown>)[key]),
         )));
   if (!valid) {
     throw new Error(
@@ -142,43 +146,127 @@ function assertContinuation(session: StoredSession): void {
   }
 }
 
+function isWaiting(waiting: unknown): boolean {
+  if (!isObject(waiting) || !isStrings(waiting.on === "tasks" ? waiting.taskIds : waiting.callIds))
+    return false;
+  return (
+    waiting.on === "tasks" ||
+    (waiting.on === "calls" &&
+      typeof waiting.dispatch === "boolean" &&
+      Array.isArray(waiting.taskToolCalls))
+  );
+}
+
+function isResults(holder: unknown, optional: boolean): boolean {
+  if (holder === undefined) return optional;
+  const results = isObject(holder) ? holder.results : undefined;
+  return (
+    Array.isArray(results) &&
+    results.every(
+      (result: unknown) =>
+        isObject(result) && typeof result.callId === "string" && typeof result.kind === "string",
+    )
+  );
+}
+
+function isStrings(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function checkpointOf(session: StoredSession, state: SessionTransferState): SessionCheckpoint {
+  return {
+    admittedDeliveryKeys: state.admittedDeliveryKeys,
+    capabilities: session.capabilities,
+    history: state.history,
+    retention: session.retention,
+    serializedContext: state.serializedContext,
+    sessionState: state.sessionState,
+    sessionTimeoutMs: session.sessionTimeoutMs,
+    version: SESSION_CHECKPOINT_VERSION,
+  };
+}
+
 export interface SessionPersistence extends SessionCheckpointSink {
-  track(session: TrackedSession): Promise<void>;
+  track(
+    session: TrackedSession,
+    first?: { readonly state: SessionTransferState; readonly openTurn?: OpenTurn },
+  ): Promise<void>;
   ended(sessionId: string): Promise<void>;
+  deferLaunch(sessionId: string, launch: StoredLaunch, start: () => void): boolean;
+  acknowledgeChild(parentSessionId: string, callId: string, childSessionId: string): Promise<void>;
 }
 
 export function createSessionPersistence(store: DurableSessionStore): SessionPersistence {
   const tracked = new Map<string, StoredSession>();
+  const deferred = new Map<string, { launch: StoredLaunch; start: () => void }[]>();
+  const writes = new Map<string, Promise<void>>();
   const save = async (session: StoredSession) => {
     tracked.set(session.sessionId, session);
-    await store.saveSession(session.sessionId, encodeStoredSession(session));
+    const record = encodeStoredSession(session);
+    const written = (writes.get(session.sessionId) ?? Promise.resolve()).then(() =>
+      store.saveSession(session.sessionId, record),
+    );
+    writes.set(
+      session.sessionId,
+      written.catch(() => {}),
+    );
+    await written;
   };
   return {
-    async track(session) {
-      await save({
+    async track(session, first) {
+      const stored: StoredSession = {
         ...tracked.get(session.sessionId),
         ...session,
         version: STORED_SESSION_VERSION,
+      };
+      await save(
+        first === undefined
+          ? stored
+          : {
+              ...stored,
+              checkpoint: checkpointOf(stored, first.state),
+              ...(first.openTurn !== undefined && { openTurn: first.openTurn }),
+            },
+      );
+    },
+    deferLaunch(sessionId, launch, start) {
+      const session = tracked.get(sessionId);
+      if (session === undefined || session.ended === true) return false;
+      deferred.set(sessionId, [...(deferred.get(sessionId) ?? []), { launch, start }]);
+      return true;
+    },
+    async acknowledgeChild(parentSessionId, callId, childSessionId) {
+      const parent = tracked.get(parentSessionId);
+      const awaiting = (launch: StoredLaunch) =>
+        launch.input.callId === callId && launch.child === undefined;
+      if (parent?.launches?.some(awaiting) !== true) return;
+      await save({
+        ...parent,
+        launches: parent.launches.map((launch) =>
+          awaiting(launch) ? { ...launch, child: childSessionId } : launch,
+        ),
       });
     },
     async checkpoint(state: SessionTransferState, openTurn?: OpenTurn) {
       const session = tracked.get(state.sessionState.sessionId);
       if (session === undefined || session.ended === true) return;
-      const { openTurn: _previous, ...rest } = session;
+      const { openTurn: _previous, launches: previous, ...rest } = session;
+      const starting = deferred.get(session.sessionId) ?? [];
+      deferred.delete(session.sessionId);
+      const table = readTaskTable(readDurableSession(state.sessionState).state);
+      const launches = [...(previous ?? []), ...starting.map(({ launch }) => launch)].filter(
+        ({ runId, taskId }) => {
+          const task = findTask(table, taskId);
+          return task?.run?.runId === runId && task.calls.length > 0;
+        },
+      );
       await save({
         ...rest,
-        checkpoint: {
-          admittedDeliveryKeys: state.admittedDeliveryKeys,
-          capabilities: session.capabilities,
-          history: state.history,
-          retention: session.retention,
-          serializedContext: state.serializedContext,
-          sessionState: state.sessionState,
-          sessionTimeoutMs: session.sessionTimeoutMs,
-          version: SESSION_CHECKPOINT_VERSION,
-        },
+        checkpoint: checkpointOf(session, state),
         ...(openTurn !== undefined && { openTurn }),
+        ...(launches.length > 0 && { launches }),
       });
+      for (const { start } of starting) start();
     },
     async ended(sessionId) {
       const session = tracked.get(sessionId);

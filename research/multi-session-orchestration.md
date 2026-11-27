@@ -8,7 +8,7 @@ last_updated: "2026-11-27"
 
 Goal: eve owns what a child session means: its identity, ownership, authority, delivery, completion, cancellation and recovery. Each execution host carries out those semantics with its own mechanics. An organizational eve on AppBoundry must coordinate children without Workflow and without weakening S8's application isolation.
 
-This document covers the audit of eve2 main `067aba6` and AppBoundry main `6a0219a`, the contract, the authority rules, the chosen recovery design, and what is verified and what is not. **The slice is not complete.** Durable child recovery off Workflow and AppBoundry child execution are designed below, not yet implemented.
+This document covers the audit of eve2 main `067aba6` and AppBoundry main `6a0219a`, the contract, the authority rules, the recovery design, and what is verified and what is not. Durable child recovery and parent-turn recovery on the in-process host are implemented. AppBoundry child execution is designed below, not yet implemented.
 
 ## Audit: how child sessions work today
 
@@ -108,10 +108,107 @@ Process death and restart, `internal/testing/session-host/child-recovery.integra
 
 ### Not covered
 
-- **Resuming the parent's own interrupted turn** is a pre-existing gap of the in-process host. A turn that resumed after waiting on its calls is checkpointed without `openTurn` (`execution/session/turn.ts`, the `paused` branch), so it is not resumed after a restart. Marking it open naively makes the retried step dispatch the task again, so it needs its own fix. The tests here assert settlement and no duplicate work, not the parent turn's completion.
 - **Usage** a child spent before the restart is not re-counted by recovery.
 - **A child turn awaiting a person's input** after the restart is not relayed to the parent: recovery waits.
-- **Authored workflow-tool runs** remain D5.
+- **Authored workflow-tool runs** remain D5. After a restart they now end explicitly (see below) instead of silently.
+
+## EVE stage: durable parent turns and child dispatch (implemented)
+
+A restored parent continues an interrupted turn, and child work is dispatched at most once across process death. The parent's stored session record and its event lines are the only authorities; there is no new store.
+
+### Durable continuation (`openTurn`)
+
+| Field        | Written                                                   | Restore does                                                    |
+| ------------ | --------------------------------------------------------- | --------------------------------------------------------------- |
+| `delivery`   | before a turn's first step (existing)                     | retries that step                                               |
+| `waiting`    | before a wait on calls (the dispatch intent) or on tasks  | resumes the wait; a calls wait with `dispatch: true` dispatches |
+| `dispatched` | after dispatch planned the runs, before any run starts    | resumes the wait with the recorded results; dispatches nothing  |
+| `step`       | after the wait resolved, before the step that consumes it | runs that step with the recorded input; never re-derives it     |
+
+An unreadable continuation makes restore refuse the session, with a reason.
+
+### Dispatch protocol (in-process host)
+
+```
+parent step ──► A: waiting {calls, dispatch:true}            intent, nothing started
+            ──► dispatchRuns: plan runs, record run addresses, defer every task run
+            ──► D: waiting {dispatch:false} + dispatched {results, pending}
+                   + launches [{runId, taskId, input}]       one atomic record write
+            ──► start the deferred runs                       external execution begins here
+            ──► publish task.started / call.started
+child boot  ──► child record + first checkpoint              one atomic write
+            ──► parent launch acknowledged {child}            before the child runs
+            ──► child turn
+parent      ──► step: next step input                         then the step
+```
+
+- **No run starts before D lands.** If the D write fails, nothing was started.
+- **A child exists durably exactly when it can be restored.** Its record and first checkpoint are one write.
+- **Acknowledgement precedes the child's turn.** A launch without `child` therefore proves the child never ran.
+- **Publication is idempotent.** On a waiting restore, the facts the stream holds past the checkpoint are folded into the projection, and `call.started` is published only for calls still `requested`.
+- **Results survive checkpoint lag.** `settledByFacts` now rebuilds a task's result from its `call.settled` fact, so a reply applied after the last checkpoint still reaches the model.
+- **Launches end** when their task has no pending calls in a checkpoint.
+
+### Restore decision per open task
+
+| Durable evidence                                           | Outcome                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------- |
+| call still in an undispatched intent                       | the resumed turn dispatches it                          |
+| a child record linked by `child.sent` or its adapter state | re-attach (EVE stage above)                             |
+| a launch, no acknowledgement, no child facts, no record    | confirmed not delivered: relaunch from the stored input |
+| acknowledged or `child.opened`/`child.sent`, but no record | unknown: explicit failure, no new child                 |
+| a non-agent task with a run                                | unknown: explicit failure, not run again (D5)           |
+| a call running a non-task run when a wait is restored      | unknown: `TOOL_OUTCOME_UNKNOWN`, not run again          |
+
+A session whose record or checkpoint is unreadable is refused, and so is every session whose parent or root is refused. They stay stored and unrun, so a repaired parent restores them later.
+
+### A child's reply during a running step
+
+A reply that arrives while the parent's model step runs is applied at that step's boundary, with or without a restart. This was already true on `main` before turn recovery. The earlier test that expected settlement while the parent's model hung forever passed only because the restart dropped the parent's turn. It is replaced by a test that holds the parent's step across the restart, asserts nothing settles early, then releases it and asserts one settlement and a completed turn. A no-restart control test pins the same contract.
+
+### Verified (`internal/testing/session-host/`)
+
+`parent-turn-recovery.integration.test.ts` uses boundary-injected crashes: the test store fails at a chosen record or line write, before or after it lands, and refuses every later write from that process. Each case asserts:
+
+- the turn completes once, with the final reply;
+- every call is requested once and settled once;
+- one child per helper, and one delivery to each child;
+- every child model call is accounted for by its one durable reply or by an `abandoned` attempt;
+- after a further restart, nothing runs again.
+
+| Death point                                                       | Restarts |
+| ----------------------------------------------------------------- | -------- |
+| before the dispatch intent is durable                             | 1        |
+| after the intent, before any child exists                         | 2        |
+| after dispatch results and launches are durable, before the run   | 1        |
+| after the child exists, before the parent acknowledges it         | 1        |
+| after the child admitted its delivery, before the acknowledgement | 1        |
+| before the parent records `child.sent`                            | 1        |
+| while the child's model call runs                                 | 2        |
+| after the child completed, before the parent settles the call     | 2        |
+| after the parent settled the call, before its continuation        | 1        |
+| between starting two children                                     | 1        |
+
+The same file also covers:
+
+- death during the continuation step, and death while the child still runs;
+- a child that finished before recovery;
+- five restarts, the last two after completion;
+- two children, and one child failing while the other succeeds;
+- Alice cancelling after restore;
+- a corrupt continuation, refused with its child across two restores;
+- a lost workflow-tool task ending as unknown.
+
+`child-recovery.integration.test.ts` keeps its earlier cases and adds the boundary contract above.
+
+These are in-process crashes against an in-memory store, not OS kills.
+
+### Remaining limits
+
+- A child whose lines were written but whose record was not has no effects and is not restored; its lines remain.
+- `receive` calls (a follow-up to a running agent task) send commands during dispatch, before D. A restart there may resend them.
+- A restored wait re-answers task tool calls (`task_wait`, `task_cancel`).
+- A refused parent's children are reported only by an unscoped restore.
 
 ## AppBoundry handoff (separate PR, not implemented)
 
