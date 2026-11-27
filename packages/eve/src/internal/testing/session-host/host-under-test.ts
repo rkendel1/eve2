@@ -12,13 +12,15 @@ import type { StoredWait } from "#internal/testing/local-world-database.js";
 import { currentTestWorld } from "#internal/testing/workflow-test-world.js";
 import { cancelRun } from "#internal/workflow/runtime.js";
 import { createBundledRuntimeCompiledArtifactsSource } from "#runtime/compiled-artifacts-source.js";
+import type { DurableSessionStore } from "#execution/in-process/session-store.js";
 import type { WorkflowBody } from "#tools/workflow-body.js";
 
-export type HostName = "workflow" | "in-process";
+export type HostName = "workflow" | "in-process" | "in-process-durable";
 
 export interface HostCapabilities {
   readonly retries: boolean;
   readonly durable: boolean;
+  readonly durableTimers: boolean;
   readonly moves: boolean;
   readonly externalCancel: boolean;
   readonly stamps: boolean;
@@ -67,6 +69,7 @@ const IN_PROCESS_CALLBACK_BASE_URL = "http://session-host.in-process";
 const IN_PROCESS_CAPABILITIES: HostCapabilities = {
   externalCancel: false,
   durable: false,
+  durableTimers: false,
   moves: false,
   retries: true,
   stamps: false,
@@ -75,6 +78,7 @@ const IN_PROCESS_CAPABILITIES: HostCapabilities = {
 const WORKFLOW_CAPABILITIES: HostCapabilities = {
   externalCancel: true,
   durable: true,
+  durableTimers: true,
   moves: true,
   retries: true,
   stamps: true,
@@ -83,6 +87,16 @@ const WORKFLOW_CAPABILITIES: HostCapabilities = {
 export const inProcessHost: SessionHostKind = {
   capabilities: IN_PROCESS_CAPABILITIES,
   make: makeInProcessHost,
+};
+
+const IN_PROCESS_DURABLE_CAPABILITIES: HostCapabilities = {
+  ...IN_PROCESS_CAPABILITIES,
+  durable: true,
+};
+
+export const inProcessDurableHost: SessionHostKind = {
+  capabilities: IN_PROCESS_DURABLE_CAPABILITIES,
+  make: makeInProcessDurableHost,
 };
 
 export const workflowHost: SessionHostKind = {
@@ -115,6 +129,84 @@ async function makeInProcessHost(setup: HostSetup = {}): Promise<HostUnderTest> 
     failedWrites: () => failed.writes,
     workflowRunsStarted: async () => started,
     dispose: () => runtime.dispose(),
+  };
+}
+
+function memoryStore() {
+  const lines = new Map<string, string[]>();
+  const records = new Map<string, string>();
+  let generation = 0;
+  const open = (): DurableSessionStore => {
+    const mine = ++generation;
+    const alive = () => {
+      if (mine !== generation) throw new Error("This process is gone.");
+    };
+    return {
+      async appendLine(sessionId, index, line) {
+        alive();
+        const stream = lines.get(sessionId) ?? [];
+        if (index !== stream.length) throw new Error(`Line ${index} is not the next line.`);
+        lines.set(sessionId, [...stream, line]);
+      },
+      async readLines(sessionId) {
+        return [...(lines.get(sessionId) ?? [])];
+      },
+      async readSessions() {
+        return [...records].map(([sessionId, record]) => ({ record, sessionId }));
+      },
+      async saveSession(sessionId, record) {
+        alive();
+        records.set(sessionId, record);
+      },
+    };
+  };
+  return { die: () => void generation++, open };
+}
+
+async function makeInProcessDurableHost(setup: HostSetup = {}): Promise<HostUnderTest> {
+  const failed = { writes: 0 };
+  const store = memoryStore();
+  let started = 0;
+  const open = () => {
+    const opened = createTestInProcessRuntime(
+      { compiledArtifactsSource: createBundledRuntimeCompiledArtifactsSource() },
+      {
+        callbackBaseUrl: IN_PROCESS_CALLBACK_BASE_URL,
+        disposeGraceMs: 0,
+        store: store.open(),
+        ...(setup.faults !== undefined && { stepFaults: inProcessFaults(setup.faults, failed) }),
+      },
+    );
+    for (const { body, workflowId } of setup.workflows ?? []) {
+      opened.registerWorkflow(workflowId, (...args: never[]) => {
+        started += 1;
+        return (body as (...args: never[]) => unknown)(...args);
+      });
+    }
+    return opened;
+  };
+  let current = open();
+  const runtime = new Proxy({} as Runtime, {
+    get: (_, key) => {
+      const value = Reflect.get(current, key);
+      return typeof value === "function" ? value.bind(current) : value;
+    },
+  });
+  return {
+    name: "in-process-durable",
+    runtime,
+    capabilities: IN_PROCESS_DURABLE_CAPABILITIES,
+    settled: () => current.idle(),
+    failedWrites: () => failed.writes,
+    workflowRunsStarted: async () => started,
+    async restart(options) {
+      store.die();
+      await current.dispose().catch(() => {});
+      await options?.beforeStart?.();
+      current = open();
+      await current.restore();
+    },
+    dispose: () => current.dispose(),
   };
 }
 

@@ -24,6 +24,7 @@ export interface SignInCallbacks {
 }
 
 export type DeliveryAddress =
+  | { readonly callback: string }
   | { readonly hook: string }
   | { readonly session: string | SessionInboxAddress }
   | { readonly signIn: string };
@@ -121,6 +122,11 @@ export function signInDelivery(
 export async function resumeRoutedHook(token: string, payload: unknown): Promise<void> {
   if (!(await deliverToHostedHook(token, payload)))
     await durableHostFor(token).deliver({ hook: token }, payload);
+}
+
+export async function resumeRoutedCallback(token: string, payload: unknown): Promise<void> {
+  if (!(await deliverToHostedHook(token, payload)))
+    await durableHostFor(token).deliver({ callback: token }, payload);
 }
 
 export async function resumeRoutedSessionInbox(

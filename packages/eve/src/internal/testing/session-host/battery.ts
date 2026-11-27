@@ -416,7 +416,8 @@ export function describeSessionHost(name: string, kind: SessionHostKind): void {
                   "Alice asks you to acknowledge receipt.",
                   { auth: null },
                 );
-                expect(await runSpecVersion!(sent.sessionId)).toBe(Number(spec));
+                if (runSpecVersion !== undefined)
+                  expect(await runSpecVersion(sent.sessionId)).toBe(Number(spec));
                 await modelCallStarted;
                 await restart!();
                 const turn = await turnFrom(runtime, sent.sessionId);
@@ -447,27 +448,35 @@ export function describeSessionHost(name: string, kind: SessionHostKind): void {
         tools: [{ name: "nap", workflow: napWorkflow }],
       });
 
-      needs("durable", "arms a sleeping turn's lost timer again after a restart", async () => {
-        await withHost(napper(1_000), async ({ restart, runtime, storedWaits }) => {
-          const sent = await alice(runtime, `${name}:nap`).send("Alice asks you to nap.", {
-            auth: null,
+      needs(
+        "durableTimers",
+        "arms a sleeping turn's lost timer again after a restart",
+        async () => {
+          await withHost(napper(1_000), async ({ restart, runtime, storedWaits }) => {
+            const sent = await alice(runtime, `${name}:nap`).send("Alice asks you to nap.", {
+              auth: null,
+            });
+            const napOf = (waits: readonly StoredWait[]) =>
+              waits.find(
+                (wait) => Date.parse(wait.resumeAt!) - Date.parse(wait.createdAt) < 60_000,
+              );
+            await vi.waitFor(
+              async () => {
+                expect(napOf(await storedWaits!())).toBeDefined();
+              },
+              { interval: 20, timeout: 10_000 },
+            );
+            expect((await storedWaits!()).map((wait) => wait.status)).not.toContain("completed");
+            const resumeAt = Date.parse(napOf(await storedWaits!())!.resumeAt!);
+            await restart!();
+            const turn = await turnFrom(runtime, sent.sessionId);
+            expect(ofType(turn, "turn.settled")).toMatchObject([
+              { data: { outcome: "completed" } },
+            ]);
+            expect(Date.now()).toBeGreaterThanOrEqual(resumeAt);
           });
-          const napOf = (waits: readonly StoredWait[]) =>
-            waits.find((wait) => Date.parse(wait.resumeAt!) - Date.parse(wait.createdAt) < 60_000);
-          await vi.waitFor(
-            async () => {
-              expect(napOf(await storedWaits!())).toBeDefined();
-            },
-            { interval: 20, timeout: 10_000 },
-          );
-          expect((await storedWaits!()).map((wait) => wait.status)).not.toContain("completed");
-          const resumeAt = Date.parse(napOf(await storedWaits!())!.resumeAt!);
-          await restart!();
-          const turn = await turnFrom(runtime, sent.sessionId);
-          expect(ofType(turn, "turn.settled")).toMatchObject([{ data: { outcome: "completed" } }]);
-          expect(Date.now()).toBeGreaterThanOrEqual(resumeAt);
-        });
-      });
+        },
+      );
 
       needs(
         "stamps",

@@ -1,7 +1,6 @@
 import { isSignInCallbackToken } from "#execution/callback-hook-tokens.js";
-import { deliverToHostedHook } from "#execution/hosts.js";
+import { resumeRoutedCallback } from "#execution/hosts.js";
 import type { AuthorizationCallbackPayload } from "#execution/session-inbox/inbox.js";
-import { resumeRunnableHook } from "#execution/session-inbox/owner.js";
 
 import type { RouteContext } from "#public/definitions/channel.js";
 import { buildAuthorizationCompletePage } from "#runtime/connections/authorization-complete-page.js";
@@ -36,7 +35,7 @@ export async function handleConnectionCallbackRequest(
     payloads: [{ authorizationCallback: { attemptId, callback, connectionName: name } }],
   };
   try {
-    if (!(await deliverToHostedHook(token, payload))) await resumeRunnableHook(token, payload);
+    await resumeRoutedCallback(token, payload);
   } catch {
     return callbackNotPending();
   }

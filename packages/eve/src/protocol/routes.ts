@@ -135,5 +135,6 @@ export function createEveSessionStubsRoutePath(sessionId: string): string {
 }
 
 export const DEVELOPMENT_WORKFLOW_WORLD_ROUTE = `${EVE_ROUTE_PREFIX}/dev/internal/workflow-world`;
+export const EVE_WORKFLOW_FLOW_ROUTE_PATH = "/.well-known/workflow/v1/flow";
 
 export const DEVELOPMENT_WORKFLOW_STREAM_ROUTE = `${DEVELOPMENT_WORKFLOW_WORLD_ROUTE}/stream`;

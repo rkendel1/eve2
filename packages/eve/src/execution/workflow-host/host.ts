@@ -4,7 +4,7 @@ import type { DeliverHookPayload } from "#channel/types.js";
 import { installDurableHost, type DurableHost } from "#execution/hosts.js";
 import type { AuthorizationCallbackPayload } from "#execution/session-inbox/inbox.js";
 import type { SessionLineStore } from "#execution/session-line-store.js";
-import { resumeSignInCallback } from "#execution/session-inbox/owner.js";
+import { resumeRunnableHook, resumeSignInCallback } from "#execution/session-inbox/owner.js";
 import { resumeSessionInbox } from "#execution/session-inbox/resume.js";
 import { resolveWorkflowCallbackBaseUrl } from "#execution/workflow-callback-url.js";
 import { createWorkflowRuntime } from "#execution/workflow-runtime.js";
@@ -46,7 +46,8 @@ const workflowLineStore: SessionLineStore = {
 export const workflowHost: DurableHost = {
   name: "workflow",
   deliver: async (to, payload) => {
-    if ("hook" in to) await resumeHook(to.hook, payload);
+    if ("callback" in to) await resumeRunnableHook(to.callback, payload);
+    else if ("hook" in to) await resumeHook(to.hook, payload);
     else if ("session" in to) await resumeSessionInbox(to.session, payload as DeliverHookPayload);
     else await resumeSignInCallback(to.signIn, payload as AuthorizationCallbackPayload);
   },
