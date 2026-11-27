@@ -93,6 +93,13 @@ interface ChannelAddress<TState = undefined> {
 
 type ChannelAddressFn<TState = undefined> = (continuationToken: string) => ChannelAddress<TState>;
 
+export function namespacedContinuationToken(
+  channelName: string,
+  continuationToken: string,
+): string {
+  return `${channelName}:${continuationToken}`;
+}
+
 export function createChannelAddress<TState = undefined>(input: {
   readonly adapter: ChannelAdapter<any>;
   readonly channelName: string;
@@ -102,7 +109,7 @@ export function createChannelAddress<TState = undefined>(input: {
   readonly turnPolicy?: TurnPolicy;
 }): ChannelAddress<TState> {
   const metadata: Partial<ChannelDeliverySource> = input.metadata ?? {};
-  const namespacedToken = `${input.channelName}:${input.continuationToken}`;
+  const namespacedToken = namespacedContinuationToken(input.channelName, input.continuationToken);
   if (isReservedSessionCommandToken(namespacedToken)) {
     throw new Error(`Channel address "${namespacedToken}" uses eve's reserved session namespace.`);
   }

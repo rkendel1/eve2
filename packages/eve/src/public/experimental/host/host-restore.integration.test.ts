@@ -150,13 +150,21 @@ async function withAgent(body: () => Promise<void>) {
   await test.run(body);
 }
 
-function host(store: EveHostStore): EveHost {
+function host(store: EveHostStore, conversation?: string): EveHost {
   return createEveHost({
     agent: readBundledCompiledArtifacts()!,
     models: { resolve: () => model() },
     store,
+    ...(conversation !== undefined && {
+      restore: { connection: { application: "meetings", conversation } },
+    }),
   });
 }
+
+const snapshot = (backing: ReturnType<typeof durableStore>, sessionId: string) => ({
+  lines: [...(backing.lines.get(sessionId) ?? [])],
+  record: backing.sessions.get(sessionId),
+});
 
 async function gone(store: { kill(): void }, dead: EveHost) {
   store.kill();
@@ -314,6 +322,162 @@ describe("eve/experimental/host with a store: sessions survive the host", () => 
       ]);
       expect(backing.sessions.get(future.sessionId)).toBe(untouched);
       await after.dispose();
+    });
+  });
+});
+
+describe("eve/experimental/host with a restore scope: one conversation per host", () => {
+  it("restores only its conversation, and never resumes another conversation's interrupted turn", async () => {
+    await withAgent(async () => {
+      effects.transfers = 0;
+      transferBank = gate();
+      const backing = durableStore();
+      const first = backing.open();
+      const before = host(first);
+      const meeting = await (
+        await before
+          .connect({ application: "meetings", conversation: "weekly-sync" })
+          .send("Alice says one.", { auth: ALICE })
+      ).result();
+      await before
+        .connect({ application: "meetings", conversation: "transfers" })
+        .send("Bob asks you to start a transfer.", { auth: ALICE });
+      await until(() => effects.transfers === 1);
+      await gone(first, before);
+      const transferId = [...backing.sessions.keys()].find((id) => id !== meeting.sessionId)!;
+      const interrupted = snapshot(backing, transferId);
+
+      seen.length = 0;
+      const scoped = host(backing.open(), "weekly-sync");
+      expect(await scoped.restoration).toEqual({ refused: [], restored: [meeting.sessionId] });
+      const two = await (
+        await scoped
+          .connect({ application: "meetings", conversation: "weekly-sync" })
+          .send("Alice says two.", { auth: ALICE })
+      ).result();
+      expect(two.sessionId).toBe(meeting.sessionId);
+      expect(two.reply).toBe("Heard: Alice says one. | Alice says two.");
+      await scoped.idle();
+      expect(seen.flat().join("\n")).not.toContain("transfer");
+      expect(snapshot(backing, transferId)).toEqual(interrupted);
+      expect(effects.transfers).toBe(1);
+      await scoped.dispose();
+    });
+  });
+
+  it("restores the other conversation on its own host: its uncertain call stays uncertain and the first is untouched", async () => {
+    await withAgent(async () => {
+      effects.transfers = 0;
+      transferBank = gate();
+      const backing = durableStore();
+      const first = backing.open();
+      const before = host(first);
+      const meeting = await (
+        await before
+          .connect({ application: "meetings", conversation: "weekly-sync" })
+          .send("Alice says one.", { auth: ALICE })
+      ).result();
+      await before
+        .connect({ application: "meetings", conversation: "transfers" })
+        .send("Bob asks you to start a transfer.", { auth: ALICE });
+      await until(() => effects.transfers === 1);
+      await gone(first, before);
+      const kept = snapshot(backing, meeting.sessionId);
+
+      seen.length = 0;
+      const scoped = host(backing.open(), "transfers");
+      const restoration = await scoped.restoration;
+      expect(restoration.refused).toEqual([]);
+      expect(restoration.restored).toHaveLength(1);
+      expect(restoration.restored).not.toContain(meeting.sessionId);
+      await scoped.idle();
+      expect(effects.transfers).toBe(1);
+      expect(seen.flat().join("\n")).toContain(INTERRUPTED);
+      expect(seen.flat().join("\n")).not.toContain("Alice says one.");
+      expect(snapshot(backing, meeting.sessionId)).toEqual(kept);
+      transferBank.release();
+      await scoped.dispose();
+    });
+  });
+
+  it("keeps its conversation's pending approval and runs the approved call once", async () => {
+    await withAgent(async () => {
+      effects.refunds = 0;
+      const backing = durableStore();
+      const first = backing.open();
+      const before = host(first);
+      const asked = await (
+        await before
+          .connect({ application: "meetings", conversation: "refunds" })
+          .send("Alice asks for a refund.", { auth: ALICE })
+      ).result();
+      await before
+        .connect({ application: "meetings", conversation: "weekly-sync" })
+        .send("Bob says hello.", { auth: ALICE });
+      await before.idle();
+      await gone(first, before);
+
+      const scoped = host(backing.open(), "refunds");
+      expect((await scoped.restoration).restored).toEqual([asked.sessionId]);
+      const answered = await (
+        await scoped.connect({ application: "meetings", conversation: "refunds" }).deliver(
+          {
+            answers: [{ interactionId: asked.interactions[0]!.interactionId, optionId: "approve" }],
+          },
+          { auth: ALICE },
+        )
+      ).result();
+      expect(answered.status).toBe("completed");
+      expect(effects.refunds).toBe(1);
+      await scoped.dispose();
+    });
+  });
+
+  it("refuses another conversation, so it never starts a second session for one it did not restore", async () => {
+    await withAgent(async () => {
+      const scoped = host(durableStore().open(), "weekly-sync");
+      await scoped.restoration;
+      expect(() => scoped.connect({ application: "meetings", conversation: "transfers" })).toThrow(
+        'serves only meetings conversation "weekly-sync"',
+      );
+      expect(() =>
+        scoped.connect({ application: "incidents", conversation: "weekly-sync" }),
+      ).toThrow("cannot serve incidents");
+      await scoped.dispose();
+    });
+  });
+
+  it("refuses its conversation's unreadable checkpoint and leaves it as it was, ignoring others'", async () => {
+    await withAgent(async () => {
+      const backing = durableStore();
+      const first = backing.open();
+      const before = host(first);
+      const future = await (
+        await before
+          .connect({ application: "meetings", conversation: "future" })
+          .send("Alice says one.", { auth: ALICE })
+      ).result();
+      const other = await (
+        await before
+          .connect({ application: "meetings", conversation: "other-future" })
+          .send("Bob says one.", { auth: ALICE })
+      ).result();
+      await before.idle();
+      await gone(first, before);
+      for (const id of [future.sessionId, other.sessionId]) {
+        const record = JSON.parse(backing.sessions.get(id)!);
+        record.checkpoint.version = 99;
+        backing.sessions.set(id, JSON.stringify(record));
+      }
+      const untouched = snapshot(backing, future.sessionId);
+
+      const scoped = host(backing.open(), "future");
+      expect(await scoped.restoration).toEqual({
+        refused: [{ reason: expect.stringContaining("99"), sessionId: future.sessionId }],
+        restored: [],
+      });
+      expect(snapshot(backing, future.sessionId)).toEqual(untouched);
+      await scoped.dispose();
     });
   });
 });

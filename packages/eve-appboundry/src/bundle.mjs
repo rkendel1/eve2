@@ -19,7 +19,7 @@ const relocated = (path, appRoot) =>
     readFileSync(path, "utf8").replaceAll(JSON.stringify(appRoot).slice(1, -1), GUEST_APP_ROOT),
   );
 
-export async function bundleGuest({ compiled, keep, application, toolModules }) {
+export async function bundleGuest({ compiled, keep, application, toolModules, eveToolEntries }) {
   const appRoot = compiled.paths.appRoot;
   const eveDist = compiled.eveDist;
   const name = (path) => {
@@ -208,6 +208,13 @@ export async function bundleGuest({ compiled, keep, application, toolModules }) 
           {
             module: name(absolute(key)),
             nodeBuiltins: builtinSites(inputs, closure(inputs, [key], new Set()), name),
+            eveTools: [
+              ...new Set(
+                [...closure(inputs, [key], new Set())]
+                  .map((k) => eveToolEntries.get(absolute(k)))
+                  .filter(Boolean),
+              ),
+            ].sort(),
           },
         ];
       }),

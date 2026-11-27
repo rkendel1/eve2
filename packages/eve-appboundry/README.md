@@ -46,8 +46,10 @@ capability the manifest does not require, and the operator binds and grants each
   tool's module and Node built-ins, the Node built-ins anywhere in the bundle. It is also written when a build is
   refused for its tools.
 
-The same inputs give the same bytes. The program names no build-machine path: the app root becomes
-`/appboundry/agent`.
+The same inputs give the same bytes. One input is the AI Gateway model catalog, which eve's compiler embeds with the
+time it read it (`fetchedAt`, in the report's `modelCatalog`). A build that refreshes it differs from one that did not.
+Set `EVE_MODEL_CATALOG=bundled` to build with the catalog bundled with eve, for byte-identical rebuilds. The program
+names no build-machine path: the app root becomes `/appboundry/agent`.
 
 ## The manifest
 
@@ -92,20 +94,38 @@ The keep list is derived, not configured:
    tools. They are read from `.eve/compile/module-map.mjs` and mapped to modules through eve's framework registry
    (`framework/sources/registry.js`, `default-tools.js`). A source the registry does not name fails the build.
 
-Each tool is then checked on its own module closure. A tool whose code needs a Node built-in the guest lacks could be
-called by the model but could not run, so the build is refused. The error names the tool, the built-ins and the
-modules that import them, and says how to remove the tool. eve's turn path, the entry's static graph short of the
-tools, may import no such built-in either.
+Each tool is then checked on its own module closure, and refused (`TOOL_UNAVAILABLE`) when the model could call it but
+it could not run on AppBoundry:
 
-| Fixture                          | Tools                                                 | Result                                                                                                                                               |
-| -------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fixtures/minimal-agent`         | two capability tools (one needs approval), a subagent | built; keeps the 5 base and agent modules; stubs 24, including `tools/provided/*`                                                                    |
-| `fixtures/framework-tools-agent` | `ask_question`, `no_reply`, a capability tool         | built; the same keep list; the tools are statically imported                                                                                         |
-| `fixtures/default-tools-agent`   | eve's defaults                                        | keeps 11 (adds `tools/provided/{bash,read-file,write-file,edit-file,web-fetch}.js` and `tools/framework/agent.js`), then refused: `TOOL_UNAVAILABLE` |
-| `fixtures/declared-tools-agent`  | `bash`, `read_file`, `web_fetch` declared             | refused: `bash` needs `node:crypto`, `read_file` `node:crypto` and `node:path`, `web_fetch` `node:dns`                                               |
+- its code needs a Node built-in the guest lacks;
+- it is one of eve's own tools (found through eve's `eve/tools/<name>` exports and its framework registry) that is not
+  verified on AppBoundry's production host. Only `ask_question` and `no_reply` are; each other tool is refused with
+  what it needs;
+- it is a provider tool (`behavior.handling.kind: "provider-tool"`), which runs inside the model provider's call.
 
-eve's `bash`, file and web tools also need a sandbox and network, which AppBoundry does not offer, so they cannot run
-there with or without the built-ins. `sleep` is refused as well: it pulls in the Workflow runtime's Node chunks.
+The error names each tool and its reasons, and says how to remove it. eve's turn path, the entry's static graph short
+of the tools, may import no unimplemented built-in either. Tools the agent authors, such as the capability tools in the
+fixtures, are the author's; they reach other systems through `capabilities@1`.
+
+### eve's built-in tools on AppBoundry
+
+`test/tools.test.mjs` builds an agent with each tool and checks the producer's decision; the two verified tools also
+run on the production host there.
+
+| Tool                                                   | On AppBoundry                              | What it needs                                                                     | Owner of the missing piece                                                                              |
+| ------------------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `ask_question`                                         | supported, verified on the production host | nothing more: `eve:answer` carries the answer                                     |                                                                                                         |
+| `no_reply`                                             | supported, verified on the production host | nothing more                                                                      |                                                                                                         |
+| authored tools calling capabilities                    | supported, verified on the production host | `capabilities@1` (exists), declared in `appboundry.json`                          |                                                                                                         |
+| `bash`, `read_file`, `write_file`, `edit_file`, `glob` | refused at build time                      | a sandbox, and `node:crypto` / `node:path` in its code                            | a new AppBoundry sandbox (workspace) capability, and an eve sandbox binding for it                      |
+| `grep`                                                 | refused at build time                      | a sandbox                                                                         | as above                                                                                                |
+| `web_fetch`                                            | refused at build time                      | network access, and `node:dns` for its destination check                          | none needed: other systems are reached through `capabilities@1`; a fetch capability is an application's |
+| `web_search`                                           | refused at build time                      | a provider tool run inside the model call                                         | `model@1` (AppBoundry): it would have to run provider tools                                             |
+| `agent`                                                | refused at build time                      | a child session per call, which the host does not keep durably                    | eve (roadmap D5: durable child sessions), then verification on AppBoundry                               |
+| `sleep`                                                | refused at build time                      | the Workflow runtime (`node:async_hooks`, `node:crypto`, `node:url`, `node:util`) | eve: a host-timer implementation of workflow waits                                                      |
+| `eve__search`, `eve__tool`, `eve__skill`               | not built or verified                      | deferred tools, connections or skills; connections reach the network              | not assessed in S7                                                                                      |
+| `workflow`, `agent_router`                             | not built or verified                      | the Workflow runtime, as `sleep`                                                  | eve                                                                                                     |
+| declared subagents                                     | verified only in the experiment harness    | in-process child sessions                                                         | verification on the production host                                                                     |
 
 ## Verify and inspect
 
@@ -129,37 +149,98 @@ and checks that it describes exactly the manifest's functions.
 EVE_APPBOUNDRY_ENGINE=<engine.wasm> APPBOUNDRY_CHECKOUT=<appboundry> pnpm --filter @eve/appboundry test
 ```
 
-- `test/producer.test.mjs` (needs the engine) covers:
-  - the section format, the declaration and the keep derivation;
-  - the manifest; no Node built-in on the turn path; no credential or build-machine path;
-  - the refusals; byte-identical rebuilds.
-- `test/appboundry.test.mjs` (needs the engine and the checkout) covers:
-  - AppBoundry's `parseManifest`, `artifact verify` and `artifact inspect`;
-  - refusal of `agents@2`, of a missing `agents@1` or `actions@1`, and of functions that differ from the program.
-- `test/host.test.mjs` (needs the engine and the checkout) runs the artifact on AppBoundry's `ArtifactHost`, with a
-  scripted model and a real AppPort provider:
-  - deliveries with history, and a capability call;
-  - approval, then exactly one call; an uncertain outcome;
-  - restore by a new host over the same state;
-  - refusal of a mismatched session and of an unpermitted caller.
+- `test/producer.test.mjs` (the engine): the section format, the declaration, the keep derivation, the manifest, no
+  Node built-in on the turn path, no credential or build-machine path, the refusals, byte-identical rebuilds.
+- `test/tools.test.mjs` (the engine; the checkout for its second part): the tool inventory above.
+- `test/appboundry.test.mjs` (the engine and the checkout): AppBoundry's `parseManifest`, `artifact verify` and
+  `artifact inspect`; refusal of `agents@2`, of a missing `agents@1` or `actions@1`, and of functions that differ
+  from the program.
+- `test/host.test.mjs` (the engine and the checkout): deliveries, a capability call, an approval, an uncertain outcome,
+  restore by a new host, refusal of a mismatched session and of an unpermitted caller.
+- `test/lifecycle.test.mjs` (the engine and the checkout): the production lifecycle below, in real host processes.
 
 Without those variables the suites that need them are skipped, naming the variable. eve's CI does not set them yet.
+`test/measure-host.mjs` measures the production host path.
 
-## What S6 shows, and what S7 still needs
+## Operating it on AppBoundry
 
-S6 shows that:
+Deploy only the artifact directory, `manifest.json` and `module.wasm`. The host needs AppBoundry with `agents@1`,
+`sessions@1`, `model@1` and `capabilities@1`, and FeltKit's engine is already inside `module.wasm`. Neither the eve
+repository, pnpm, eve's compiler, FeltKit nor the build workspace is needed.
 
-- the organization's eve is produced, reproducibly, from its compiled agent into an artifact AppBoundry verifies;
-- the artifact runs its deliveries on AppBoundry's production host with the host's model, sessions, capabilities and
-  approvals.
+```sh
+node <appboundry>/packages/appboundry/dist/bin.js artifact verify org-eve.app
+```
 
-S7 still needs:
+The deployment binds what the artifact only names:
 
-- **Scoped restore.** eve's `restore()` restores every stored session. With one instance per session, each new
-  instance restores all of them.
-- **Cold start per session lane.** Every new session lane is a cold start: the program loads in about 14 s on Node v22 here, and S5 measured 7.8-8.6 s on Node v26. Memory is 209.5 MB, under the host's 256 MiB.
-- **A published AppBoundry** serving `agents@1`, `sessions@1` and `model@1`, so eve's CI can verify and run the
-  artifact.
+- **the model**, `ArtifactHost.open({ modelBinding })` or `appboundry run --model`: provider, protocol, model,
+  endpoint, credential and allowed hosts;
+- **each required capability**, `capabilityBindings`: the provider application, its URL, the credential and the grant;
+- **the warm window**, `--agent-idle-ms` (default 60 000).
+
+Each conversation is one session lane (`<application>.<conversation>`), on its own instance. The guest creates eve with
+`restore: { connection }`, so a new instance restores only its conversation's session. The host scopes `sessions@1`
+to the lane, so the instance cannot read, list or change any other. A stored session the guest cannot restore is
+refused (`SESSION_UNRESTORABLE`) and left as it was. The delivery that starts an instance reports
+`start: { loadMs, restoreMs, restored }`. The guest's clock advances with each host step, so a time inside one step
+reads 0.
+
+`test/lifecycle.test.mjs` runs, in real host processes from a directory holding only the two files:
+
+1. install and verify the artifact;
+2. open the host, deliver to a new session and continue it;
+3. call a capability and wait for an approval;
+4. release the idle instances, and restore a session on its next delivery;
+5. `SIGKILL` the host with a capability call in flight and the approval pending;
+6. restart and restore only the session delivered to: the in-flight call is reported as uncertain and not repeated,
+   and no other conversation reaches the model;
+7. find the other sessions' records unchanged, by FeltDB record version;
+8. answer the approval after the release and the kill: the call runs once;
+9. close cleanly, then find every acknowledged line stored and every conversation continuing.
+
+It also covers:
+
+- two sessions running independently;
+- deliveries to one session serialized, each seeing the one before;
+- a close that waits for the turn in flight;
+- a corrupted checkpoint refused, with its record unchanged.
+
+### Measured on the production host
+
+`node --expose-gc test/measure-host.mjs` measures `ArtifactHost` with the minimal agent, on Node v26.13.1, 4 vCPU Xeon
+@ 2.10 GHz, under the default 256 MiB guest memory limit:
+
+| Step                                               | Time or memory                                                                                       |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Load the artifact (`loadArtifact`)                 | 35 ms                                                                                                |
+| Open the host; it warms one guest as `verify` does | 7.8 s                                                                                                |
+| New session: start its instance                    | 7.7 s                                                                                                |
+| New session: eve's start in it (no session yet)    | 4 ms                                                                                                 |
+| New session: whole delivery                        | 8.2 s                                                                                                |
+| Warm delivery                                      | 346 ms                                                                                               |
+| Two new sessions and one warm, at once             | 8.3 s wall (7.8 s, 8.3 s, 382 ms each)                                                               |
+| Restore a 4-turn session on a new instance         | instance 7.7 s, then restore 27 ms                                                                   |
+| Restore a 20-turn session on a new instance        | instance 7.5 s, then restore 156 ms                                                                  |
+| Guest memory per instance                          | 209.6 MB (limit 256 MiB, no memory faults)                                                           |
+| Process memory (RSS)                               | 683 MB after open; 901 MB with one session; 1,129 MB with three instances; 586 MB after idle release |
+
+Every new session, and every session after its idle window, pays the instance start. Restoring the session itself
+takes tens to hundreds of milliseconds.
+
+On the same machine, `experiments/eve-host-boa/host/measure-cold.mjs` loads the S5 program in 7.6-8.4 s and this
+program in 7.4-8.0 s (209.6 MB). That is within S5's 15 s budget and the host's 30 s `maxInitMs`. On Node v22 both
+take about 14 s.
+
+## What remains for S8
+
+- **Applications and acting identity.** One organization's eve serving several applications, with each application's
+  identity and authorization (`agent-connections@1`, `actingAs`).
+- **A published AppBoundry** serving `agents@1`, `sessions@1`, `model@1` and `capabilities@1`, so eve's CI can
+  verify and run the artifact.
 - **A supported compile entry in eve.** The producer imports `dist/src/compiler/compile-agent.js`, which `eve` does not
   export.
-- **The final scenario**, steps 1-3 and 11-14, against the artifact.
+- **The cold start per session lane** (about 8 s on Node 26): every new conversation, and every conversation after
+  its idle window, waits for it. The host also warms one instance when it opens (7.8 s), and the first lane still
+  starts its own (7.7 s).
+- **The tools above** that need a sandbox, provider tools, durable child sessions or the Workflow runtime.

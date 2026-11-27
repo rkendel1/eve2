@@ -291,10 +291,65 @@ One contract, three ownership paths; none requires the others:
   - eve's CI does not run these suites; they need `EVE_APPBOUNDRY_ENGINE` and a built AppBoundry checkout until a published AppBoundry serves `agents@1`, `sessions@1` and `model@1`;
   - eve exports no compile entry, so the producer imports eve's built `compiler/compile-agent.js`.
 
-**S7: Eve `.app` runs on `appboundry-host` as the organization's application.** AppBoundry experiments to tests.
+**S7: Eve `.app` runs on `appboundry-host` as the organization's application.** eve2 and AppBoundry. Done, in review.
 
-- **Prerequisites:** S6, S5; eve restoring only the delivered session (from S4). Each new session lane is a cold start (about 14 s on Node v22, 8 s on v26), and without scoped restore each one restores every stored session.
-- **Acceptance:** the final scenario's steps 1-3 and 11-14, against the real artifact.
+- **Scoped restoration (eve).** `createEveHost({ restore: { connection } })` restores and serves one application
+  conversation: only the stored session holding that conversation's token is restored, and `connect` refuses any
+  other conversation. Without `restore`, every stored session is restored, as before. The guest creates eve this way
+  for each instance, and refuses a delivery whose stored session it cannot restore (`SESSION_UNRESTORABLE`), leaving
+  the record as it was.
+- **Lane-scoped `sessions@1` (AppBoundry).** Inside an agent delivery, `sessions@1` reads, writes and lists only the
+  sessions of the delivery's lane, which the host validated. Another lane's session, or one written outside any lane, is
+  refused (`FORBIDDEN`), unchanged. The host supplies the scope, so a guest cannot widen it.
+- **Draining shutdown (AppBoundry).** `ArtifactHost.close` refuses new calls and waits (default 30 s) for running
+  calls, so a delivery's acknowledged session writes are stored before the process exits.
+- **Verified in the production host** (`packages/eve-appboundry/test/lifecycle.test.mjs`, real host processes, an
+  artifact directory holding only `manifest.json` and `module.wasm`, Node v26.13.1):
+  - install and verify;
+  - deliver and continue, an authorized capability call, an approval;
+  - idle release and restore;
+  - `SIGKILL` with a capability call in flight and an approval pending;
+  - restart restoring only the session delivered to: the in-flight call is reported as uncertain, not repeated, and no
+    other conversation reaches the model;
+  - the other sessions' FeltDB records unchanged by version;
+  - the approval answered after the release and the kill, its call run once;
+  - clean shutdown with every acknowledged line stored;
+  - two sessions independent, one session's deliveries serialized, a close that waits for the turn in flight, a
+    corrupted checkpoint refused and left unchanged.
+- **Final scenario steps 1-3 and 11-14** pass against the artifact. The steps are: one organizational principal
+  (`org-eve`), the verified artifact, run by the host, `SIGKILL` and restart, the right conversation restored, the
+  interrupted effect not repeated and reported, idle release with the state kept.
+- **Measured on the production host** (Node v26.13.1, 4 vCPU Xeon @ 2.10 GHz, 256 MiB guest limit):
+
+  | Measurement                 | Result                                                                               |
+  | --------------------------- | ------------------------------------------------------------------------------------ |
+  | Host open (warms one guest) | 7.8 s                                                                                |
+  | Instance start, new session | 7.7 s                                                                                |
+  | Delivery, new session       | 8.2 s                                                                                |
+  | Warm delivery               | 346 ms                                                                               |
+  | Restore on a new instance   | 27 ms (4 turns), 156 ms (20 turns), after the 7.5-7.7 s instance start               |
+  | Two new sessions at once    | 8.3 s wall                                                                           |
+  | Guest memory                | 209.6 MB per instance, no memory faults                                              |
+  | Process RSS                 | 683 MB open, 901 MB one session, 1,129 MB three instances, 586 MB after idle release |
+
+  The program loads in 7.4-8.0 s, against 7.6-8.4 s for the S5 program on the same machine.
+
+- **eve's tools.** Of eve's own tools, only `ask_question` and `no_reply` are supported, verified on the production
+  host. The producer refuses each other one with what it needs:
+  - a sandbox: `bash`, the file tools, `glob`, `grep`;
+  - network access: `web_fetch`;
+  - a provider tool inside the model call: `web_search`;
+  - durable child sessions: `agent` (D5);
+  - the Workflow runtime: `sleep`.
+
+  Declared subagents are verified only in the experiment harness. The catalog tools, `workflow` and `agent_router` are
+  not built or verified. See `packages/eve-appboundry/README.md`.
+
+- **Not done here:**
+  - eve's CI does not run these suites; they need FeltKit's engine and an AppBoundry checkout until AppBoundry
+    publishes `agents@1`, `sessions@1`, `model@1` and `capabilities@1`;
+  - each new session lane pays the cold start;
+  - `sessions@1` on a remote FeltDB server is still verified by contract test only.
 
 **S8: application connections and acting identity.** AppBoundry. Blocks.
 
@@ -335,7 +390,7 @@ One contract, three ownership paths; none requires the others:
 | S4 Agent lifecycle, timers, capability fetch | appboundry                            | Done                                         | appboundry #114                                           |
 | S5 Cold start                                | appboundry / eve2                     | Done in the harness; host execution in S7    | appboundry #115                                           |
 | S6 `.app` producer                           | eve2                                  | Done                                         | eve2 #44                                                  |
-| S7 Eve `.app` on `appboundry-host`           | appboundry                            | Not started                                  |                                                           |
+| S7 Eve `.app` on `appboundry-host`           | eve2, appboundry                      | Done, in review                              | eve2 (this PR), appboundry #116                           |
 | S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)                             |                                                           |
 | S9 FeltKit organizational client             | feltkit                               | Not started                                  |                                                           |
 | S10 Operations                               | appboundry, feltkit                   | Not started                                  |                                                           |
