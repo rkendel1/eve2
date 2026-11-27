@@ -261,18 +261,39 @@ One contract, three ownership paths; none requires the others:
 - **Done in the experiment harness** (real Eve guest, FeltKit's Boa engine bounded by the host's own `boundModule`; Node v26.13.1, 4 vCPU Xeon @ 2.10 GHz):
   - bundle 12.78 MB to 4.85 MB; cold load 43-45 s to 7.8-8.6 s; memory 541 MB (traps under the 256 MiB bound) to 209 MB; restore and deliveries unchanged (restore 10 / 112 / 386 ms for 0 / 80 / 400 stored lines);
   - the whole eve-host-boa suite passes on the reduced guest (37/37: Boa and Node turns, `model@1`, `capability.invoke`, the restart matrix, `test/cold-start.test.mjs`).
-- **Not yet verified:** the guest inside the production host's worker (maxInitMs, maxStepMs) as an artifact: that is S6 and S7. The keep list is this agent's; an agent that declares eve's bash, file or web tools needs them kept, which the producer should derive from the compiled agent (S6).
+- **Not yet verified:** the guest inside the production host's worker (maxInitMs, maxStepMs) as an artifact: that is S6 and S7. The keep list is this agent's; an agent that declares eve's bash, file or web tools needs them kept, which the producer should derive from the compiled agent (S6, done: the producer derives it).
 
-**S6: Eve `.app` producer.** eve2 (a command or script) or AppBoundry tooling, decided in the PR.
+**S6: Eve `.app` producer.** eve2, `packages/eve-appboundry` (`eve-appboundry build`). Done.
 
-- Builds `module.wasm` with its program section and `manifest.json` from `eve build`'s compiled agent (the `experiments/eve-host-boa/build.mjs` pipeline).
-- **Prerequisites:** S2-S4, so the manifest can declare its interfaces.
-- **Acceptance:** `appboundry verify` and `appboundry inspect` accept the artifact; there are no Node built-ins on its static graph.
-- **Tests:** a producer test plus `artifact-host.test.ts`-style load.
+- **What it does.** It compiles the agent with eve's compiler, then bundles the guest (the S5 pipeline, plus a production-ABI entry). It appends the program to FeltKit's guest engine as the `appboundry.program` section, FeltKit's format. It writes `manifest.json`:
+  - functions `eve:deliver` and `eve:answer`, agent deliveries keyed `<application>.<conversation>`;
+  - interfaces `actions`, `agents`, `identity`, `model`, `sessions`, and `capabilities` with `requires` from the app's `appboundry.json`.
+
+  The engine is an input file, so eve takes no FeltKit or FeltDB dependency.
+
+- **Keep list.** It is derived from the compiled agent's module map and eve's framework registry. A tool whose closure needs a Node built-in the guest lacks is refused, with the tool and the built-ins named. eve's bash, file, web and `sleep` tools are refused that way; they also need a sandbox and network that AppBoundry does not offer.
+- **Verified** (Node v22.23.5, 4 vCPU Xeon @ 2.10 GHz):
+  - AppBoundry's `parseManifest`, `artifact verify` (the program loads in the guest and describes the manifest's functions) and `artifact inspect` accept the minimal and the framework-tools agents;
+  - `agents@2`, a missing `agents@1` or `actions@1`, and functions that differ from the program are refused;
+  - no Node built-in is on eve's turn path, the artifact carries no credential or build-machine path, and rebuilds are byte-identical;
+  - on AppBoundry's production `ArtifactHost`:
+    - deliveries with the bound model, and per-session history;
+    - a capability call through `capability.invoke`, keyed by the tool call;
+    - approval, then exactly one call; an uncertain outcome reported to the model;
+    - restore by a new host over the same state;
+    - refusal of a mismatched session and of an unpermitted caller;
+  - the eve-host-boa suites against the extracted program: 37/37 (the harness needs a keepalive, see below);
+  - program 4.81 MB, built in about 3 s; load 13.3-14.3 s, against 13.9 s for the S5 program on the same machine (S5's 7.8-8.6 s was measured on Node v26); restore 9 / 136 / 445 ms for 0 / 80 / 400 stored lines; memory 209.5 MB, under 256 MiB.
+- **Found:**
+  - The host performs an action's requests one at a time and answers them together. A timer issued beside other work (eve's timeouts) held that work back, so the guest keeps its own clock and asks for `timer.sleep` only when nothing else is outstanding (at most 60 s).
+  - The eve-host-boa harness's unref'd timers let Node exit mid-turn when nothing else holds the event loop. This fails `boa.test.mjs` on main with the S5 program too; it is an AppBoundry experiment fix, outside S6.
+- **Not done here:**
+  - eve's CI does not run these suites; they need `EVE_APPBOUNDRY_ENGINE` and a built AppBoundry checkout until a published AppBoundry serves `agents@1`, `sessions@1` and `model@1`;
+  - eve exports no compile entry, so the producer imports eve's built `compiler/compile-agent.js`.
 
 **S7: Eve `.app` runs on `appboundry-host` as the organization's application.** AppBoundry experiments to tests.
 
-- **Prerequisites:** S6, S5; eve restoring only the delivered session (from S4).
+- **Prerequisites:** S6, S5; eve restoring only the delivered session (from S4). Each new session lane is a cold start (about 14 s on Node v22, 8 s on v26), and without scoped restore each one restores every stored session.
 - **Acceptance:** the final scenario's steps 1-3 and 11-14, against the real artifact.
 
 **S8: application connections and acting identity.** AppBoundry. Blocks.
@@ -313,7 +334,7 @@ One contract, three ownership paths; none requires the others:
 | S3 Model access (`model@1`)                  | appport-services, feltkit, appboundry | Done; `@appport/services` 0.23.0 unpublished | appport-services #56, appboundry #112, #113, feltkit #175 |
 | S4 Agent lifecycle, timers, capability fetch | appboundry                            | Done                                         | appboundry #114                                           |
 | S5 Cold start                                | appboundry / eve2                     | Done in the harness; host execution in S7    | appboundry #115                                           |
-| S6 `.app` producer                           | eve2 or appboundry                    | Not started                                  |                                                           |
+| S6 `.app` producer                           | eve2                                  | Done                                         | eve2 (this PR)                                            |
 | S7 Eve `.app` on `appboundry-host`           | appboundry                            | Not started                                  |                                                           |
 | S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)                             |                                                           |
 | S9 FeltKit organizational client             | feltkit                               | Not started                                  |                                                           |

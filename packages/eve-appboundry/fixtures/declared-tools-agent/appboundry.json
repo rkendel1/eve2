@@ -1,0 +1,11 @@
+{
+  "application": {
+    "id": "org-eve",
+    "name": "Organization eve",
+    "version": "1.0.0",
+    "description": "The organization's agent with eve's bash, read_file and web_fetch tools declared."
+  },
+  "requires": [
+    { "name": "repo.changes.get", "versions": "1", "purpose": "Reads a prepared change" }
+  ]
+}
