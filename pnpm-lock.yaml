@@ -2225,6 +2225,27 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
+  packages/eve-appboundry:
+    devDependencies:
+      acorn:
+        specifier: 8.19.0
+        version: 8.19.0
+      acorn-walk:
+        specifier: 8.3.4
+        version: 8.3.4
+      buffer:
+        specifier: 6.0.3
+        version: 6.0.3
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      eve:
+        specifier: workspace:*
+        version: link:../eve
+      web-streams-polyfill:
+        specifier: 4.2.0
+        version: 4.2.0
+
   packages/eve-catalog:
     devDependencies:
       vitest:
@@ -8743,6 +8764,10 @@ packages:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
     peerDependencies:
       acorn: ^6.0.0 || ^7.0.0 || ^8.0.0
+
+  acorn-walk@8.3.4:
+    resolution: {integrity: sha512-ueEepnujpqee2o5aIYnvHU6C0A42MNdsIDeqy5BydrkuC5R1ZuUFnm27EeFJGoEHJQgn3uleRvmTXaJgfXbt4g==}
+    engines: {node: '>=0.4.0'}
 
   acorn@8.19.0:
     resolution: {integrity: sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw==}
@@ -15452,6 +15477,10 @@ packages:
   web-streams-polyfill@4.0.0-beta.3:
     resolution: {integrity: sha512-QW95TCTaHmsYfHDybGMwO5IJIM93I/6vTRk+daHTWFPhwh+C8Cg7j7XyKrwrj8Ib6vYXe0ocYNrmzY4xAAN6ug==}
     engines: {node: '>= 14'}
+
+  web-streams-polyfill@4.2.0:
+    resolution: {integrity: sha512-0rYDzGOh9EZpig92umN5g5D/9A1Kff7k0/mzPSSCY8jEQeYkgRMoY7LhbXtUCWzLCMX0TUE9aoHkjFNB7D9pfA==}
+    engines: {node: '>= 8'}
 
   webgpu@0.4.0:
     resolution: {integrity: sha512-F5pimn3Aoi0zWjuRdiVs5TnrUwSzD2lESBohsIUsqyitWkGRQlXU2fhV6ycXlQTa1bvAf3sjqiUpBEpmSQ5ptA==}
@@ -22791,6 +22820,10 @@ snapshots:
       acorn: 8.19.0
 
   acorn-jsx@5.3.2(acorn@8.19.0):
+    dependencies:
+      acorn: 8.19.0
+
+  acorn-walk@8.3.4:
     dependencies:
       acorn: 8.19.0
 
@@ -31074,6 +31107,8 @@ snapshots:
   web-streams-polyfill@3.3.3: {}
 
   web-streams-polyfill@4.0.0-beta.3: {}
+
+  web-streams-polyfill@4.2.0: {}
 
   webgpu@0.4.0(supports-color@10.2.2):
     dependencies:

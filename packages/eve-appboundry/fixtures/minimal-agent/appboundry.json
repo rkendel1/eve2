@@ -1,0 +1,16 @@
+{
+  "application": {
+    "id": "org-eve",
+    "name": "Organization eve",
+    "version": "1.0.0",
+    "description": "The organization's agent: repository tools through application capabilities."
+  },
+  "requires": [
+    { "name": "repo.changes.get", "versions": "1", "purpose": "Reads a prepared change" },
+    {
+      "name": "repo.changes.publish",
+      "versions": "1",
+      "purpose": "Publishes a prepared change after a person approves"
+    }
+  ]
+}

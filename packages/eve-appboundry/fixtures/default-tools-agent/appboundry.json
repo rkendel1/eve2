@@ -1,0 +1,9 @@
+{
+  "application": {
+    "id": "org-eve",
+    "name": "Organization eve",
+    "version": "1.0.0",
+    "description": "The organization's agent with eve's default tools."
+  },
+  "requires": []
+}
