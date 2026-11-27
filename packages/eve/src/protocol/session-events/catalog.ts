@@ -138,6 +138,7 @@ export const FACT_CATALOG: { readonly [TType in Fact["type"]]: FactDescriptor } 
   "interaction.opened": { family: "interaction", idField: "interactionId", role: "introduces" },
   "interaction.settled": { family: "interaction", idField: "interactionId", role: "terminal" },
   "model.requested": { family: "model", idField: "runId", role: "introduces" },
+  "model.composed": { family: "model", idField: "runId", role: "updates" },
   "model.retried": { family: "model", idField: "runId", role: "updates" },
   "model.settled": { family: "model", idField: "runId", role: "terminal" },
   "model.started": { family: "model", idField: "runId", role: "updates" },

@@ -171,7 +171,15 @@ export interface Usage {
   readonly cacheWriteTokens: number;
   /** Absent when the provider reported no cost. */
   readonly costUsd?: number;
+  /**
+   * The counts the provider did not report: each is recorded as 0, so read it as unknown, not as
+   * none. Absent when every count was reported, and on usage recorded before eve tracked this.
+   */
+  readonly unreported?: readonly UsageCount[];
 }
+
+/** A token count a {@link Usage} records. */
+export type UsageCount = "inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens";
 
 /**
  * A value carried by reference instead of inline: too large for a line, or withheld. A field
