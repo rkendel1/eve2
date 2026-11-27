@@ -5,24 +5,40 @@ import { HistoryStateKey } from "#context/keys.js";
 import { keptAnnouncements } from "#harness/announcements.js";
 import { withoutPromptMeasurement } from "#harness/compaction/engine.js";
 import { validateHarnessModelMessages } from "#harness/messages.js";
-import type { HarnessSession } from "#harness/types.js";
+import type { HarnessSession, SessionStateMap } from "#harness/types.js";
+import { archiveForCompaction, followHistory } from "./transcript.js";
 import { checksSessionEvents } from "#shared/dev-checks.js";
 
 export type HistoryChange =
   | { readonly append: readonly ModelMessage[] }
+  | { readonly compact: readonly ModelMessage[] }
   | { readonly extend: readonly ModelMessage[] }
   | { readonly repaired: readonly ModelMessage[] }
   | { readonly rewrite: readonly ModelMessage[] };
 
-type WithHistory = Pick<HarnessSession, "compaction" | "history">;
+type WithHistory = Pick<HarnessSession, "compaction" | "history"> & {
+  readonly state?: SessionStateMap;
+};
 
 export function changeHistory<T extends WithHistory>(session: T, change: HistoryChange): T {
-  const changed = applyChange(session, change);
+  const changed =
+    "compact" in change
+      ? applyChange(archiveForCompaction(session, change.compact), { rewrite: change.compact })
+      : withTranscript(session, applyChange(session, change));
   if (changed !== session && checksSessionEvents()) assertAnswersFollowCalls(changed.history);
   return changed;
 }
 
-function applyChange<T extends WithHistory>(session: T, change: HistoryChange): T {
+function withTranscript<T extends WithHistory>(before: T, after: T): T {
+  if (after === before || after.history === before.history) return after;
+  const followed = followHistory(before, after.history);
+  return followed.state === before.state ? after : { ...after, state: followed.state };
+}
+
+function applyChange<T extends WithHistory>(
+  session: T,
+  change: Exclude<HistoryChange, { readonly compact: readonly ModelMessage[] }>,
+): T {
   if ("append" in change) {
     if (change.append.length === 0) return session;
     return {

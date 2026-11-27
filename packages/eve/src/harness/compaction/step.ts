@@ -296,7 +296,7 @@ async function summarizeHistory(
     await settleChange(step, { ...input, runOpen, summaryUsage }, unchanged ? before : messages);
   }
   if (unchanged) return undefined;
-  const rewritten = changeHistory(step.session, { rewrite: messages });
+  const rewritten = changeHistory(step.session, { compact: messages });
   step.session = { ...rewritten, compaction: { ...rewritten.compaction, lastStage: stage } };
   return messages;
 }

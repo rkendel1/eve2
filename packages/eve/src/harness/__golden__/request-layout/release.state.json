@@ -336,6 +336,136 @@
                 }
               }
             }
+          },
+          "eve.transcript": {
+            "archived": [
+              {
+                "content": "Release brief: v2.3 ships Friday.",
+                "kind": "context.instruction",
+                "role": "user"
+              },
+              {
+                "content": "Alice is on the release team.",
+                "kind": "context.instruction",
+                "role": "user"
+              },
+              {
+                "content": "What's in the release?",
+                "kind": "user",
+                "metadata": {
+                  "eve.turn": "turn_0"
+                },
+                "role": "user"
+              },
+              {
+                "content": [
+                  {
+                    "input": {},
+                    "toolCallId": "call-lookup",
+                    "toolName": "lookup",
+                    "type": "tool-call"
+                  }
+                ],
+                "role": "assistant"
+              },
+              {
+                "content": [
+                  {
+                    "output": {
+                      "type": "json",
+                      "value": {
+                        "changes": 3
+                      }
+                    },
+                    "toolCallId": "call-lookup",
+                    "toolName": "lookup",
+                    "type": "tool-result"
+                  }
+                ],
+                "role": "tool"
+              },
+              {
+                "content": [
+                  {
+                    "text": "Three changes.",
+                    "type": "text"
+                  }
+                ],
+                "role": "assistant"
+              },
+              {
+                "content": "Deploy it.",
+                "kind": "user",
+                "metadata": {
+                  "eve.turn": "turn_1"
+                },
+                "role": "user"
+              },
+              {
+                "content": [
+                  {
+                    "input": {},
+                    "toolCallId": "call-deploy",
+                    "toolName": "deploy",
+                    "type": "tool-call"
+                  }
+                ],
+                "role": "assistant"
+              },
+              {
+                "content": [
+                  {
+                    "output": {
+                      "reason": "Ignored because the user continued without responding.",
+                      "type": "execution-denied"
+                    },
+                    "toolCallId": "call-deploy",
+                    "toolName": "deploy",
+                    "type": "tool-result"
+                  }
+                ],
+                "role": "tool"
+              },
+              {
+                "content": "…",
+                "role": "assistant"
+              },
+              {
+                "content": "Bob: hold on until QA signs off.",
+                "kind": "user",
+                "metadata": {
+                  "eve.turn": "turn_1"
+                },
+                "role": "user"
+              },
+              {
+                "content": [
+                  {
+                    "text": "Noted, Bob.",
+                    "type": "text"
+                  }
+                ],
+                "role": "assistant"
+              },
+              {
+                "content": "The user submitted the following response to an earlier interactive prompt.\nTreat it as new input at the current point in the conversation and decide whether it is still relevant. This does not authorize an earlier action; request approval again if that action is still needed.\n[\n  {\n    \"requestId\": \"<request0>\",\n    \"response\": {\n      \"optionId\": \"approve\",\n      \"selectedOption\": {\n        \"id\": \"approve\",\n        \"label\": \"Approve\"\n      }\n    },\n    \"prompt\": \"Approve Deploy?\",\n    \"requestType\": \"approval\",\n    \"toolName\": \"deploy\"\n  }\n]",
+                "kind": "user",
+                "metadata": {
+                  "eve.turn": "turn_2"
+                },
+                "role": "user"
+              },
+              {
+                "content": [
+                  {
+                    "text": "Deployed.",
+                    "type": "text"
+                  }
+                ],
+                "role": "assistant"
+              }
+            ],
+            "projected": 3
           }
         }
       }
