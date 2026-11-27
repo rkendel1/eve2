@@ -109,7 +109,8 @@ export function createInProcessHost(
   options: InProcessHostOptions,
   runtimeFor: (config: SessionRuntimeConfig) => Runtime,
 ): InProcessHost {
-  const { store } = options;
+  const work = createWorkCounter();
+  const store = options.store === undefined ? undefined : countingWrites(options.store, work);
   const lineText = new TextDecoder();
   const lines = createMemoryLineStore(
     store === undefined
@@ -119,7 +120,6 @@ export function createInProcessHost(
   const persistence = store === undefined ? undefined : createSessionPersistence(store);
   const retried = new Set<string>();
   const stepBoundary = options.stepBoundary ?? structuredCloneBoundary;
-  const work = createWorkCounter();
   const registry = createMemoryInboxRegistry(stepBoundary, {
     ...(options.deliveries !== undefined && { deliveries: options.deliveries }),
   });
@@ -291,6 +291,19 @@ async function restsWithin(
   } finally {
     clearTimeout(timer);
   }
+}
+
+function countingWrites(
+  store: DurableSessionStore,
+  work: ReturnType<typeof createWorkCounter>,
+): DurableSessionStore {
+  return {
+    appendLine: (sessionId, index, line) =>
+      work.count(() => store.appendLine(sessionId, index, line)),
+    readLines: (sessionId) => store.readLines(sessionId),
+    saveSession: (sessionId, record) => work.count(() => store.saveSession(sessionId, record)),
+    readSessions: () => store.readSessions(),
+  };
 }
 
 function createWorkCounter() {

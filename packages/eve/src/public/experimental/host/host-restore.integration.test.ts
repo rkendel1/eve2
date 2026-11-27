@@ -24,7 +24,8 @@ const ALICE: SessionAuthContext = {
   principalType: "user",
 };
 
-function durableStore() {
+function durableStore(writeMs = 0) {
+  const written = () => new Promise((resolve) => setTimeout(resolve, writeMs));
   const lines = new Map<string, string[]>();
   const sessions = new Map<string, string>();
   let generation = 0;
@@ -40,6 +41,7 @@ function durableStore() {
         const stream = lines.get(sessionId) ?? [];
         if (index !== stream.length) throw new Error(`line ${index} is not the next line`);
         lines.set(sessionId, [...stream, line]);
+        if (writeMs > 0) await written();
       },
       async readLines(sessionId) {
         return [...(lines.get(sessionId) ?? [])];
@@ -47,6 +49,7 @@ function durableStore() {
       async saveSession(sessionId, record) {
         alive();
         sessions.set(sessionId, record);
+        if (writeMs > 0) await written();
       },
       async readSessions() {
         return [...sessions].map(([sessionId, record]) => ({ record, sessionId }));
@@ -251,29 +254,35 @@ describe("eve/experimental/host with a store: sessions survive the host", () => 
     });
   });
 
-  it("does not run an effect again whose outcome the dead host never recorded, and tells the model", async () => {
-    await withAgent(async () => {
-      effects.transfers = 0;
-      transferBank = gate();
-      const backing = durableStore();
-      const first = backing.open();
-      const before = host(first);
-      await before
-        .connect({ application: "meetings", conversation: "transfers" })
-        .send("Alice asks you to start a transfer.", { auth: ALICE });
-      await until(() => effects.transfers === 1);
-      await gone(first, before);
+  it.each([
+    { store: "a store that writes at once", writeMs: 0 },
+    { store: "a store whose writes take time", writeMs: 20 },
+  ])(
+    "does not run an effect again whose outcome the dead host never recorded, and tells the model, on $store",
+    async ({ writeMs }) => {
+      await withAgent(async () => {
+        effects.transfers = 0;
+        transferBank = gate();
+        const backing = durableStore(writeMs);
+        const first = backing.open();
+        const before = host(first);
+        await before
+          .connect({ application: "meetings", conversation: "transfers" })
+          .send("Alice asks you to start a transfer.", { auth: ALICE });
+        await until(() => effects.transfers === 1);
+        await gone(first, before);
 
-      seen.length = 0;
-      const after = host(backing.open());
-      expect((await after.restoration).restored).toHaveLength(1);
-      await after.idle();
-      expect(effects.transfers).toBe(1);
-      expect(seen.flat().join("\n")).toContain(INTERRUPTED);
-      transferBank.release();
-      await after.dispose();
-    });
-  });
+        seen.length = 0;
+        const after = host(backing.open());
+        expect((await after.restoration).restored).toHaveLength(1);
+        await after.idle();
+        expect(effects.transfers).toBe(1);
+        expect(seen.flat().join("\n")).toContain(INTERRUPTED);
+        transferBank.release();
+        await after.dispose();
+      });
+    },
+  );
 
   it("refuses to restore a session whose checkpoint this eve cannot read, and leaves it as it was", async () => {
     await withAgent(async () => {
