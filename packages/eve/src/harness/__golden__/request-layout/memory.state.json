@@ -87,27 +87,28 @@
     "eve.reactions": {
       "at": "<time>",
       "latest": {
-        "*": 20,
-        "content.completed": 18,
-        "content.delta": 17,
-        "context.settled": 11,
-        "context.settled:compaction": 11,
-        "context.started": 9,
-        "context.started:compaction": 9,
-        "delivery.admitted": 13,
-        "delivery.consumed": 14,
-        "delivery.settled": 20,
-        "model.requested": 15,
-        "model.settled": 19,
-        "model.started": 16,
+        "*": 22,
+        "content.completed": 20,
+        "content.delta": 19,
+        "context.settled": 12,
+        "context.settled:compaction": 12,
+        "context.started": 10,
+        "context.started:compaction": 10,
+        "delivery.admitted": 14,
+        "delivery.consumed": 15,
+        "delivery.settled": 22,
+        "model.composed": 18,
+        "model.requested": 16,
+        "model.settled": 21,
+        "model.started": 17,
         "session.started": 0,
-        "turn.settled": 20,
-        "turn.started": 14,
-        "usage.recorded": 19
+        "turn.settled": 22,
+        "turn.started": 15,
+        "usage.recorded": 21
       },
       "memos": {
         "memory:team:recall": {
-          "vgwb_PJlsAJUva0VtMYUPM": {
+          "YGES4O7XnffqHyUmwEx2_B": {
             "cleared": null,
             "result": {
               "messages": [
@@ -242,7 +243,7 @@
                   "value": "Yes."
                 }
               },
-              "position": 21,
+              "position": 23,
               "responses": {},
               "runs": {
                 "run_2": {
@@ -264,7 +265,11 @@
                     "cacheReadTokens": 0,
                     "cacheWriteTokens": 0,
                     "inputTokens": 1,
-                    "outputTokens": 1
+                    "outputTokens": 1,
+                    "unreported": [
+                      "cacheReadTokens",
+                      "cacheWriteTokens"
+                    ]
                   }
                 }
               },

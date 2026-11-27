@@ -33,7 +33,7 @@ import { type ModelProfile, resolveModelProfile } from "#harness/model-profile.j
 import { awaitsProviderToolResult } from "#harness/provider-tool-history.js";
 import { estimateRequestEnvelope } from "#harness/request-envelope.js";
 import { summarizeKnownError } from "#harness/semantic-errors/index.js";
-import { retryRun } from "#harness/session-machine/runs.js";
+import { composeRun, retryRun } from "#harness/session-machine/runs.js";
 import { discardAttempt } from "#harness/session-machine/transitions.js";
 import { activeTurnId } from "#harness/session-machine/view.js";
 import type { Step } from "#harness/step/context.js";
@@ -71,6 +71,7 @@ import { modelInstructions, type RequestMessages, withTrailingUserNote } from ".
 import { answerSkippedToolCalls, extractToolResultCallIds, withCallResults } from "./response.js";
 import { ALLOW_RETRY, runModelCallWithRetries, STOP_RETRY } from "./retry.js";
 import { withUniqueCallIds } from "./unique-call-ids.js";
+import { withComposition } from "./composition.js";
 import { modelCallErrorInfo } from "./failure.js";
 import { prepareModelTools } from "./tools.js";
 import {
@@ -344,10 +345,16 @@ export class ModelCaller {
       headers: this.attributionHeaders,
       instructions,
       model: withUniqueCallIds(
-        withGatewayTraceContext(
-          model,
-          this.profile,
-          this.step.instrumentation?.gatewayTraceContextHeaders,
+        withComposition(
+          withGatewayTraceContext(
+            model,
+            this.profile,
+            this.step.instrumentation?.gatewayTraceContextHeaders,
+          ),
+          async (composition, send) =>
+            await step.apply(
+              composeRun({ ...composition, attempt: attemptIndex, runId: position.runId!, send }),
+            ),
         ),
         [
           ...Object.keys(step.view().projection.view.calls),

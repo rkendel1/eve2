@@ -52,6 +52,7 @@ export const HOOK_CONTINUE_KEYS = {
   "delivery.settled": false,
   "interaction.opened": false,
   "interaction.settled": false,
+  "model.composed": false,
   "model.requested": false,
   "model.retried": false,
   "model.settled": false,

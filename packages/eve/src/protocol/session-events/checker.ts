@@ -361,13 +361,23 @@ export function createStreamChecker(
   }
 
   function checkAttempt(fact: Fact, fail: (rule: ViolationRule, message: string) => void): void {
-    if (fact.type !== "model.started" && fact.type !== "model.retried") return;
+    if (
+      fact.type !== "model.started" &&
+      fact.type !== "model.retried" &&
+      fact.type !== "model.composed"
+    )
+      return;
     const { attempt, runId } = fact.data;
     const current = view.runs[runId]?.attempt;
     if (fact.type === "model.started" && current !== undefined && attempt <= current)
       fail("attempts", `run "${runId}" starts attempt ${attempt} after attempt ${current}.`);
     if (fact.type === "model.retried" && attempt !== current)
       fail("attempts", `run "${runId}" retries attempt ${attempt}, but its current is ${current}.`);
+    if (fact.type === "model.composed" && attempt !== current)
+      fail(
+        "attempts",
+        `run "${runId}" composes attempt ${attempt}, but its current is ${current}.`,
+      );
   }
 
   function checkProgress(

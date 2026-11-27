@@ -98,19 +98,20 @@
     "eve.reactions": {
       "at": "<time>",
       "latest": {
-        "*": 15,
-        "content.completed": 13,
-        "content.delta": 12,
-        "delivery.admitted": 8,
-        "delivery.consumed": 9,
-        "delivery.settled": 15,
-        "model.requested": 10,
-        "model.settled": 14,
-        "model.started": 11,
+        "*": 17,
+        "content.completed": 15,
+        "content.delta": 14,
+        "delivery.admitted": 9,
+        "delivery.consumed": 10,
+        "delivery.settled": 17,
+        "model.composed": 13,
+        "model.requested": 11,
+        "model.settled": 16,
+        "model.started": 12,
         "session.started": 0,
-        "turn.settled": 15,
-        "turn.started": 9,
-        "usage.recorded": 14
+        "turn.settled": 17,
+        "turn.started": 10,
+        "usage.recorded": 16
       },
       "revision": "bundled",
       "slots": {
@@ -235,7 +236,7 @@
                   "value": "I can reach Linear and Notion."
                 }
               },
-              "position": 16,
+              "position": 18,
               "responses": {},
               "runs": {
                 "run_1": {
@@ -257,7 +258,11 @@
                     "cacheReadTokens": 0,
                     "cacheWriteTokens": 0,
                     "inputTokens": 1,
-                    "outputTokens": 1
+                    "outputTokens": 1,
+                    "unreported": [
+                      "cacheReadTokens",
+                      "cacheWriteTokens"
+                    ]
                   }
                 }
               },

@@ -6,10 +6,13 @@ import type {
 import { gateway, type LanguageModel, wrapLanguageModel } from "ai";
 
 export function withUniqueCallIds(model: LanguageModel, taken: Iterable<string>): LanguageModel {
-  return wrapLanguageModel({ model: resolved(model), middleware: uniqueCallIds(new Set(taken)) });
+  return wrapLanguageModel({
+    model: resolvedLanguageModel(model),
+    middleware: uniqueCallIds(new Set(taken)),
+  });
 }
 
-function resolved(model: LanguageModel) {
+export function resolvedLanguageModel(model: LanguageModel) {
   if (typeof model !== "string") return model;
   const provider = Reflect.get(globalThis, "AI_SDK_DEFAULT_PROVIDER") as ProviderV4 | undefined;
   return (provider ?? gateway).languageModel(model);

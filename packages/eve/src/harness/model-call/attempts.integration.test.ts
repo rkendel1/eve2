@@ -76,7 +76,9 @@ async function runTurn(
     ]),
   })(session, { message: "Alice asks for the weekly summary." });
   return events.filter(
-    (event) => event.type.startsWith("model.") || event.type === "usage.recorded",
+    (event) =>
+      (event.type.startsWith("model.") && event.type !== "model.composed") ||
+      event.type === "usage.recorded",
   );
 }
 

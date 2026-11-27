@@ -15,7 +15,7 @@ import { settleCall } from "#harness/session-machine/calls.js";
 import { settleRun } from "#harness/session-machine/runs.js";
 import { REPLY_TOOL_NAME } from "#protocol/reply-tool.js";
 import { isInvalidToolCall } from "#harness/tool-call-input-errors.js";
-import type { Usage } from "#protocol/session-events/envelope.js";
+import type { Usage, UsageCount } from "#protocol/session-events/envelope.js";
 import type { ToolSignIn } from "#harness/call-executor.js";
 import type { HeldCalls } from "#harness/session-machine/view.js";
 import type { TurnPosition } from "#harness/session-machine/view.js";
@@ -170,14 +170,25 @@ export function runUsageOf(input: {
 }): Usage | undefined {
   const { usage } = input;
   if (usage === undefined && input.costUsd === undefined) return undefined;
-  return usageOf({
+  const counts = {
     cacheReadTokens: usage?.inputTokenDetails?.cacheReadTokens,
     cacheWriteTokens: usage?.inputTokenDetails?.cacheWriteTokens,
-    costUsd: input.costUsd,
     inputTokens: usage?.inputTokens,
     outputTokens: usage?.outputTokens,
-  });
+  };
+  const unreported = USAGE_COUNTS.filter((name) => counts[name] === undefined);
+  return {
+    ...usageOf({ ...counts, costUsd: input.costUsd }),
+    ...(unreported.length > 0 && { unreported }),
+  };
 }
+
+const USAGE_COUNTS = [
+  "inputTokens",
+  "outputTokens",
+  "cacheReadTokens",
+  "cacheWriteTokens",
+] as const satisfies readonly UsageCount[];
 
 export function extractGatewayCostUsd(
   providerMetadata: ProviderMetadata | undefined,

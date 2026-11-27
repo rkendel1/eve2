@@ -24,6 +24,10 @@ export function startRun(input: Parameters<typeof runStarted>[0]): Commit {
   return commitOf([runStarted(input)]);
 }
 
+export function composeRun(data: FactOf<"model.composed">["data"]): Commit {
+  return commitOf([fact("model.composed", data)]);
+}
+
 export function retryRun(input: {
   readonly attempt: number;
   readonly error: ErrorInfo;

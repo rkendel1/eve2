@@ -98,6 +98,9 @@ export const usage = conforming<Usage>()(
     costUsd: z.number().finite().nonnegative().optional(),
     inputTokens: count,
     outputTokens: count,
+    unreported: z
+      .array(z.enum(["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"]))
+      .optional(),
   }),
 );
 

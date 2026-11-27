@@ -11,6 +11,7 @@ export const authoringEventTypes = [
   "turn.settled",
   "model.requested",
   "model.started",
+  "model.composed",
   "model.retried",
   "model.settled",
   "content.delta",

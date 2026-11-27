@@ -106,29 +106,30 @@
     "eve.reactions": {
       "at": "<time>",
       "latest": {
-        "*": 51,
-        "call.requested": 18,
-        "call.settled": 23,
-        "call.started": 5,
-        "content.completed": 49,
-        "content.delta": 48,
-        "context.settled": 42,
-        "context.settled:compaction": 42,
-        "context.started": 40,
-        "context.started:compaction": 40,
-        "delivery.admitted": 44,
-        "delivery.consumed": 45,
-        "delivery.settled": 51,
-        "interaction.opened": 20,
-        "interaction.settled": 23,
-        "model.requested": 46,
-        "model.settled": 50,
-        "model.started": 47,
+        "*": 57,
+        "call.requested": 21,
+        "call.settled": 26,
+        "call.started": 6,
+        "content.completed": 55,
+        "content.delta": 54,
+        "context.settled": 47,
+        "context.settled:compaction": 47,
+        "context.started": 45,
+        "context.started:compaction": 45,
+        "delivery.admitted": 49,
+        "delivery.consumed": 50,
+        "delivery.settled": 57,
+        "interaction.opened": 23,
+        "interaction.settled": 26,
+        "model.composed": 53,
+        "model.requested": 51,
+        "model.settled": 56,
+        "model.started": 52,
         "session.started": 0,
-        "turn.paused": 21,
-        "turn.settled": 51,
-        "turn.started": 45,
-        "usage.recorded": 50
+        "turn.paused": 24,
+        "turn.settled": 57,
+        "turn.started": 50,
+        "usage.recorded": 56
       },
       "revision": "bundled",
       "slots": {
@@ -257,7 +258,7 @@
                   "value": "Yes."
                 }
               },
-              "position": 52,
+              "position": 58,
               "responses": {},
               "runs": {
                 "run_6": {
@@ -279,7 +280,11 @@
                     "cacheReadTokens": 0,
                     "cacheWriteTokens": 0,
                     "inputTokens": 1,
-                    "outputTokens": 1
+                    "outputTokens": 1,
+                    "unreported": [
+                      "cacheReadTokens",
+                      "cacheWriteTokens"
+                    ]
                   }
                 }
               },

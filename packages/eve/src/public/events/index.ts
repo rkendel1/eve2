@@ -26,6 +26,7 @@ export {
   type Principal,
   type ErrorInfo,
   type Usage,
+  type UsageCount,
   type ValueReference,
   type JsonValue,
   type UserPart,
@@ -130,15 +131,27 @@ export type {
   ModelOwner,
   ModelRequestedData,
   ModelStartedData,
+  ModelComposedData,
+  ModelCompositionEstimator,
+  ModelCompositionTokens,
   ModelRetriedData,
   ModelOutcome,
   ModelSettledData,
   ModelRequested,
   ModelStarted,
+  ModelComposed,
   ModelRetried,
   ModelSettled,
   ModelFact,
 } from "#protocol/session-events/families/model.js";
+
+export {
+  modelCalls,
+  type ModelCall,
+  type ModelCallCache,
+  type ModelCallUsage,
+  type ReportedCount,
+} from "#protocol/session-events/model-calls.js";
 
 export type {
   ResponseValue,
