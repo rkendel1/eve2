@@ -179,13 +179,34 @@ Each slice is one PR in its owning repository unless stated otherwise. "Blocks" 
   - per-application isolation of store contents;
   - the operations are refused unless declared.
 - **Tests:** `appboundry-host/test/sessions-interface.test.ts`, using a probe guest. Restart persistence is checked by reopening the store in a new host process.
-- **Verified (S2, in review):**
-  - `sessions@1` in `appboundry-host` (`src/sessions.ts`), available in actions only; documented in `docs/artifact-runtime.md`.
-  - Contract, isolation (two applications on one FeltDB) and failure tests (`test/sessions.test.ts`): conflict, invalid input, corrupt data as `DATA_LOSS`, uncommitted writes as `UNAVAILABLE`.
-  - SIGKILL restart tests in separate processes (`test/sessions-restart.test.ts`), including a kill mid-stream.
-  - eve's restart scenarios on the production capability, on Node and Boa (`experiments/eve-host-boa`, `EVE_STORE=appboundry`).
-  - It found an eve fix: the host's `idle()` and `dispose()` did not wait for store writes, so with a store whose writes take time, `idle()` resolved before a restored session's checkpoint was written.
-- **Not verified:** a remote FeltDB backend (a required test before S7, not an assumed result); durability past process death (power loss is the backend's promise); backup and retention of session contents (S10).
+- **S2 status (AppBoundry PR in review; eve fix merged in #41).**
+- **Implemented and verified:**
+  - `sessions@1` in `appboundry-host` (`src/sessions.ts`), actions only, in the host's own FeltDB state: `_appboundry_agent_sessions` and `_appboundry_agent_session_lines`. Documented in `docs/artifact-runtime.md`.
+  - Contract and failure tests (`test/sessions.test.ts`):
+    - ordering;
+    - `CONFLICT` for a repeated, out-of-order or concurrent append;
+    - invalid input;
+    - corrupt data as `DATA_LOSS`, never an empty restore;
+    - uncommitted writes as `UNAVAILABLE`;
+    - refusal when not declared or outside an action.
+  - Isolation: two applications on one FeltDB, guest-supplied scope ignored, and `db.*` refused on both collections.
+  - Process death (`test/sessions-restart.test.ts`): a SIGKILLed host, then a fresh host process reads every acknowledged line and record back in order, including after a kill mid-stream.
+  - eve through `EveHostStore` (`experiments/eve-host-boa`): 12/12 SIGKILL scenarios on Node and Boa, each on the file store and on `sessions@1` in a real `ArtifactHost`:
+    - history and conversation isolation;
+    - approvals run once;
+    - completed effects not repeated;
+    - interrupted effects reported as uncertain and not retried.
+  - eve's `idle()` and `dispose()` wait for store writes (#41). eve takes no FeltDB dependency.
+- **Implemented, not verified against a remote FeltDB:**
+  - the managed contract declares both collections, so the managed authority accepts them and managed backups include them (contract test only);
+  - running `sessions@1` against a `feltdb-server` (`managed-acceptance.test.ts` with `FELTDB_REPO`) is a required test before S7.
+- **Remaining limitations:**
+  - durability beyond process death (for example power loss) is whatever the configured FeltDB promises;
+  - the 10,000-session cap is enforced when sessions are read back with `sessions.readSessions`, not when they are written;
+  - no session deletion or retention.
+- **Later slices:**
+  - eve does not yet run in the production host (S3 model access, S4 lifecycle and timers, S7);
+  - backup, retention and operations of session state (S10).
 
 **S3: `model@1`, host-resolved models.** AppBoundry. Blocks.
 
@@ -256,19 +277,19 @@ Each slice is one PR in its owning repository unless stated otherwise. "Blocks" 
 
 ## 5. Status
 
-| Slice                                        | Repository                     | Status           | PR  |
-| -------------------------------------------- | ------------------------------ | ---------------- | --- |
-| S1 Durable host sessions                     | eve2                           | Done             | #39 |
-| S2 `sessions@1`                              | appboundry                     | Done (in review) |     |
-| S3 `model@1`                                 | appboundry                     | Not started (D3) |     |
-| S4 Agent lifecycle, timers, capability fetch | appboundry                     | Not started (D1) |     |
-| S5 Cold start                                | appboundry / eve2              | Not started (D6) |     |
-| S6 `.app` producer                           | eve2 or appboundry             | Not started      |     |
-| S7 Eve `.app` on `appboundry-host`           | appboundry                     | Not started      |     |
-| S8 Application connections, `actingAs`       | appboundry                     | Not started (D4) |     |
-| S9 FeltKit organizational client             | feltkit                        | Not started      |     |
-| S10 Operations                               | appboundry, feltkit            | Not started      |     |
-| S11 Real applications                        | meetings, feltkit-eve, feltkit | Not started      |     |
+| Slice                                        | Repository                     | Status           | PR      |
+| -------------------------------------------- | ------------------------------ | ---------------- | ------- |
+| S1 Durable host sessions                     | eve2                           | Done             | #39     |
+| S2 `sessions@1`                              | appboundry                     | Done (in review) | eve #41 |
+| S3 `model@1`                                 | appboundry                     | Not started (D3) |         |
+| S4 Agent lifecycle, timers, capability fetch | appboundry                     | Not started (D1) |         |
+| S5 Cold start                                | appboundry / eve2              | Not started (D6) |         |
+| S6 `.app` producer                           | eve2 or appboundry             | Not started      |         |
+| S7 Eve `.app` on `appboundry-host`           | appboundry                     | Not started      |         |
+| S8 Application connections, `actingAs`       | appboundry                     | Not started (D4) |         |
+| S9 FeltKit organizational client             | feltkit                        | Not started      |         |
+| S10 Operations                               | appboundry, feltkit            | Not started      |         |
+| S11 Real applications                        | meetings, feltkit-eve, feltkit | Not started      |         |
 
 ## 6. Final acceptance scenario
 
