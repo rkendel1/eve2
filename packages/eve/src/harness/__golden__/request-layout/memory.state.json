@@ -321,6 +321,28 @@
                 }
               }
             }
+          },
+          "eve.transcript": {
+            "archived": [
+              {
+                "content": "Did QA pass?",
+                "kind": "user",
+                "metadata": {
+                  "eve.turn": "turn_0"
+                },
+                "role": "user"
+              },
+              {
+                "content": [
+                  {
+                    "text": "QA passed.",
+                    "type": "text"
+                  }
+                ],
+                "role": "assistant"
+              }
+            ],
+            "projected": 3
           }
         }
       }
