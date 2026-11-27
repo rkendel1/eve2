@@ -1,10 +1,11 @@
-import type { DeliverHookPayload, SessionCapabilities } from "#channel/types.js";
+import type { SessionCapabilities } from "#channel/types.js";
+import { isObject } from "#shared/guards.js";
 import {
   SESSION_CHECKPOINT_VERSION,
   type SessionCheckpoint,
   type SessionTransferState,
 } from "#execution/session/checkpoint.js";
-import type { SessionCheckpointSink } from "#execution/session/turn.js";
+import type { OpenTurn, SessionCheckpointSink } from "#execution/session/turn.js";
 import type { AgentWorkflowRetentionDefinition } from "#shared/agent-definition.js";
 
 export interface DurableSessionStore {
@@ -25,7 +26,7 @@ export interface StoredSession {
   readonly retention?: AgentWorkflowRetentionDefinition;
   readonly sessionTimeoutMs: number | false;
   readonly checkpoint?: SessionCheckpoint;
-  readonly openTurn?: { readonly delivery?: DeliverHookPayload };
+  readonly openTurn?: OpenTurn;
   readonly ended?: true;
 }
 
@@ -111,7 +112,34 @@ export function decodeStoredSession(record: string): StoredSession {
       `Session record version ${String(session.version)} is not one this eve reads (${STORED_SESSION_VERSION}).`,
     );
   }
+  assertContinuation(session);
   return session;
+}
+
+function assertContinuation(session: StoredSession): void {
+  const { step, waiting } = (session.openTurn ?? {}) as { step?: unknown; waiting?: unknown };
+  const results = isObject(step) ? step.runtimeResults : undefined;
+  const valid =
+    (waiting === undefined ||
+      (isObject(waiting) &&
+        waiting.on === "tasks" &&
+        Array.isArray(waiting.taskIds) &&
+        waiting.taskIds.every((id: unknown) => typeof id === "string"))) &&
+    (step === undefined || isObject(step)) &&
+    (results === undefined ||
+      (isObject(results) &&
+        Array.isArray(results.results) &&
+        results.results.every(
+          (result: unknown) =>
+            isObject(result) &&
+            typeof result.callId === "string" &&
+            typeof result.kind === "string",
+        )));
+  if (!valid) {
+    throw new Error(
+      `Session ${session.sessionId} was interrupted mid-turn, and its stored continuation is not one eve can read. eve did not resume the turn, to avoid repeating or skipping its work.`,
+    );
+  }
 }
 
 export interface SessionPersistence extends SessionCheckpointSink {
@@ -133,10 +161,7 @@ export function createSessionPersistence(store: DurableSessionStore): SessionPer
         version: STORED_SESSION_VERSION,
       });
     },
-    async checkpoint(
-      state: SessionTransferState,
-      openTurn?: { readonly delivery?: DeliverHookPayload },
-    ) {
+    async checkpoint(state: SessionTransferState, openTurn?: OpenTurn) {
       const session = tracked.get(state.sessionState.sessionId);
       if (session === undefined || session.ended === true) return;
       const { openTurn: _previous, ...rest } = session;

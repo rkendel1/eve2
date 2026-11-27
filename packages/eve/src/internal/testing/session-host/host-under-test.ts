@@ -12,9 +12,12 @@ import type { StoredWait } from "#internal/testing/local-world-database.js";
 import { currentTestWorld } from "#internal/testing/workflow-test-world.js";
 import { cancelRun } from "#internal/workflow/runtime.js";
 import { createBundledRuntimeCompiledArtifactsSource } from "#runtime/compiled-artifacts-source.js";
+import type { SessionRestoration } from "#execution/in-process/runtime.js";
 import {
   decodeStoredSession,
+  encodeStoredSession,
   type DurableSessionStore,
+  type StoredSession,
 } from "#execution/in-process/session-store.js";
 import type { WorkflowBody } from "#tools/workflow-body.js";
 
@@ -53,7 +56,9 @@ export interface HostUnderTest {
   settled(): Promise<void>;
   failedWrites(): number;
   workflowRunsStarted(): Promise<number>;
-  restart?(options?: { readonly beforeStart?: () => Promise<void> }): Promise<void>;
+  restart?(options?: {
+    readonly beforeStart?: () => Promise<void>;
+  }): Promise<SessionRestoration | void>;
   cancelRunOutsideEve?(sessionId: string): Promise<void>;
   storedWaits?(): Promise<StoredWait[]>;
   runStatus?(runId: string): Promise<string>;
@@ -61,6 +66,7 @@ export interface HostUnderTest {
   rewriteRunAttributes?(runId: string, patch: Record<string, string | undefined>): Promise<void>;
   storedSessions?(): Promise<{ readonly sessionId: string; readonly ownerKey: unknown }[]>;
   forgetSession?(sessionId: string): void;
+  rewriteSession?(sessionId: string, edit: (session: StoredSession) => StoredSession): void;
   dispose(): Promise<void>;
 }
 
@@ -221,15 +227,20 @@ async function makeInProcessDurableHost(setup: HostSetup = {}): Promise<HostUnde
       await current.dispose().catch(() => {});
       await options?.beforeStart?.();
       current = open();
-      await current.restore();
+      return await current.restore();
     },
     async storedSessions() {
       return [...store.records].map(([sessionId, record]) => ({
-        ownerKey: decodeStoredSession(record).ownerKey,
+        ownerKey: (JSON.parse(record) as { readonly ownerKey?: unknown }).ownerKey,
         sessionId,
       }));
     },
     forgetSession: (sessionId) => store.forget(sessionId),
+    rewriteSession(sessionId, edit) {
+      const record = store.records.get(sessionId);
+      if (record === undefined) throw new Error(`No stored session ${sessionId}.`);
+      store.records.set(sessionId, encodeStoredSession(edit(decodeStoredSession(record))));
+    },
     dispose: () => current.dispose(),
   };
 }

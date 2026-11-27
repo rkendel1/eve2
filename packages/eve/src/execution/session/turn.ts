@@ -82,11 +82,14 @@ const NO_INPUT_CAPABILITY_ERROR_MESSAGE =
   "This session cannot request human input, so it cannot wait for a tool approval or question. " +
   "Configure unattended tools with an approval policy that does not require human input.";
 
+export interface OpenTurn {
+  readonly delivery?: DeliverHookPayload;
+  readonly step?: TurnStepPayload;
+  readonly waiting?: Extract<TurnPause, { readonly on: "tasks" }>;
+}
+
 export interface SessionCheckpointSink {
-  checkpoint(
-    state: SessionTransferState,
-    openTurn?: { readonly delivery?: DeliverHookPayload },
-  ): Promise<void>;
+  checkpoint(state: SessionTransferState, openTurn?: OpenTurn): Promise<void>;
 }
 
 export interface SessionTurnHost {
@@ -125,6 +128,7 @@ export class SessionExecution {
     options: {
       readonly caller?: TurnCaller;
       readonly control?: TurnControl;
+      readonly waiting?: OpenTurn["waiting"];
     } = {},
   ): Promise<TurnOutcome> {
     const { cursor } = this.input;
@@ -139,7 +143,7 @@ export class SessionExecution {
       options.control,
     );
     try {
-      const outcome = await this.runTurnSteps(turn, delivery);
+      const outcome = await this.runTurnSteps(turn, delivery, options.waiting);
       await this.handleBoundaryMessages(turn.takeBoundaryMessages(), outcome.kind === "done");
       if (outcome.kind === "park" && outcome.settled !== undefined) {
         await cancelWorkingTasks(this.input.cursor, "turn-ended");
@@ -186,10 +190,16 @@ export class SessionExecution {
   private async runTurnSteps(
     turn: ActiveTurn,
     delivery: TurnStepPayload | undefined,
+    waiting: OpenTurn["waiting"],
   ): Promise<TurnOutcome> {
     let nextStepInput: TurnStepPayload | undefined = delivery;
     let bindCaller = turn.caller;
     let heldByControl = false;
+    if (waiting !== undefined) {
+      const resumed = await this.continueAfter(turn, waiting, this.input.queue.nextAdmission);
+      if (resumed === "cancelled") return await this.finishCancelledTurn(turn);
+      nextStepInput = resumed;
+    }
 
     while (true) {
       const { cursor } = this.input;
@@ -260,13 +270,7 @@ export class SessionExecution {
             continue;
           }
           heldByControl = false;
-          await this.input.host.persistence?.checkpoint({
-            admittedDeliveryKeys: this.input.queue.admittedDeliveryKeys,
-            history: cursor.history,
-            serializedContext: cursor.serializedContext,
-            sessionState: cursor.sessionState,
-          });
-          const resumed = await this.resume(turn, result, stepAdmission);
+          const resumed = await this.continueAfter(turn, result, stepAdmission);
           if (resumed === "cancelled") return await this.finishCancelledTurn(turn);
           nextStepInput = resumed;
           continue;
@@ -274,18 +278,36 @@ export class SessionExecution {
         case "continue":
           heldByControl = false;
           nextStepInput = await this.withSteering(turn, {});
-          await this.input.host.persistence?.checkpoint(
-            {
-              admittedDeliveryKeys: this.input.queue.admittedDeliveryKeys,
-              history: cursor.history,
-              serializedContext: cursor.serializedContext,
-              sessionState: cursor.sessionState,
-            },
-            { delivery: nextStepInput?.delivery },
-          );
+          await this.checkpoint({ delivery: nextStepInput?.delivery });
           continue;
       }
     }
+  }
+
+  private async continueAfter(
+    turn: ActiveTurn,
+    paused: TurnPause,
+    heldSince: number,
+  ): Promise<TurnStepPayload | undefined | "cancelled"> {
+    await this.checkpoint(paused.on === "tasks" ? { waiting: paused } : undefined);
+    const resumed = await this.resume(turn, paused, heldSince);
+    if (resumed !== "cancelled" && paused.on !== "interaction") {
+      await this.checkpoint({ delivery: resumed?.delivery, step: resumed });
+    }
+    return resumed;
+  }
+
+  private async checkpoint(openTurn: OpenTurn | undefined): Promise<void> {
+    const { cursor } = this.input;
+    await this.input.host.persistence?.checkpoint(
+      {
+        admittedDeliveryKeys: this.input.queue.admittedDeliveryKeys,
+        history: cursor.history,
+        serializedContext: cursor.serializedContext,
+        sessionState: cursor.sessionState,
+      },
+      openTurn,
+    );
   }
 
   private async awaitResume(
