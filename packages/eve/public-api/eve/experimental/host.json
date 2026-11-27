@@ -6,6 +6,7 @@
   "EveHostModels",
   "EveHostOptions",
   "EveHostRestoration",
+  "EveHostRestoreScope",
   "EveHostStore",
   "EveModelReference",
   "createEveHost"

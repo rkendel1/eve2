@@ -16,11 +16,12 @@ const storeOn = (prefix) => ({
   readSessions: async () => (await host(`${prefix}.readSessions`, {})).sessions,
 });
 let started;
-const eveFor = (durable, contract) =>
+const eveFor = (durable, contract, scope) =>
   (started ??= loadAgent().then((agent) =>
     createEveHost({
       agent,
       ...(durable && { store: storeOn(protocol() === "appboundry" ? "sessions" : "store") }),
+      ...(scope !== undefined && { restore: { connection: scope } }),
       models: {
         resolve: (reference) => {
           references.push(reference.id);
@@ -36,18 +37,7 @@ const summary = (result) => ({
   status: result.status,
   sessionId: result.sessionId,
   reply: result.reply ?? null,
-  interactions: (result.interactions ?? []).map((interaction) => ({
-    interactionId: interaction.interactionId,
-    kind: interaction.kind ?? null,
-    call: interaction.call
-      ? {
-          callId: interaction.call.callId,
-          toolName: interaction.call.toolName,
-          input: interaction.call.input,
-        }
-      : null,
-    options: (interaction.options ?? []).map((option) => option.id ?? option.optionId ?? option),
-  })),
+  interactions: JSON.parse(JSON.stringify(result.interactions ?? [])),
   error: result.error ? String(result.error.message ?? result.error) : null,
 });
 
@@ -74,11 +64,30 @@ async function sessionLines(eve, sessionId, limit = 60) {
 }
 
 async function deliver(request, act) {
-  const eve = await eveFor(request.durable === true, request.models);
-  const conversation = eve.connect({
-    application: request.application,
-    conversation: request.conversation,
-  });
+  const connection = { application: request.application, conversation: request.conversation };
+  const starting = started === undefined;
+  const t0 = Date.now();
+  const eve = await eveFor(
+    request.durable === true,
+    request.models,
+    request.scoped ? connection : undefined,
+  );
+  const t1 = Date.now();
+  let start;
+  if (request.scoped) {
+    const { refused, restored } = await eve.restoration;
+    if (starting)
+      start = { loadMs: t1 - t0, restoreMs: Date.now() - t1, restored: restored.length };
+    if (refused.length > 0) {
+      throw Object.assign(
+        new Error(
+          `${request.application} conversation "${request.conversation}" has a stored session this eve cannot restore (${refused.map((r) => `${r.sessionId}: ${r.reason}`).join("; ")}); its record is left as it was, and nothing is delivered.`,
+        ),
+        { code: "SESSION_UNRESTORABLE" },
+      );
+    }
+  }
+  const conversation = eve.connect(connection);
   const accepted = await act(conversation);
   try {
     const result = await within(
@@ -87,7 +96,7 @@ async function deliver(request, act) {
       "the delivery's result",
     );
     await within(eve.idle(), request.idleMs ?? 120_000, "eve's idle");
-    return { ...summary(result), modelReferences: references.splice(0) };
+    return { ...summary(result), modelReferences: references.splice(0), ...(start && { start }) };
   } catch (error) {
     const lines = await sessionLines(eve, accepted.sessionId);
     throw Object.assign(
@@ -228,6 +237,7 @@ function delivery(args, invocation) {
     auth: authOf(invocation.principal),
     durable: true,
     models: "generate",
+    scoped: true,
   };
 }
 

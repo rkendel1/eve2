@@ -47,8 +47,12 @@ export interface SessionRestoration {
   readonly refused: readonly { readonly sessionId: string; readonly reason: string }[];
 }
 
+export interface SessionRestoreScope {
+  readonly continuationToken: string;
+}
+
 export interface InProcessRuntime extends Runtime {
-  restore(): Promise<SessionRestoration>;
+  restore(scope?: SessionRestoreScope): Promise<SessionRestoration>;
   settled(sessionId: string): Promise<void>;
   holds(token: string): boolean;
   stepsRunning(sessionId: string): number;
@@ -221,13 +225,14 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
 
     startEntry: (entry) => startEntry(entry, undefined),
 
-    async restore() {
+    async restore(scope) {
       const restored: string[] = [];
       const refused: { sessionId: string; reason: string }[] = [];
       if (host.store === undefined) return { refused, restored };
       for (const { sessionId, record } of await host.store.readSessions()) {
         try {
           const stored = decodeStoredSession(record);
+          if (scope !== undefined && stored.continuationToken !== scope.continuationToken) continue;
           if (stored.ended === true || stored.checkpoint === undefined) continue;
           await host.working(() => restoreEntry(stored));
           restored.push(sessionId);

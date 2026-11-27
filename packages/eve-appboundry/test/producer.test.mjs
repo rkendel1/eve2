@@ -236,18 +236,25 @@ describe("producing the organization's agent", { skip: needsEngine, timeout: 600
     );
   });
 
-  it("rebuilds the same bytes from the same inputs", async () => {
-    const first = await artifactOf("minimal-agent");
-    const again = await produce({
-      appRoot: fixture("minimal-agent"),
-      engine: ENGINE,
-      out: join(scratch(), "again.app"),
-    });
-    assert.equal(again.manifest.module.sha256, first.manifest.module.sha256);
-    assert.equal(
-      readFileSync(join(again.path, "manifest.json"), "utf8"),
-      readFileSync(join(first.path, "manifest.json"), "utf8"),
-    );
+  it("rebuilds the same bytes from the same inputs, the model catalog included", async () => {
+    const pinned = process.env.EVE_MODEL_CATALOG;
+    process.env.EVE_MODEL_CATALOG = "bundled";
+    try {
+      const build = () =>
+        produce({
+          appRoot: fixture("minimal-agent"),
+          engine: ENGINE,
+          out: join(scratch(), "again.app"),
+        });
+      const first = await build();
+      const again = await build();
+      assert.equal(again.manifest.module.sha256, first.manifest.module.sha256);
+      assert.deepEqual(again.manifest, first.manifest);
+      assert.equal(first.report.modelCatalog.fetchedAt, again.report.modelCatalog.fetchedAt);
+    } finally {
+      if (pinned === undefined) delete process.env.EVE_MODEL_CATALOG;
+      else process.env.EVE_MODEL_CATALOG = pinned;
+    }
   });
 
   it("refuses an engine that already carries a program, and an output that is not an artifact", async () => {

@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { bundleGuest } from "./bundle.mjs";
 import { deriveKeep } from "./keep.mjs";
 import { artifactManifest } from "./manifest.mjs";
-import { moduleMapEntries } from "./module-map.mjs";
+import { frameworkModules, moduleMapEntries } from "./module-map.mjs";
 import { findSecrets } from "./secrets.mjs";
 import { appendCustomSection, customSections, PROGRAM_SECTION } from "./wasm.mjs";
 
@@ -72,7 +72,8 @@ async function eveOf(appRoot) {
   const { compileAgent } = await import(
     pathToFileURL(join(dist, "compiler/compile-agent.js")).href
   );
-  return { version: JSON.parse(readFileSync(manifestPath, "utf8")).version, dist, compileAgent };
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  return { version: manifest.version, root, manifest, dist, compileAgent };
 }
 
 function agentTools(compiled, keep) {
@@ -103,6 +104,65 @@ function agentTools(compiled, keep) {
       decision: kept ? "kept: the module map loads it on demand" : "missing",
     };
   });
+}
+
+export const VERIFIED_EVE_TOOLS = new Set(["ask_question", "no_reply"]);
+
+const SANDBOX = "it works in the agent's sandbox, and AppBoundry provides none";
+const EVE_TOOL_NEEDS = {
+  bash: SANDBOX,
+  read_file: SANDBOX,
+  write_file: SANDBOX,
+  edit_file: SANDBOX,
+  glob: SANDBOX,
+  grep: SANDBOX,
+  web_fetch:
+    "it fetches from the network, and AppBoundry gives an artifact no network (other systems are reached through capabilities@1)",
+  web_search:
+    "it is a provider tool that runs inside the model provider's call, and model@1 does not run provider tools",
+  agent:
+    "it runs each call as a child session task, which this host does not keep durably (roadmap D5); not verified on AppBoundry",
+  sleep: "it waits on the Workflow runtime, which the guest does not carry",
+};
+
+function eveToolEntries(eve) {
+  const entries = new Map();
+  for (const [key, target] of Object.entries(eve.manifest.exports ?? {})) {
+    const match = /^\.\/tools\/([a-z_]+)$/.exec(key);
+    if (!match || match[1] === "approval") continue;
+    const file = typeof target === "string" ? target : (target.import ?? target.default);
+    if (typeof file === "string") entries.set(join(eve.root, file), match[1]);
+  }
+  for (const [logicalPath, path] of frameworkModules(eve.dist)) {
+    const match = /^tools\/([a-z_]+)\.ts$/.exec(logicalPath);
+    if (match) entries.set(path, match[1]);
+  }
+  return entries;
+}
+
+function toolProblems(tool, report, manifestTools) {
+  const problems = [];
+  const needs = tool.nodeBuiltins.filter((site) => !(site.builtin in report.implemented));
+  if (needs.length) {
+    problems.push(
+      `${[...new Set(needs.map((n) => `node:${n.builtin}`))].join(", ")}, from ${[...new Set(needs.map((n) => n.importer))].join(", ")}`,
+    );
+  }
+  for (const name of tool.eveTools) {
+    if (!VERIFIED_EVE_TOOLS.has(name)) {
+      problems.push(
+        EVE_TOOL_NEEDS[name] ??
+          `eve's ${name} tool is not verified on AppBoundry's production host`,
+      );
+    }
+  }
+  if (
+    manifestTools.find((t) => t.name === tool.tool)?.behavior?.handling?.kind === "provider-tool" &&
+    !problems.includes(EVE_TOOL_NEEDS.web_search)
+  ) {
+    problems.push(EVE_TOOL_NEEDS.web_search);
+  }
+  return problems;
 }
 
 export async function produce({ appRoot: appRootInput, engine: enginePath, out: outInput }) {
@@ -159,6 +219,7 @@ export async function produce({ appRoot: appRootInput, engine: enginePath, out: 
     compiled,
     keep,
     toolModules,
+    eveToolEntries: eveToolEntries(eve),
     application: {
       id: declaration.application.id,
       producer: `${producer.name}/${producer.version}`,
@@ -184,32 +245,27 @@ export async function produce({ appRoot: appRootInput, engine: enginePath, out: 
       "KEEP_INCOMPLETE",
       `kept modules missing from the bundle: ${unbundled.map((k) => k.module).join(", ")}`,
     );
-  const unavailable = tools
-    .map((t) => ({
-      ...t,
-      needs: (report.tools[t.tool]?.nodeBuiltins ?? []).filter(
-        (site) => !(site.builtin in report.implemented),
-      ),
-    }))
-    .filter((t) => t.needs.length);
+  const toolReport = tools.map(({ path: _path, ...t }) => ({
+    ...t,
+    ...(report.tools[t.tool] ?? { module: null, nodeBuiltins: [], eveTools: [] }),
+  }));
+  const unavailable = toolReport
+    .map((t) => ({ ...t, problems: toolProblems(t, report, compiled.manifest.tools ?? []) }))
+    .filter((t) => t.problems.length);
   if (unavailable.length) {
     fail(
       "TOOL_UNAVAILABLE",
       [
-        "these tools need Node built-ins the AppBoundry guest does not have, so the model could call them but they could not run:",
-        ...unavailable.map(
-          (t) =>
-            `  ${t.tool} (${t.source}): ${[...new Set(t.needs.map((n) => `node:${n.builtin}`))].join(", ")}, from ${[...new Set(t.needs.map((n) => n.importer))].join(", ")}`,
-        ),
+        "these tools could be offered to the model but could not run on AppBoundry:",
+        ...unavailable.map((t) => `  ${t.tool} (${t.source}): ${t.problems.join("; ")}`),
         "Remove them from the agent: a default tool with `defaultTools: false` in agent.ts (or `export default disableTool()` in tools/<name>.ts), a declared one by deleting its file.",
       ].join("\n"),
       {
         agent: {
           name: compiled.manifest.config.name,
-          tools: tools.map(({ path: _path, ...t }) => ({
+          tools: toolReport.map((t) => ({
             ...t,
-            module: report.tools[t.tool]?.module ?? null,
-            nodeBuiltins: report.tools[t.tool]?.nodeBuiltins ?? [],
+            problems: toolProblems(t, report, compiled.manifest.tools ?? []),
           })),
         },
         keep: report.kept,
@@ -267,11 +323,12 @@ export async function produce({ appRoot: appRootInput, engine: enginePath, out: 
       agent: {
         name: compiled.manifest.config.name,
         model: compiled.manifest.config.model?.id ?? null,
-        tools: tools.map(({ path: _path, ...t }) => ({
-          ...t,
-          module: report.tools[t.tool]?.module ?? null,
-          nodeBuiltins: report.tools[t.tool]?.nodeBuiltins ?? [],
-        })),
+        tools: toolReport,
+      },
+      modelCatalog: {
+        fetchedAt:
+          JSON.parse(readFileSync(compiled.paths.modelMetadataPath, "utf8")).fetchedAt ?? null,
+        source: process.env.EVE_MODEL_CATALOG === "bundled" ? "bundled" : "remote",
       },
       interfaces: manifest.runtime.interfaces,
       requires: declaration.requires,
