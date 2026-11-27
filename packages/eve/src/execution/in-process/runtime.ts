@@ -185,7 +185,9 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
     await inbox.claimSessionHook(sessionCommandHookToken(sessionId));
     if (stored.continuationToken !== "") await inbox.claimSessionHook(stored.continuationToken);
     await host.persistence!.track(stored);
-    if (stored.openTurn !== undefined) host.retryFirstStep(sessionId);
+    if (stored.openTurn !== undefined && stored.openTurn.waiting === undefined) {
+      host.retryFirstStep(sessionId);
+    }
     run(
       sessionId,
       {
@@ -205,7 +207,12 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
         start:
           stored.openTurn === undefined
             ? { kind: "parked" }
-            : { input: stored.openTurn.delivery, kind: "turn" },
+            : {
+                input: stored.openTurn.delivery,
+                kind: "turn",
+                step: stored.openTurn.step,
+                waiting: stored.openTurn.waiting,
+              },
       },
       inbox,
     );

@@ -18,7 +18,7 @@ import { turnCoordinates } from "#protocol/session-projection.js";
 import type { HarnessModelMessage } from "#harness/messages.js";
 import { nextTurnDelivery, type NextTurnInstruction } from "#execution/session/next-input.js";
 import { SessionInputQueue, type ControlOrigin } from "#execution/session/input-queue.js";
-import { SessionExecution, type SessionTurnHost } from "#execution/session/turn.js";
+import { SessionExecution, type OpenTurn, type SessionTurnHost } from "#execution/session/turn.js";
 import {
   createTurnControl,
   nextTurnControl,
@@ -55,7 +55,12 @@ export type SessionAnchor =
     };
 
 export type SessionStart =
-  | { readonly kind: "turn"; readonly input: DeliverHookPayload | undefined }
+  | {
+      readonly kind: "turn";
+      readonly input: DeliverHookPayload | undefined;
+      readonly step?: TurnStepPayload;
+      readonly waiting?: OpenTurn["waiting"];
+    }
   | { readonly kind: "first-message" }
   | { readonly kind: "parked" };
 
@@ -361,7 +366,10 @@ async function runSessionLoop(
   let turnControl =
     boot.initialTurnControl ?? (boot.anchor.kind === "self" ? createTurnControl() : undefined);
   let compactionHandoffDue = false;
-  const runTurn = async (payload: TurnStepPayload | undefined): Promise<TurnOutcome> => {
+  const runTurn = async (
+    payload: TurnStepPayload | undefined,
+    waiting?: OpenTurn["waiting"],
+  ): Promise<TurnOutcome> => {
     const caller = progress.caller;
     const control = turnControl;
     turnControl = undefined;
@@ -370,7 +378,7 @@ async function runSessionLoop(
       payload?.control === undefined
         ? turnCoordinates(storedProjection(cursor.sessionState.snapshot.session.state)).turnId
         : undefined;
-    const outcome = await execution.runTurn(payload, { caller, control });
+    const outcome = await execution.runTurn(payload, { caller, control, waiting });
     if (control !== undefined) turnControl ??= nextTurnControl(control);
     progress.turnId = undefined;
     sessionTimeout?.recordActivity();
@@ -471,9 +479,12 @@ async function runSessionLoop(
       case "parked":
         return { action: { kind: "park" }, kind: "action" };
       case "turn": {
-        const { input } = boot.start;
-        await host.persistence?.checkpoint(transferState(), { delivery: input });
-        const action = await runTurn(input === undefined ? undefined : { delivery: input });
+        const { input, step, waiting } = boot.start;
+        await host.persistence?.checkpoint(transferState(), { delivery: input, step, waiting });
+        const action = await runTurn(
+          step ?? (input === undefined ? undefined : { delivery: input }),
+          waiting,
+        );
         return { action, kind: "action" };
       }
     }
