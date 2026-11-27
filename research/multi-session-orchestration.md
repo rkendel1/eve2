@@ -20,7 +20,7 @@ This document covers the audit of eve2 main `067aba6` and AppBoundry main `6a021
   - State: the task table (`execution/tasks/table.ts`) holds the run address, pending calls and results.
 - **Workflow.** The serve run is a Workflow run. Workflow journals and replays it, so a child's reply reaches the parent after a process dies. Remote agents (`execution/agent-sessions/steps.ts`) exist only here.
 - **In-process.**
-  - `execution/in-process/runs.ts` runs the same serve body in memory, with hooks opened `keep: KEEP_NOTHING`. Children are real sessions created through the host's own runtime (`localSessions.start` → `createSession`), so with a `DurableSessionStore` the child session itself is persisted.
+  - `execution/in-process/runs.ts` runs the same serve body in memory, with hooks opened `keep: KEEP_NOTHING`. Children are real sessions created through the host's own runtime (`localSessions.start` → `createSession`). Before the EVE stage below they were **not** persisted: `bootEntry` tracked only sessions owned by a person or by nobody, and a child's owner is `{ root }`. #51's first version of this document said otherwise, which was wrong.
   - The bridge is not: after a process dies, the parent never hears the child.
   - Remote agents and tools that start, send to or read other sessions are refused (`NO_STEP_RUNTIME`, `recordRemoteBinding`).
 - **AppBoundry.**
@@ -30,15 +30,13 @@ This document covers the audit of eve2 main `067aba6` and AppBoundry main `6a021
 
 ## Verified
 
-The session-host battery has a new case: the process dies while an `agent` child is working, and the parent must still hear the child's reply after restart. It runs under a new declared capability, `durableChildren`.
+The session-host battery case: the process dies while an `agent` child works, and the parent must still hear the child's reply after restart. It runs under the declared capability `durableChildren`.
 
-| Host                            | Result                                                                 |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| Workflow (local world)          | pass, about 3.3 s                                                      |
-| in-process with a durable store | fails (the parent waits forever), so declared `durableChildren: false` |
-| in-process                      | not durable, so skipped                                                |
-
-The battery as a whole: 36 pass and 12 skip by declared capability; none fail.
+| Host                            | Result                                           |
+| ------------------------------- | ------------------------------------------------ |
+| Workflow (local world)          | pass                                             |
+| in-process with a durable store | pass after the EVE stage below; it failed before |
+| in-process                      | not durable, so skipped                          |
 
 ## Contract
 
@@ -64,31 +62,79 @@ The existing `Runtime` (`channel/types.ts`) is the cross-session contract: `crea
 
 Capabilities are checked at invocation as in S8: the connection's capabilities, then AuthBoundry `on_behalf_of` the actor at call time. A child's capability call passes the same check, so disconnect and revocation stay effective across restoration. A child receives only its task message and the parent's verified context for that delivery, not the parent's transcript.
 
-## Chosen recovery design: re-attach from facts
+## EVE stage: re-attach from durable facts (implemented)
 
-No replay engine. On restore, for every working task with `kind: "agent"` in a restored parent's task table:
+No replay of the serve run, and no new session system.
 
-1. Find the child from `child.opened` (owner: the task's call) and the latest `child.sent` delivery for the task's pending call.
-2. Read the child's stream for that delivery's turn:
-   - If it has settled, send the parent the run messages `ctx.reply` would have sent (`reply`, then `outcome`), under the task's run id.
-   - If it has not, follow the stream and do the same when it settles.
-3. Open the task's deterministic hook token again, so cancellation reaches the child. A follow-up call with that `taskId` gets the existing "this task has ended; call without taskId" answer, and the task is marked not resumable.
+### Persistence
 
-Where it plugs in:
+- A child session is checkpointed like any session, with `ownerKey: { root }`.
+- A scoped restore also restores the sessions rooted in what it restored.
 
-- `execution/in-process/runtime.ts` `restoreEntry`, after a session's checkpoint is restored;
-- `execution/in-process/runs.ts` for the task's hook and run id;
-- `execution/tasks/table.ts` for the working tasks;
-- `execution/session-event-stream.ts` to read the child.
+### What restore does
 
-Authored workflow-tool runs stay outside this design (D5) and are reported as interrupted, as today.
+For each restored parent, in `execution/in-process/runtime.ts` `restoreEntry`:
 
-## AppBoundry design
+1. **Facts first.** Calls with a `call.settled` fact and tasks with a `task.ended` fact are dropped from the restored task table (`settledByFacts`). The event lines are committed before the checkpoint, so they are the settlement authority when the checkpoint lags.
+2. **Open agent tasks.** A task with `kind: "agent"` that is not cancelled and has pending calls is adopted (`adoptAgentTasks`). Before the parent runs, the host records a fresh run on the task, under the task's deterministic hook token `eve:task:<session>:<task>`. A late message from the dead run then fails `isActiveTaskRun` and is dropped.
+3. **Child link, in order:**
+   - the parent's `child.sent` for the pending call;
+   - else the child's own durable record: a session whose subagent adapter state names this parent and this call. That is needed because the parent can die before it applies the run's `agent-started` and `agent-sent` messages.
+4. **Recovery** (`execution/in-process/reattach.ts`) re-opens the task hook and sends `started`. It then reads the child's stream with the same `turnSummary` that `Delivery.result()` uses, waiting until that delivery settles, and settles the parent's call through the existing run-message protocol:
+   - **completed:** `reply` for the pending calls, then `outcome: completed`. A follow-up call that arrived meanwhile gets `outcome: failed` ("call without taskId to continue").
+   - **failed or cancelled child turn:** `outcome: failed` with the same message a live serve run gives.
+   - **`end` or `cancel` on the task hook:** cancels the child's turn, then `outcome: cancelled`.
+   - **no link:** `outcome: failed`, saying eve could not confirm whether the agent received the message. No new child is created.
+5. **Checkpointing parked messages.** The session program now checkpoints after applying a run message while parked (`execution/session/program.ts`), so a settlement a parked parent applies is durable. Workflow has no checkpoint sink, so this does not change its behavior.
 
-- **Persistence:** unchanged. Children belong to the parent's lane by `sessions@1`'s first-write binding.
-- **Restore:** a scoped restore must also restore the sessions in the conversation's lane that the conversation opened as children. The lane already confines `readSessions`.
-- **Execution:** an additive `agents@1` operation by which the guest declares lane work still pending (a child turn). The host keeps the lane warm until it settles, or resumes the lane after a restart. The host, not the guest, decides the lane. No cross-lane write is added.
-- **Producer:** allow the `agent` tool once the host declares that operation, and verify it with the two-application suite. Application B's lanes and sessions stay unreachable from A's children, as `#inLane` already enforces.
+### Settlement semantics
+
+- **Child completed:** the child's `delivery.settled` and `turn.settled` in its own durable stream.
+- **Reply delivered:** the parent's inbox received the run message. That is not durable by itself.
+- **Call settled:** the parent's `call.settled` fact.
+
+Recovery acts only when the parent's facts show no settlement. The parent applies a `reply` only for pending calls of the active run, and an `outcome` only for the active run. So a duplicate or late message, or a second recovery after another restart, settles nothing.
+
+### Verified on the durable in-process host
+
+Process death and restart, `internal/testing/session-host/child-recovery.integration.test.ts`:
+
+- a running child, then two more restarts: the call settles once, there is one child, and the child received one delivery;
+- a child that finished before the parent applied its reply;
+- recovery itself interrupted by another restart;
+- a child turn that fails;
+- a parent cancelled during recovery: the child's turn is cancelled and the call is `interrupted`;
+- a missing link: an explicit failure, and no new child.
+
+### Not covered
+
+- **Resuming the parent's own interrupted turn** is a pre-existing gap of the in-process host. A turn that resumed after waiting on its calls is checkpointed without `openTurn` (`execution/session/turn.ts`, the `paused` branch), so it is not resumed after a restart. Marking it open naively makes the retried step dispatch the task again, so it needs its own fix. The tests here assert settlement and no duplicate work, not the parent turn's completion.
+- **Usage** a child spent before the restart is not re-counted by recovery.
+- **A child turn awaiting a person's input** after the restart is not relayed to the parent: recovery waits.
+- **Authored workflow-tool runs** remain D5.
+
+## AppBoundry handoff (separate PR, not implemented)
+
+The code it builds on: `appboundry-host/src/sessions.ts` (`#inLane`, `laneOf`), the agents@1 lane lifecycle in `appboundry-host/src/agents*.ts`, and `ArtifactHost` release and restore.
+
+1. **The gap: background child execution in a lane.**
+   - A child runs in the parent lane's guest instance as a background turn. agents@1 sees only the delivery that is running (`eve:deliver`), so after it returns the host can release the lane as idle, or the host process can die, with the child's turn and the parent's recovery pending.
+   - Nothing restarts them until the next delivery to that lane.
+2. **The smallest host operation: `agents.keepLane { until: "settled" }`.**
+   - A guest-to-host request, made by eve's in-process host while a child turn or recovery is pending, plus a matching release.
+   - The host persists, per lane, that work is pending (a host-owned record keyed by the lane the host assigned) and does not release the lane while it is set.
+   - After a host restart, the host starts every lane with pending work, through the existing restore path that starts a lane's instance. The guest's `runtime.restore()` then restores the lane's sessions and re-attaches as above.
+   - The guest never names a lane. The host takes it from the instance's own lane.
+3. **Discovery after restart.** It needs no new index: children belong to the parent's lane by `sessions@1`'s first-write binding, and `readSessions(lane)` returns the lane's sessions.
+4. **Isolation.**
+   - `#inLane` already refuses any session of another lane (`FORBIDDEN`).
+   - A lane belongs to one application connection (S8: the lane starts with `<application>.`), so a child cannot reach another application's sessions, even by id.
+   - The pending-work record is keyed by the host's lane, so one lane cannot mark, discover or resume another's children.
+5. **At host restart, per child state:**
+   - **running:** the child's own open turn resumes in its restored session;
+   - **completed:** recovery reads the settled turn from the child's stream;
+   - **uncertain capability outcome:** reported, as in S7, and never resent.
+6. **The producer** keeps refusing the `agent` tool until the host declares the operation. Then the two-application suite verifies children under S8 connections.
 
 ## Follow-up inventory (not implemented here)
 

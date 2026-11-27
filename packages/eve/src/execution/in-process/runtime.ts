@@ -28,6 +28,14 @@ import { migrateSessionCheckpoint } from "#execution/session/checkpoint-migratio
 import { createTurnControl } from "#execution/session/turn-control.js";
 import type { SessionBoot } from "#execution/session/program.js";
 import { decodeStoredSession, type StoredSession } from "./session-store.js";
+import {
+  adoptAgentTasks,
+  linkFromChild,
+  settledByFacts,
+  openAgentTasks,
+  type OpenAgentTask,
+  type ReattachHost,
+} from "./reattach.js";
 
 type SessionOwner = string | null | { readonly root: string };
 const ownersByHost = new WeakMap<InProcessHost, Map<string, SessionOwner>>();
@@ -131,7 +139,7 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       if (holder === undefined) throw new Error("The session's address is held elsewhere.");
       return { claimedContinuation: false, sessionId: holder };
     }
-    if (owner !== undefined && (owner === null || typeof owner === "string")) {
+    if (owner !== undefined) {
       await host.persistence?.track({
         capabilities: boot.session.capabilities,
         continuationToken:
@@ -145,7 +153,7 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
     run(sessionId, boot.session, boot.inbox);
     return { claimedContinuation: true, sessionId };
   };
-  const restoreEntry = async (stored: StoredSession): Promise<void> => {
+  const restoreEntry = async (stored: StoredSession): Promise<OpenAgentTask[]> => {
     const migration = migrateSessionCheckpoint(stored.checkpoint);
     if (migration.kind !== "current") {
       throw new Error(
@@ -154,12 +162,22 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
           : migration.detail,
       );
     }
-    const { checkpoint } = migration;
     const { sessionId } = stored;
     const encoder = new TextEncoder();
-    const restoredLines = (await host.store!.readLines(sessionId)).map((line) =>
-      encoder.encode(line),
-    );
+    const storedLines = await host.store!.readLines(sessionId);
+    const tasks = openAgentTasks({
+      lines: storedLines,
+      sessionId,
+      sessionState: migration.checkpoint.sessionState,
+    });
+    const checkpoint = {
+      ...migration.checkpoint,
+      sessionState: adoptAgentTasks(
+        settledByFacts(migration.checkpoint.sessionState, storedLines),
+        tasks,
+      ),
+    };
+    const restoredLines = storedLines.map((line) => encoder.encode(line));
     owners.set(sessionId, stored.ownerKey);
     const sessionWritable = lines.open(sessionId, restoredLines);
     host.onDispose(registerSessionLineStore(sessionId, lines));
@@ -191,6 +209,16 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       },
       inbox,
     );
+    return tasks;
+  };
+  const reattachHost: ReattachHost = {
+    readEvents: async (sessionId) => readSessionEventStream(sessionId),
+    async cancelChildTurn(sessionId) {
+      await host.deliverCommand(sessionCommandHookToken(sessionId), {
+        deliveryId: `reattach-cancel:${sessionId}`,
+        kind: "cancel",
+      });
+    },
   };
 
   return {
@@ -229,19 +257,51 @@ function runtimeOn(host: InProcessHost, config: SessionRuntimeConfig): InProcess
       const restored: string[] = [];
       const refused: { sessionId: string; reason: string }[] = [];
       if (host.store === undefined) return { refused, restored };
-      for (const { sessionId, record } of await host.store.readSessions()) {
+      const records = await host.store.readSessions();
+      const reattaching: OpenAgentTask[] = [];
+      const restoreRecords = async (pick: (stored: StoredSession) => boolean) => {
+        for (const { sessionId, record } of records) {
+          if (restored.includes(sessionId)) continue;
+          try {
+            const stored = decodeStoredSession(record);
+            if (!pick(stored)) continue;
+            if (stored.ended === true || stored.checkpoint === undefined) continue;
+            reattaching.push(...(await host.working(() => restoreEntry(stored))));
+            restored.push(sessionId);
+          } catch (error) {
+            refused.push({
+              reason: error instanceof Error ? error.message : String(error),
+              sessionId,
+            });
+          }
+        }
+      };
+      await restoreRecords(
+        (stored) => scope === undefined || stored.continuationToken === scope.continuationToken,
+      );
+      if (scope !== undefined) {
+        await restoreRecords((stored) => {
+          const owner = stored.ownerKey;
+          return owner !== null && typeof owner === "object" && restored.includes(owner.root);
+        });
+      }
+      const children = records.flatMap(({ record, sessionId }) => {
         try {
           const stored = decodeStoredSession(record);
-          if (scope !== undefined && stored.continuationToken !== scope.continuationToken) continue;
-          if (stored.ended === true || stored.checkpoint === undefined) continue;
-          await host.working(() => restoreEntry(stored));
-          restored.push(sessionId);
-        } catch (error) {
-          refused.push({
-            reason: error instanceof Error ? error.message : String(error),
-            sessionId,
-          });
+          return stored.checkpoint === undefined
+            ? []
+            : [{ serializedContext: stored.checkpoint.serializedContext, sessionId }];
+        } catch {
+          return [];
         }
+      });
+      for (const task of reattaching) {
+        const child =
+          task.child ??
+          children
+            .map((candidate) => linkFromChild(task, candidate))
+            .find((link) => link !== undefined);
+        host.runs.reattach({ ...task, child }, reattachHost);
       }
       return { refused, restored };
     },

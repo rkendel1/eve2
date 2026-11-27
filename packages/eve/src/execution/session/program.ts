@@ -334,6 +334,7 @@ async function runSessionLoop(
       }
       if (next.kind === "workflow") {
         await execution.handleWorkflowMessage(next.message);
+        await host.persistence?.checkpoint(transferState());
         continue;
       }
       if (next.kind === "cancel-working-tasks") {

@@ -28,7 +28,7 @@ export function workflowToolRunHookToken(input: Omit<WorkflowToolRunInput, "hook
     : taskRunHookToken(input.session.id, input.entry.taskId);
 }
 
-function taskRunHookToken(sessionId: string, taskId: string): string {
+export function taskRunHookToken(sessionId: string, taskId: string): string {
   return `eve:task:${sessionId}:${taskId}`;
 }
 

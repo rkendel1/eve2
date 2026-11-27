@@ -20,7 +20,7 @@ export interface StoredSession {
   readonly version: typeof STORED_SESSION_VERSION;
   readonly sessionId: string;
   readonly continuationToken: string;
-  readonly ownerKey: string | null;
+  readonly ownerKey: string | null | { readonly root: string };
   readonly capabilities?: SessionCapabilities;
   readonly retention?: AgentWorkflowRetentionDefinition;
   readonly sessionTimeoutMs: number | false;
