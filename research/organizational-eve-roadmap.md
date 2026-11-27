@@ -334,7 +334,7 @@ One contract, three ownership paths; none requires the others:
 | S3 Model access (`model@1`)                  | appport-services, feltkit, appboundry | Done; `@appport/services` 0.23.0 unpublished | appport-services #56, appboundry #112, #113, feltkit #175 |
 | S4 Agent lifecycle, timers, capability fetch | appboundry                            | Done                                         | appboundry #114                                           |
 | S5 Cold start                                | appboundry / eve2                     | Done in the harness; host execution in S7    | appboundry #115                                           |
-| S6 `.app` producer                           | eve2                                  | Done                                         | eve2 (this PR)                                            |
+| S6 `.app` producer                           | eve2                                  | Done                                         | eve2 #44                                                  |
 | S7 Eve `.app` on `appboundry-host`           | appboundry                            | Not started                                  |                                                           |
 | S8 Application connections, `actingAs`       | appboundry                            | Not started (D4)                             |                                                           |
 | S9 FeltKit organizational client             | feltkit                               | Not started                                  |                                                           |
