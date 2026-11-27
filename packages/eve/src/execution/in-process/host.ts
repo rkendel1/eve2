@@ -49,7 +49,7 @@ export const IN_PROCESS_DEPLOYMENT_ID = "in-process";
 
 function unavailable(what: string): never {
   throw new Error(
-    `${what} needs a deployment, which an in-process session doesn't have. Run the agent with \`eve dev\` or deploy it.`,
+    `${what} needs an execution host that runs other sessions beside this one, which the in-process host does not. Run the agent on a host that does, such as \`eve dev\` or a Workflow deployment.`,
   );
 }
 
@@ -64,6 +64,7 @@ const NO_STEP_RUNTIME: Runtime = {
 };
 
 const deliverRouted: DurableHost["deliver"] = async (to, payload) => {
+  if ("callback" in to) return await resumeRoutedHook(to.callback, payload);
   if ("hook" in to) return await resumeRoutedHook(to.hook, payload);
   if ("session" in to)
     return await resumeRoutedSessionInbox(to.session, payload as DeliverHookPayload);

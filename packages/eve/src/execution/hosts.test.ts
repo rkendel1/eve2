@@ -7,6 +7,7 @@ import {
   isRetriedStep,
   registerHost,
   registerSessionLineStore,
+  resumeRoutedCallback,
   resumeRoutedHook,
   resumeRoutedSessionInbox,
   routedRunEnded,
@@ -63,7 +64,8 @@ function durableHost(name: string): DurableHost {
   return {
     name,
     deliver: async (to) => {
-      if ("hook" in to) durable.reached.push(`resume ${to.hook}`);
+      if ("callback" in to) durable.reached.push(`callback ${to.callback}`);
+      else if ("hook" in to) durable.reached.push(`resume ${to.hook}`);
       else if ("session" in to)
         durable.reached.push(
           `inbox ${typeof to.session === "string" ? to.session : to.session.sessionId}`,
@@ -199,6 +201,35 @@ describe("the hosts in a realm", () => {
     } finally {
       release();
     }
+  });
+
+  it("delivers an external callback to the route holding it, else asks the durable host to", async () => {
+    await expect(resumeRoutedCallback("eve:sign-in:v1:alice", {})).rejects.toThrow(
+      HookNotFoundError,
+    );
+    installDurableHost(durableHost("durable"));
+    const delivered: string[] = [];
+    const release = registerHost({
+      deliver: async (token) => {
+        if (token === "eve:sign-in:v1:ended") return "gone";
+        if (token !== "eve:sign-in:v1:alice") return undefined;
+        delivered.push(token);
+        return "delivered";
+      },
+      runEnded: () => undefined,
+      cancelRun: () => undefined,
+    });
+    try {
+      await resumeRoutedCallback("eve:sign-in:v1:alice", {});
+      await expect(resumeRoutedCallback("eve:sign-in:v1:ended", {})).rejects.toThrow(
+        HookNotFoundError,
+      );
+      await resumeRoutedCallback("eve:reply:v1:bob", {});
+    } finally {
+      release();
+    }
+    expect(delivered).toEqual(["eve:sign-in:v1:alice"]);
+    expect(durable.reached).toEqual(["callback eve:reply:v1:bob"]);
   });
 
   it("reads a durable run's end and liveness from its status", async () => {

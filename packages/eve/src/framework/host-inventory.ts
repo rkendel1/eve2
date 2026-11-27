@@ -5,10 +5,10 @@ import {
   EVE_DEV_RUNTIME_ARTIFACTS_ROUTE_PATH,
   EVE_DEV_RUNTIME_ARTIFACTS_SUSPEND_ROUTE_PATH,
 } from "#protocol/routes.js";
-import { EVE_WORKFLOW_FLOW_ROUTE_PATH } from "#internal/workflow-bundle/flow-route.js";
 import {
   DEVELOPMENT_WORKFLOW_STREAM_ROUTE,
   DEVELOPMENT_WORKFLOW_WORLD_ROUTE,
+  EVE_WORKFLOW_FLOW_ROUTE_PATH,
 } from "#protocol/routes.js";
 
 type HostHttpMethod = "ALL" | "GET" | "POST";

@@ -227,6 +227,13 @@
  *             `import()`s count, including ones split across lines. Workflow
  *             reaches these modules through their host ports and the host
  *             registry. Only direct imports are checked.
+ *   rule 69 — The host-neutral core reaches Workflow through no chain of
+ *             static value imports either: nothing the in-process runtime,
+ *             `eve/experimental/host`, the session program or the harness
+ *             kernel imports, at any depth, is one of rule 66's Workflow
+ *             modules. A lazy `import()` ends a chain, because that is how an
+ *             installed execution host loads its side. Rule 66 checks the
+ *             core's own imports; this rule checks everything they pull in.
  *   rule 67 — Source under `packages/` carries comments only as JSDoc on
  *             declarations users can see: what a published package entry
  *             exports, plus the types those declarations refer to. Tool
@@ -1027,7 +1034,7 @@ const BROWSER_ENTRIES = [
 const NODE_BUILTINS = new Set(require("node:module").builtinModules);
 
 /** @param {import("typescript").SourceFile} source */
-function valueImportSpecifiers(source) {
+function valueImportSpecifiers(source, { lazy = true } = {}) {
   /** @type {string[]} */
   const specifiers = [];
   /** @param {import("typescript").Node} node */
@@ -1039,6 +1046,7 @@ function valueImportSpecifiers(source) {
       if (node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier))
         specifiers.push(node.moduleSpecifier.text);
     } else if (
+      lazy &&
       ts.isCallExpression(node) &&
       node.expression.kind === ts.SyntaxKind.ImportKeyword &&
       node.arguments[0] !== undefined &&
@@ -1095,6 +1103,76 @@ async function checkRule65() {
     }
   }
   return violations;
+}
+
+const HOST_NEUTRAL_ENTRIES = [
+  "packages/eve/src/execution/in-process/runtime.ts",
+  "packages/eve/src/public/experimental/host/index.ts",
+  "packages/eve/src/execution/session/program.ts",
+  "packages/eve/src/harness/kernel.ts",
+];
+
+/** @param {string} specifier */
+function isWorkflowModule(specifier) {
+  return (
+    WORKFLOW_RUNTIME_SPECIFIER_RE.test(specifier) ||
+    specifier === "#execution/workflow-runtime.js" ||
+    specifier.startsWith("#execution/workflow-host/") ||
+    WORKFLOW_PORT_MODULES.has(specifier)
+  );
+}
+
+async function checkRule69() {
+  /** @type {Violation[]} */
+  const violations = [];
+  /** @type {Map<string, string | undefined>} file → the file that first imported it */
+  const parents = new Map(HOST_NEUTRAL_ENTRIES.map((entry) => [entry, undefined]));
+  const queue = [...HOST_NEUTRAL_ENTRIES];
+  while (queue.length > 0) {
+    const file = /** @type {string} */ (queue.shift());
+    const content = await readFile(join(REPO_ROOT, file), "utf8");
+    const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true);
+    for (const raw of valueImportSpecifiers(source, { lazy: false })) {
+      const specifier = aliasOfSpecifier(file, raw);
+      if (isWorkflowModule(specifier)) {
+        const chain = [file];
+        for (let at = parents.get(file); at !== undefined; at = parents.get(at)) chain.push(at);
+        violations.push({
+          rule: 69,
+          file,
+          message: `imports ${specifier}, so ${chain.at(-1)} loads Workflow wherever it runs. Import chain: ${chain.reverse().join(" -> ")}. Reach Workflow through a host port or the host registry (\`execution/hosts.ts\`), or load it with a lazy \`import()\` where Workflow is the installed host.`,
+        });
+        continue;
+      }
+      const next = await resolveNeutralSource(specifier, file);
+      if (next === undefined || parents.has(next)) continue;
+      parents.set(next, file);
+      queue.push(next);
+    }
+  }
+  return violations;
+}
+
+/**
+ * The eve source file an aliased specifier loads under Node, the superset host: `#platform/*`
+ * resolves to `platform/node/`, and a directory to its `index.ts`. External packages and the
+ * vendored `#compiled/*` tree resolve to undefined; rule 69 matches those by specifier.
+ * @param {string} specifier
+ * @param {string} from
+ */
+async function resolveNeutralSource(specifier, from) {
+  if (!specifier.startsWith("#") || specifier.startsWith("#compiled/")) return undefined;
+  const path = specifier.startsWith("#platform/")
+    ? `packages/eve/src/platform/node/${specifier.slice("#platform/".length)}`
+    : `packages/eve/src/${specifier.slice(1)}`;
+  const base = path.replace(/\.js$/, "");
+  for (const candidate of [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) {
+    try {
+      await readFile(join(REPO_ROOT, candidate));
+      return candidate;
+    } catch {}
+  }
+  throw new Error(`rule 69: ${from} imports ${specifier}, which names no eve source file.`);
 }
 
 /**
@@ -2500,6 +2578,7 @@ async function main() {
   violations.push(...state.rule63);
   violations.push(...state.rule64);
   violations.push(...(await checkRule65()));
+  violations.push(...(await checkRule69()));
   violations.push(...state.rule66);
 
   for (const issue of await checkPublicExports()) {

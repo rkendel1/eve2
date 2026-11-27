@@ -1,5 +1,5 @@
 import { isRemoteReplyHookToken } from "#execution/callback-hook-tokens.js";
-import { resumeRunnableHook } from "#execution/session-inbox/owner.js";
+import { resumeRoutedCallback } from "#execution/hosts.js";
 import { z } from "#compiled/zod/index.js";
 import type { RouteContext } from "#public/definitions/channel.js";
 import type { RuntimeSubagentChildResult } from "#shared/action-types.js";
@@ -110,7 +110,7 @@ export async function handleSessionCallbackRequest(
   if (result instanceof Response) return result;
 
   try {
-    await resumeRunnableHook(
+    await resumeRoutedCallback(
       token,
       forwarded ?? { kind: "runtime-action-result", results: [result] },
     );

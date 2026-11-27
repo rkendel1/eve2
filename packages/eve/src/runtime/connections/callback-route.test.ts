@@ -4,6 +4,7 @@ import { createEveConnectionCallbackRoutePath } from "#protocol/routes.js";
 import type { RouteContext } from "#public/definitions/channel.js";
 import { handleConnectionCallbackRequest } from "#execution/connections/callback-route.js";
 import { registerHost } from "#execution/hosts.js";
+import { installWorkflowHost } from "#execution/workflow-host/host.js";
 
 const resumeHookMock = vi.fn();
 
@@ -14,6 +15,8 @@ vi.mock("#compiled/@workflow/core/runtime.js", () => ({
 }));
 
 const INBOX = "eve:inbox:v1:eve:session:wrun_1:inbox";
+
+installWorkflowHost();
 
 function buildRouteContext(params: Readonly<Record<string, string>>): RouteContext {
   return {
